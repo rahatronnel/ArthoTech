@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { parseISO, isBefore } from 'date-fns';
 import { Upload, Download } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAuth } from '@/context/AuthContext';
 
 
 type ReportRow = {
@@ -38,6 +39,11 @@ type UploadedRow = {
 export default function SavingsBalancePage() {
   const { toast } = useToast();
   const { savingsTransactions, addSavingsTransaction } = useSavings();
+  const { currentUser } = useAuth();
+  
+  const userVisibleGroups = currentUser?.role === 'Super Admin'
+    ? groups
+    : groups.filter(g => g.responsibleEmployeeId === currentUser?.id);
   
   // State for the entry form
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -88,7 +94,7 @@ export default function SavingsBalancePage() {
   };
 
   const handleDownloadTemplate = () => {
-    const templateData = groups.map(g => ({
+    const templateData = userVisibleGroups.map(g => ({
         GroupID: g.id,
         GroupName: g.name,
         Deposit: 0,
@@ -118,11 +124,11 @@ export default function SavingsBalancePage() {
 
         const validData: UploadedRow[] = jsonData.filter(row => row.GroupID && (Number(row.Deposit) > 0 || Number(row.Withdraw) > 0)).map(row => ({
             GroupID: String(row.GroupID),
-            GroupName: String(row.GroupName || groups.find(g => g.id === String(row.GroupID))?.name || 'Unknown'),
+            GroupName: String(row.GroupName || userVisibleGroups.find(g => g.id === String(row.GroupID))?.name || 'Unknown'),
             Deposit: Number(row.Deposit) || 0,
             Withdraw: Number(row.Withdraw) || 0,
             Notes: String(row.Notes || ''),
-        }));
+        })).filter(row => userVisibleGroups.some(g => g.id === row.GroupID));
 
         if (validData.length === 0) {
             toast({ variant: "destructive", title: "Invalid File", description: "The uploaded file contains no valid data to process." });
@@ -183,7 +189,7 @@ export default function SavingsBalancePage() {
     }
     const targetDate = parseISO(searchDate);
 
-    const report = groups.map(group => {
+    const report = userVisibleGroups.map(group => {
         const openingBalance = group.initialSavings + savingsTransactions
             .filter(t => t.groupId === group.id && isBefore(parseISO(t.date), targetDate))
             .reduce((acc, t) => acc + t.deposit - t.withdraw, 0);
@@ -232,7 +238,7 @@ export default function SavingsBalancePage() {
                   <SelectValue placeholder="Select a group" />
                 </SelectTrigger>
                 <SelectContent>
-                  {groups.map(g => (
+                  {userVisibleGroups.map(g => (
                     <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                   ))}
                 </SelectContent>

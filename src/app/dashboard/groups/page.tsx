@@ -18,10 +18,17 @@ import { useToast } from "@/hooks/use-toast";
 import { useMember } from '@/context/MemberContext';
 import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
+import { useAuth } from '@/context/AuthContext';
 
 export default function GroupsPage() {
   const { toast } = useToast();
-  const [groups, setGroups] = useState(initialGroups);
+  const { currentUser } = useAuth();
+
+  const userVisibleGroups = currentUser?.role === 'Super Admin'
+    ? initialGroups
+    : initialGroups.filter(g => g.responsibleEmployeeId === currentUser?.id);
+
+  const [groups, setGroups] = useState(userVisibleGroups);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
@@ -33,6 +40,10 @@ export default function GroupsPage() {
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  };
+
+  const getEmployeeName = (employeeId: string) => {
+    return employees.find(e => e.id === employeeId)?.name || 'N/A';
   };
   
   const calculateCurrentMembers = (groupId: string, initialMembers: number) => {
@@ -96,13 +107,13 @@ export default function GroupsPage() {
     const [name, setName] = useState(editingGroup?.name || '');
     const [code, setCode] = useState(editingGroup?.code || '');
     const [day, setDay] = useState(editingGroup?.day || '');
-    const [leader, setLeader] = useState(editingGroup?.leader || '');
+    const [responsibleEmployeeId, setResponsibleEmployeeId] = useState(editingGroup?.responsibleEmployeeId || '');
     const [initialMembers, setInitialMembers] = useState(editingGroup?.initialMembers || 0);
     const [initialSavings, setInitialSavings] = useState(editingGroup?.initialSavings || 0);
     const [status, setStatus] = useState<Group['status'] | ''>(editingGroup?.status || '');
 
     const handleSubmit = () => {
-      if (!name || !code || !day || !leader || !status) {
+      if (!name || !code || !day || !responsibleEmployeeId || !status) {
         toast({
             variant: "destructive",
             title: "Validation Error",
@@ -111,7 +122,7 @@ export default function GroupsPage() {
         return;
       }
       if (editingGroup) { // Update
-        const updatedGroup: Group = { ...editingGroup, name, code, day, leader, status: status as Group['status'], initialMembers, initialSavings };
+        const updatedGroup: Group = { ...editingGroup, name, code, day, responsibleEmployeeId, status: status as Group['status'], initialMembers, initialSavings };
 
         setGroups(groups.map(g => (g.id === editingGroup.id ? updatedGroup : g)));
         toast({ title: "Group updated", description: `"${name}" has been updated.` });
@@ -121,7 +132,7 @@ export default function GroupsPage() {
           name,
           code,
           day,
-          leader,
+          responsibleEmployeeId,
           initialMembers: initialMembers,
           initialSavings: initialSavings,
           status: status as Group['status'],
@@ -177,13 +188,13 @@ export default function GroupsPage() {
                             <Label htmlFor="leader">
                                Leader
                             </Label>
-                            <Select onValueChange={setLeader} value={leader}>
+                            <Select onValueChange={setResponsibleEmployeeId} value={responsibleEmployeeId}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Select a leader" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {employees.map(e => (
-                                        <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
+                                    {employees.filter(e => e.role === 'Branch User').map(e => (
+                                        <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -266,7 +277,7 @@ export default function GroupsPage() {
                   <TableCell>
                     <Badge variant={group.status === 'Active' ? 'default' : 'secondary'}>{group.status}</Badge>
                   </TableCell>
-                  <TableCell>{group.leader}</TableCell>
+                  <TableCell>{getEmployeeName(group.responsibleEmployeeId)}</TableCell>
                   <TableCell className="text-right">{calculateCurrentMembers(group.id, group.initialMembers)}</TableCell>
                   <TableCell className="hidden text-right lg:table-cell">{formatCurrency(calculateCurrentLoan(group.id, group.totalLoans))}</TableCell>
                   <TableCell className="hidden text-right lg:table-cell">{formatCurrency(calculateCurrentSavings(group.id, group.initialSavings))}</TableCell>

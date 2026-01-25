@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { parseISO, isBefore } from 'date-fns';
 import { Upload, Download } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAuth } from '@/context/AuthContext';
 
 type ReportRow = {
   groupId: string;
@@ -37,7 +38,12 @@ type UploadedRow = {
 export default function MembersPage() {
   const { toast } = useToast();
   const { memberChanges, addMemberChange } = useMember();
+  const { currentUser } = useAuth();
   
+  const userVisibleGroups = currentUser?.role === 'Super Admin'
+    ? groups
+    : groups.filter(g => g.responsibleEmployeeId === currentUser?.id);
+
   // State for the entry form
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [groupId, setGroupId] = useState('');
@@ -83,7 +89,7 @@ export default function MembersPage() {
   };
   
   const handleDownloadTemplate = () => {
-    const templateData = groups.map(g => ({
+    const templateData = userVisibleGroups.map(g => ({
         GroupID: g.id,
         GroupName: g.name,
         MembersAdded: 0,
@@ -113,11 +119,11 @@ export default function MembersPage() {
 
         const validData: UploadedRow[] = jsonData.filter(row => row.GroupID && (Number(row.MembersAdded) > 0 || Number(row.MembersDropped) > 0)).map(row => ({
             GroupID: String(row.GroupID),
-            GroupName: String(row.GroupName || groups.find(g => g.id === String(row.GroupID))?.name || 'Unknown'),
+            GroupName: String(row.GroupName || userVisibleGroups.find(g => g.id === String(row.GroupID))?.name || 'Unknown'),
             MembersAdded: Number(row.MembersAdded) || 0,
             MembersDropped: Number(row.MembersDropped) || 0,
             Notes: String(row.Notes || ''),
-        }));
+        })).filter(row => userVisibleGroups.some(g => g.id === row.GroupID));
 
         if (validData.length === 0) {
             toast({ variant: "destructive", title: "Invalid File", description: "The uploaded file contains no valid data to process." });
@@ -178,7 +184,7 @@ export default function MembersPage() {
     }
     const targetDate = parseISO(searchDate);
 
-    const report = groups.map(group => {
+    const report = userVisibleGroups.map(group => {
         const openingBalance = group.initialMembers + memberChanges
             .filter(c => c.groupId === group.id && isBefore(parseISO(c.date), targetDate))
             .reduce((acc, c) => acc + c.added - c.dropped, 0);
@@ -227,7 +233,7 @@ export default function MembersPage() {
                   <SelectValue placeholder="Select a group" />
                 </SelectTrigger>
                 <SelectContent>
-                  {groups.map(g => (
+                  {userVisibleGroups.map(g => (
                     <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                   ))}
                 </SelectContent>

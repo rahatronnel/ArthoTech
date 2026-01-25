@@ -92,7 +92,7 @@ export type OtherDataEntry = {
 export type Group = {
   id: string;
   name: string;
-  leader: string;
+  responsibleEmployeeId: string;
   initialMembers: number;
   totalLoans: number;
   initialSavings: number;
@@ -146,11 +146,11 @@ export const employees: Employee[] = [
 ];
 
 export const groups: Group[] = [
-    { id: 'G001', name: 'Sunrise Group', code: 'SG001', day: 'Monday', leader: 'Grace Lee', initialMembers: 12, totalLoans: 50000, initialSavings: 12000, status: 'Active' },
-    { id: 'G002', name: 'Community Builders', code: 'CB002', day: 'Tuesday', leader: 'Henry Kim', initialMembers: 8, totalLoans: 32000, initialSavings: 8500, status: 'Active' },
-    { id: 'G003', name: 'Future Stars', code: 'FS003', day: 'Wednesday', leader: 'Ivy Chen', initialMembers: 15, totalLoans: 75000, initialSavings: 20000, status: 'Active' },
-    { id: 'G004', name: 'Old Timers', code: 'OT004', day: 'Thursday', leader: 'Jack Davis', initialMembers: 5, totalLoans: 10000, initialSavings: 25000, status: 'Inactive' },
-    { id: 'G005', name: 'Innovators Circle', code: 'IC005', day: 'Friday', leader: 'Karen White', initialMembers: 10, totalLoans: 60000, initialSavings: 15000, status: 'Active' },
+    { id: 'G001', name: 'Sunrise Group', code: 'SG001', day: 'Monday', responsibleEmployeeId: 'E001', initialMembers: 12, totalLoans: 50000, initialSavings: 12000, status: 'Active' },
+    { id: 'G002', name: 'Community Builders', code: 'CB002', day: 'Tuesday', responsibleEmployeeId: 'E001', initialMembers: 8, totalLoans: 32000, initialSavings: 8500, status: 'Active' },
+    { id: 'G003', name: 'Future Stars', code: 'FS003', day: 'Wednesday', responsibleEmployeeId: 'E001', initialMembers: 15, totalLoans: 75000, initialSavings: 20000, status: 'Active' },
+    { id: 'G004', name: 'Old Timers', code: 'OT004', day: 'Thursday', responsibleEmployeeId: 'E006', initialMembers: 5, totalLoans: 10000, initialSavings: 25000, status: 'Inactive' },
+    { id: 'G005', name: 'Innovators Circle', code: 'IC005', day: 'Friday', responsibleEmployeeId: 'E006', initialMembers: 10, totalLoans: 60000, initialSavings: 15000, status: 'Active' },
 ];
 
 export const groupMemberChanges: GroupMemberChange[] = [

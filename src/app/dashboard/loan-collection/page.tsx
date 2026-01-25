@@ -15,6 +15,7 @@ import { groups, LoanCollection } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, Download } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useAuth } from '@/context/AuthContext';
 
 type ReportRow = LoanCollection & { groupName: string };
 
@@ -28,6 +29,11 @@ type UploadedRow = {
 export default function LoanCollectionPage() {
   const { toast } = useToast();
   const { loanCollections, addLoanCollection } = useLoan();
+  const { currentUser } = useAuth();
+
+  const userVisibleGroups = currentUser?.role === 'Super Admin'
+    ? groups
+    : groups.filter(g => g.responsibleEmployeeId === currentUser?.id);
   
   // State for the entry form
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -76,7 +82,7 @@ export default function LoanCollectionPage() {
   };
 
   const handleDownloadTemplate = () => {
-    const templateData = groups.map(g => ({
+    const templateData = userVisibleGroups.map(g => ({
         GroupID: g.id,
         GroupName: g.name,
         Amount: 0,
@@ -105,10 +111,10 @@ export default function LoanCollectionPage() {
 
         const validData: UploadedRow[] = jsonData.filter(row => row.GroupID && Number(row.Amount) > 0).map(row => ({
             GroupID: String(row.GroupID),
-            GroupName: String(row.GroupName || groups.find(g => g.id === String(row.GroupID))?.name || 'Unknown'),
+            GroupName: String(row.GroupName || userVisibleGroups.find(g => g.id === String(row.GroupID))?.name || 'Unknown'),
             Amount: Number(row.Amount) || 0,
             Notes: String(row.Notes || ''),
-        }));
+        })).filter(row => userVisibleGroups.some(g => g.id === row.GroupID));
 
         if (validData.length === 0) {
             toast({ variant: "destructive", title: "Invalid File", description: "The uploaded file contains no valid data to process." });
@@ -166,7 +172,7 @@ export default function LoanCollectionPage() {
     }
     
     const dailyReport = loanCollections
-        .filter(c => c.date === searchDate)
+        .filter(c => c.date === searchDate && userVisibleGroups.some(g => g.id === c.groupId))
         .map(c => ({
             ...c,
             groupName: groups.find(g => g.id === c.groupId)?.name || 'Unknown Group'
@@ -200,7 +206,7 @@ export default function LoanCollectionPage() {
                   <SelectValue placeholder="Select a group" />
                 </SelectTrigger>
                 <SelectContent>
-                  {groups.map(g => (
+                  {userVisibleGroups.map(g => (
                     <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                   ))}
                 </SelectContent>
