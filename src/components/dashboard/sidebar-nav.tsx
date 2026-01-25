@@ -24,6 +24,7 @@ import {
   MapPin,
   Network,
   FileUp,
+  Newspaper,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
@@ -31,6 +32,7 @@ import { useOrganization } from '@/context/OrganizationContext';
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/dashboard/reports", icon: Newspaper, label: "Reports" },
   { href: "/dashboard/regions", icon: Map, label: "Regions" },
   { href: "/dashboard/zones", icon: MapPin, label: "Zones" },
   { href: "/dashboard/areas", icon: Network, label: "Areas" },

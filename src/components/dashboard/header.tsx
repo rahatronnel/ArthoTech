@@ -5,9 +5,19 @@ import { SidebarTrigger } from "@/components/ui/sidebar";
 
 function getTitleFromPath(path: string): string {
   if (path === '/dashboard') return 'Dashboard';
-  const segment = path.split('/').pop() || '';
-  if (!segment) return 'Dashboard';
-  return segment.charAt(0).toUpperCase() + segment.slice(1);
+
+  const segments = path.split('/').filter(Boolean);
+  const lastSegment = segments[segments.length - 1] || '';
+  
+  if (!lastSegment) return 'Dashboard';
+
+  const title = lastSegment
+    .replace(/-/g, ' ')
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+    
+  return title;
 }
 
 export function Header() {

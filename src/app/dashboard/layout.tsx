@@ -6,12 +6,16 @@ import { SidebarNav } from '@/components/dashboard/sidebar-nav';
 export default function DashboardLayout({ children }: PropsWithChildren) {
   return (
     <SidebarProvider>
-      <Sidebar>
-        <SidebarNav />
-      </Sidebar>
+      <div className="print:hidden">
+        <Sidebar>
+          <SidebarNav />
+        </Sidebar>
+      </div>
       <SidebarInset>
-        <Header />
-        <main className="p-4 sm:p-6">{children}</main>
+        <div className="print:hidden">
+          <Header />
+        </div>
+        <main className="p-4 sm:p-6 print:p-0">{children}</main>
       </SidebarInset>
     </SidebarProvider>
   );
