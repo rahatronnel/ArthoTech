@@ -10,12 +10,12 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 
-export const AnalyzeFileInputSchema = z.object({
+const AnalyzeFileInputSchema = z.object({
   fileContent: z.string().describe('The text content of the file to be analyzed.'),
 });
 export type AnalyzeFileInput = z.infer<typeof AnalyzeFileInputSchema>;
 
-export const AnalyzeFileOutputSchema = z.object({
+const AnalyzeFileOutputSchema = z.object({
   analysis: z.string().describe('A summary and analysis of the provided file content.'),
 });
 export type AnalyzeFileOutput = z.infer<typeof AnalyzeFileOutputSchema>;
