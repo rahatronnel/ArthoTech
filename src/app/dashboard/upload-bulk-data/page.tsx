@@ -5,8 +5,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Upload } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 
-const uploadTargets = ["Regions", "Zones", "Areas", "Branches", "Employees", "Groups"];
+const orgUploadTargets = ["Regions", "Zones", "Areas", "Branches", "Employees", "Groups"];
 
 function UploadForm({ target }: { target: string }) {
   return (
@@ -37,26 +38,49 @@ export default function UploadBulkDataPage() {
           Upload data for various parts of your organization in bulk.
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        <Tabs defaultValue={uploadTargets[0]} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
-            {uploadTargets.map((target) => (
-              <TabsTrigger key={target} value={target}>{target}</TabsTrigger>
+      <CardContent className="flex flex-col gap-8 pt-6">
+        <div>
+          <h3 className="text-lg font-semibold">Organization Structure</h3>
+          <p className="text-sm text-muted-foreground">
+            Bulk upload for regions, zones, employees, etc.
+          </p>
+          <Tabs defaultValue={orgUploadTargets[0]} className="w-full pt-4">
+            <TabsList className="grid w-full grid-cols-3 md:grid-cols-6">
+              {orgUploadTargets.map((target) => (
+                <TabsTrigger key={target} value={target}>{target}</TabsTrigger>
+              ))}
+            </TabsList>
+            {orgUploadTargets.map((target) => (
+              <TabsContent key={target} value={target}>
+                  <Card className="mt-4">
+                      <CardHeader>
+                          <CardTitle>Upload {target}</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                           <UploadForm target={target} />
+                      </CardContent>
+                  </Card>
+              </TabsContent>
             ))}
-          </TabsList>
-          {uploadTargets.map((target) => (
-            <TabsContent key={target} value={target}>
-                <Card className="mt-4">
-                    <CardHeader>
-                        <CardTitle>Upload {target}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                         <UploadForm target={target} />
-                    </CardContent>
-                </Card>
-            </TabsContent>
-          ))}
-        </Tabs>
+          </Tabs>
+        </div>
+
+        <Separator />
+        
+        <div>
+          <h3 className="text-lg font-semibold">Upload Microfinance Data</h3>
+          <p className="text-sm text-muted-foreground">
+            Bulk upload for members, savings, and loan information.
+          </p>
+           <Card className="mt-4">
+                <CardHeader>
+                    <CardTitle>Upload Data File</CardTitle>
+                </CardHeader>
+                <CardContent>
+                    <UploadForm target="Microfinance Data" />
+                </CardContent>
+            </Card>
+        </div>
       </CardContent>
     </Card>
   );
