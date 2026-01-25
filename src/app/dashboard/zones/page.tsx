@@ -6,7 +6,7 @@ import type { Zone } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FileDown, FileUpload } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -148,10 +148,20 @@ export default function ZonesPage() {
           <CardTitle>Zones</CardTitle>
           <CardDescription>Manage your organization's zones.</CardDescription>
         </div>
-        <Button size="sm" className="gap-1" onClick={handleAddNewClick}>
-          <PlusCircle className="h-4 w-4" />
-          New Zone
-        </Button>
+        <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="gap-1">
+                <FileDown className="h-4 w-4" />
+                Download
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1">
+                <FileUpload className="h-4 w-4" />
+                Upload
+            </Button>
+            <Button size="sm" className="gap-1" onClick={handleAddNewClick}>
+            <PlusCircle className="h-4 w-4" />
+            New Zone
+            </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>

@@ -2,7 +2,7 @@ import { employees } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FileDown, FileUpload } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 export default function EmployeesPage() {
@@ -13,10 +13,20 @@ export default function EmployeesPage() {
           <CardTitle>Employees</CardTitle>
           <CardDescription>Manage staff and their roles.</CardDescription>
         </div>
-        <Button size="sm" className="gap-1">
-          <PlusCircle className="h-4 w-4" />
-          New Employee
-        </Button>
+        <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" className="gap-1">
+                <FileDown className="h-4 w-4" />
+                Download
+            </Button>
+            <Button size="sm" variant="outline" className="gap-1">
+                <FileUpload className="h-4 w-4" />
+                Upload
+            </Button>
+            <Button size="sm" className="gap-1">
+                <PlusCircle className="h-4 w-4" />
+                New Employee
+            </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
