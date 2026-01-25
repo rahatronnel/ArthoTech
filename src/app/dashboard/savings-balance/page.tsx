@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from 'react';
+import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -8,11 +9,14 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSavings } from '@/context/SavingsContext';
 import { groups } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { parseISO, isBefore } from 'date-fns';
-import { Upload } from 'lucide-react';
+import { Upload, Download } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
 
 type ReportRow = {
   groupId: string;
@@ -21,6 +25,14 @@ type ReportRow = {
   depositedToday: number;
   withdrawnToday: number;
   closingBalance: number;
+};
+
+type UploadedRow = {
+  GroupID: string;
+  GroupName: string;
+  Deposit: number;
+  Withdraw: number;
+  Notes: string;
 };
 
 export default function SavingsBalancePage() {
@@ -36,6 +48,9 @@ export default function SavingsBalancePage() {
 
   // State for bulk upload
   const [file, setFile] = useState<File | null>(null);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+  const [uploadedData, setUploadedData] = useState<UploadedRow[]>([]);
+  const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
 
   // State for the report
   const [searchDate, setSearchDate] = useState('');
@@ -72,20 +87,83 @@ export default function SavingsBalancePage() {
     }
   };
 
-  const handleBulkUpload = () => {
+  const handleDownloadTemplate = () => {
+    const templateData = groups.map(g => ({
+        GroupID: g.id,
+        GroupName: g.name,
+        Deposit: 0,
+        Withdraw: 0,
+        Notes: ''
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Savings");
+    XLSX.writeFile(workbook, "SavingsTransactionsTemplate.xlsx");
+    toast({ title: "Template Downloaded", description: "Fill in the template and upload it." });
+  };
+
+  const handleProcessUpload = () => {
     if (!file) {
-      toast({
-        variant: "destructive",
-        title: "No file selected",
-        description: "Please select an Excel file to upload.",
-      });
+      toast({ variant: "destructive", title: "No file selected", description: "Please select a file to upload." });
       return;
     }
-    // Placeholder for Excel processing logic
-    toast({
-      title: "File Uploaded",
-      description: `${file.name} is being processed. This is a placeholder; file parsing is not yet implemented.`,
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+        const validData: UploadedRow[] = jsonData.filter(row => row.GroupID && (Number(row.Deposit) > 0 || Number(row.Withdraw) > 0)).map(row => ({
+            GroupID: String(row.GroupID),
+            GroupName: String(row.GroupName || groups.find(g => g.id === String(row.GroupID))?.name || 'Unknown'),
+            Deposit: Number(row.Deposit) || 0,
+            Withdraw: Number(row.Withdraw) || 0,
+            Notes: String(row.Notes || ''),
+        }));
+
+        if (validData.length === 0) {
+            toast({ variant: "destructive", title: "Invalid File", description: "The uploaded file contains no valid data to process." });
+            return;
+        }
+
+        setUploadedData(validData);
+        setIsConfirmDialogOpen(true);
+
+      } catch (error) {
+        console.error("Error parsing Excel file:", error);
+        toast({ variant: "destructive", title: "Error reading file", description: "There was a problem processing the Excel file." });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  
+  const handleConfirmUpload = () => {
+    if (!uploadDate) {
+        toast({ variant: "destructive", title: "Date required", description: "Please select a date for the bulk upload." });
+        return;
+    }
+    let transactionsCount = 0;
+    uploadedData.forEach(row => {
+        if (row.Deposit > 0 || row.Withdraw > 0) {
+            addSavingsTransaction({
+                date: uploadDate,
+                groupId: row.GroupID,
+                deposit: row.Deposit,
+                withdraw: row.Withdraw,
+                notes: `Bulk upload: ${row.Notes || ''}`.trim(),
+            });
+            transactionsCount++;
+        }
     });
+
+    toast({ title: "Bulk Upload Successful", description: `${transactionsCount} savings transactions have been recorded for ${uploadDate}.` });
+    
+    // Reset state
+    setIsConfirmDialogOpen(false);
+    setUploadedData([]);
     setFile(null);
     const fileInput = document.getElementById('bulk-upload-savings') as HTMLInputElement;
     if (fileInput) {
@@ -181,19 +259,23 @@ export default function SavingsBalancePage() {
         <Card>
           <CardHeader>
             <CardTitle>Bulk Upload Savings Transactions</CardTitle>
-            <CardDescription>Upload an Excel file to add multiple transactions at once.</CardDescription>
+            <CardDescription>Download the template, fill it out, and upload it here.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <Button onClick={handleDownloadTemplate} variant="outline" className="w-full">
+                <Download className="mr-2 h-4 w-4" />
+                Download Template
+            </Button>
             <div className="space-y-2">
-              <Label htmlFor="bulk-upload-savings">Excel File</Label>
+              <Label htmlFor="bulk-upload-savings">Upload Filled Template</Label>
               <Input id="bulk-upload-savings" type="file" accept=".xlsx, .xls" onChange={handleFileChange} />
-              <p className="text-xs text-muted-foreground">
-                The file should have columns: GroupID, Date (YYYY-MM-DD), Deposit, Withdraw, Notes (optional).
+               <p className="text-xs text-muted-foreground">
+                File must be the downloaded template with your data filled in.
               </p>
             </div>
-            <Button onClick={handleBulkUpload} className="w-full">
+            <Button onClick={handleProcessUpload} className="w-full" disabled={!file}>
               <Upload className="mr-2 h-4 w-4" />
-              Upload File
+              Upload and Preview
             </Button>
           </CardContent>
         </Card>
@@ -245,6 +327,47 @@ export default function SavingsBalancePage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Confirm Bulk Savings Upload</DialogTitle>
+            <DialogDescription>
+              Review the savings transactions below. Select a date for these changes and click "Confirm" to save.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+             <div className="space-y-2">
+              <Label htmlFor="upload-date">Date for Transactions</Label>
+              <Input id="upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
+            </div>
+            <ScrollArea className="h-64">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Group Name</TableHead>
+                            <TableHead className="text-right">Deposit</TableHead>
+                            <TableHead className="text-right">Withdrawal</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {uploadedData.map((row, index) => (
+                            <TableRow key={index}>
+                                <TableCell>{row.GroupName}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(row.Deposit)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(row.Withdraw)}</TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            </ScrollArea>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleConfirmUpload}>Confirm & Save</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
