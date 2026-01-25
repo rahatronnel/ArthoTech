@@ -89,7 +89,7 @@ export default function RegionsPage() {
   
     return (
       <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleDialogClose()}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editingRegion ? 'Edit Region' : 'Create New Region'}</DialogTitle>
             <DialogDescription>
@@ -97,30 +97,30 @@ export default function RegionsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
+            <div className="grid gap-2">
+              <Label htmlFor="name">
                 Region Name
               </Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Capital Region" className="col-span-3" />
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Capital Region" />
             </div>
-             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="bengaliName" className="text-right">
+             <div className="grid gap-2">
+              <Label htmlFor="bengaliName">
                 Bengali Name
               </Label>
-              <Input id="bengaliName" value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} placeholder="e.g., রাজধানী অঞ্চল" className="col-span-3" />
+              <Input id="bengaliName" value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} placeholder="e.g., রাজধানী অঞ্চল" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="code" className="text-right">
+            <div className="grid gap-2">
+              <Label htmlFor="code">
                 Region Code
               </Label>
-              <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., CR" className="col-span-3" />
+              <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., CR" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="employee" className="text-right">
+            <div className="grid gap-2">
+              <Label htmlFor="employee">
                 Responsible Employee
               </Label>
               <Select onValueChange={setEmployeeId} value={employeeId}>
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger>
                   <SelectValue placeholder="Select an employee" />
                 </SelectTrigger>
                 <SelectContent>
@@ -142,7 +142,7 @@ export default function RegionsPage() {
   
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Regions</CardTitle>
           <CardDescription>Manage your organization's regions.</CardDescription>
@@ -168,7 +168,7 @@ export default function RegionsPage() {
             <TableRow>
               <TableHead>Region Name</TableHead>
               <TableHead>Bengali Name</TableHead>
-              <TableHead>Region Code</TableHead>
+              <TableHead className="hidden md:table-cell">Region Code</TableHead>
               <TableHead>Responsible Employee</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -178,7 +178,7 @@ export default function RegionsPage() {
               <TableRow key={region.id}>
                 <TableCell className="font-medium">{region.name}</TableCell>
                 <TableCell>{region.bengaliName}</TableCell>
-                <TableCell>{region.code}</TableCell>
+                <TableCell className="hidden md:table-cell">{region.code}</TableCell>
                 <TableCell>{getEmployeeName(region.responsibleEmployeeId)}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>

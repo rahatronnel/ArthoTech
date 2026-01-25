@@ -96,7 +96,7 @@ export default function GroupsPage() {
 
     return (
         <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleDialogClose()}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>{editingGroup ? 'Edit Group' : 'Create New Group'}</DialogTitle>
                     <DialogDescription>
@@ -104,24 +104,24 @@ export default function GroupsPage() {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="name" className="text-right">
+                    <div className="grid gap-2">
+                        <Label htmlFor="name">
                             Group Name
                         </Label>
-                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Sunrise Group" className="col-span-3" />
+                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Sunrise Group" />
                     </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="code" className="text-right">
+                     <div className="grid gap-2">
+                        <Label htmlFor="code">
                             Group Code
                         </Label>
-                        <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., SG001" className="col-span-3" />
+                        <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., SG001" />
                     </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="day" className="text-right">
+                     <div className="grid gap-2">
+                        <Label htmlFor="day">
                            Group Day
                         </Label>
                         <Select onValueChange={setDay} value={day}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select a day" />
                             </SelectTrigger>
                             <SelectContent>
@@ -131,12 +131,12 @@ export default function GroupsPage() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="leader" className="text-right">
+                    <div className="grid gap-2">
+                        <Label htmlFor="leader">
                            Leader
                         </Label>
                         <Select onValueChange={setLeader} value={leader}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select a leader" />
                             </SelectTrigger>
                             <SelectContent>
@@ -146,18 +146,18 @@ export default function GroupsPage() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="members" className="text-right">
+                    <div className="grid gap-2">
+                        <Label htmlFor="members">
                            Members
                         </Label>
-                        <Input id="members" type="number" value={members} onChange={(e) => setMembers(Number(e.target.value))} placeholder="e.g., 10" className="col-span-3" />
+                        <Input id="members" type="number" value={members} onChange={(e) => setMembers(Number(e.target.value))} placeholder="e.g., 10" />
                     </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="status" className="text-right">
+                     <div className="grid gap-2">
+                        <Label htmlFor="status">
                             Status
                         </Label>
                         <Select onValueChange={(value) => setStatus(value as Group['status'])} value={status}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select status" />
                             </SelectTrigger>
                             <SelectContent>
@@ -179,7 +179,7 @@ export default function GroupsPage() {
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Groups / Centers</CardTitle>
             <CardDescription>Manage client groups and their financial activities.</CardDescription>
@@ -196,13 +196,13 @@ export default function GroupsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Group Name</TableHead>
-                <TableHead>Group Code</TableHead>
+                <TableHead className="hidden md:table-cell">Group Code</TableHead>
                 <TableHead>Group Day</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Leader</TableHead>
                 <TableHead className="text-right">Members</TableHead>
-                <TableHead className="text-right">Total Loans</TableHead>
-                <TableHead className="text-right">Total Savings</TableHead>
+                <TableHead className="hidden text-right lg:table-cell">Total Loans</TableHead>
+                <TableHead className="hidden text-right lg:table-cell">Total Savings</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -210,15 +210,15 @@ export default function GroupsPage() {
               {groups.map((group) => (
                 <TableRow key={group.id}>
                   <TableCell className="font-medium">{group.name}</TableCell>
-                  <TableCell>{group.code}</TableCell>
+                  <TableCell className="hidden md:table-cell">{group.code}</TableCell>
                   <TableCell>{group.day}</TableCell>
                   <TableCell>
                     <Badge variant={group.status === 'Active' ? 'default' : 'secondary'}>{group.status}</Badge>
                   </TableCell>
                   <TableCell>{group.leader}</TableCell>
                   <TableCell className="text-right">{group.members}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(group.totalLoans)}</TableCell>
-                  <TableCell className="text-right">{formatCurrency(group.totalSavings)}</TableCell>
+                  <TableCell className="hidden text-right lg:table-cell">{formatCurrency(group.totalLoans)}</TableCell>
+                  <TableCell className="hidden text-right lg:table-cell">{formatCurrency(group.totalSavings)}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

@@ -91,7 +91,7 @@ export default function ZonesPage() {
 
     return (
       <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleDialogClose()}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{editingZone ? 'Edit Zone' : 'Create New Zone'}</DialogTitle>
             <DialogDescription>
@@ -99,30 +99,30 @@ export default function ZonesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="name" className="text-right">
+            <div className="grid gap-2">
+              <Label htmlFor="name">
                 Zone Name
               </Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Metro Zone" className="col-span-3" />
+              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Metro Zone" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="bengaliName" className="text-right">
+            <div className="grid gap-2">
+              <Label htmlFor="bengaliName">
                 Bengali Name
               </Label>
-              <Input id="bengaliName" value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} placeholder="e.g., মেট্রো জোন" className="col-span-3" />
+              <Input id="bengaliName" value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} placeholder="e.g., মেট্রো জোন" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="code" className="text-right">
+            <div className="grid gap-2">
+              <Label htmlFor="code">
                 Zone Code
               </Label>
-              <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., MZ" className="col-span-3" />
+              <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., MZ" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="region" className="text-right">
+            <div className="grid gap-2">
+              <Label htmlFor="region">
                 Region
               </Label>
               <Select onValueChange={setRegion} value={region}>
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger>
                   <SelectValue placeholder="Select a region" />
                 </SelectTrigger>
                 <SelectContent>
@@ -132,12 +132,12 @@ export default function ZonesPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="employee" className="text-right">
+            <div className="grid gap-2">
+              <Label htmlFor="employee">
                 Responsible Employee
               </Label>
               <Select onValueChange={setEmployeeId} value={employeeId}>
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger>
                   <SelectValue placeholder="Select an employee" />
                 </SelectTrigger>
                 <SelectContent>
@@ -159,7 +159,7 @@ export default function ZonesPage() {
   
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Zones</CardTitle>
           <CardDescription>Manage your organization's zones.</CardDescription>
@@ -185,8 +185,8 @@ export default function ZonesPage() {
             <TableRow>
               <TableHead>Zone Name</TableHead>
               <TableHead>Bengali Name</TableHead>
-              <TableHead>Zone Code</TableHead>
-              <TableHead>Region</TableHead>
+              <TableHead className="hidden md:table-cell">Zone Code</TableHead>
+              <TableHead className="hidden md:table-cell">Region</TableHead>
               <TableHead>Responsible Employee</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -196,8 +196,8 @@ export default function ZonesPage() {
               <TableRow key={zone.id}>
                 <TableCell className="font-medium">{zone.name}</TableCell>
                 <TableCell>{zone.bengaliName}</TableCell>
-                <TableCell>{zone.code}</TableCell>
-                <TableCell>{zone.region}</TableCell>
+                <TableCell className="hidden md:table-cell">{zone.code}</TableCell>
+                <TableCell className="hidden md:table-cell">{zone.region}</TableCell>
                 <TableCell>{getEmployeeName(zone.responsibleEmployeeId)}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>

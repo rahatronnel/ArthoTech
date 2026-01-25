@@ -88,7 +88,7 @@ export default function BranchesPage() {
 
     return (
         <Dialog open={isDialogOpen} onOpenChange={(open) => !open && handleDialogClose()}>
-            <DialogContent className="sm:max-w-[425px]">
+            <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>{editingBranch ? 'Edit Branch' : 'Create New Branch'}</DialogTitle>
                     <DialogDescription>
@@ -96,30 +96,30 @@ export default function BranchesPage() {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="name" className="text-right">
+                    <div className="grid gap-2">
+                        <Label htmlFor="name">
                             Branch Name
                         </Label>
-                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Downtown Branch" className="col-span-3" />
+                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Downtown Branch" />
                     </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="bengaliName" className="text-right">
+                     <div className="grid gap-2">
+                        <Label htmlFor="bengaliName">
                             Bengali Name
                         </Label>
-                        <Input id="bengaliName" value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} placeholder="e.g., ডাউনটাউন শাখা" className="col-span-3" />
+                        <Input id="bengaliName" value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} placeholder="e.g., ডাউনটাউন শাখা" />
                     </div>
-                     <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="code" className="text-right">
+                     <div className="grid gap-2">
+                        <Label htmlFor="code">
                             Branch Code
                         </Label>
-                        <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., DB" className="col-span-3" />
+                        <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., DB" />
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="region" className="text-right">
+                    <div className="grid gap-2">
+                        <Label htmlFor="region">
                             Region
                         </Label>
                         <Select onValueChange={setRegion} value={region}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select a region" />
                             </SelectTrigger>
                             <SelectContent>
@@ -129,12 +129,12 @@ export default function BranchesPage() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="zone" className="text-right">
+                    <div className="grid gap-2">
+                        <Label htmlFor="zone">
                             Zone
                         </Label>
                         <Select onValueChange={setZone} value={zone}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select a zone" />
                             </SelectTrigger>
                             <SelectContent>
@@ -144,12 +144,12 @@ export default function BranchesPage() {
                             </SelectContent>
                         </Select>
                     </div>
-                    <div className="grid grid-cols-4 items-center gap-4">
-                        <Label htmlFor="area" className="text-right">
+                    <div className="grid gap-2">
+                        <Label htmlFor="area">
                             Area
                         </Label>
                         <Select onValueChange={setArea} value={area}>
-                            <SelectTrigger className="col-span-3">
+                            <SelectTrigger>
                                 <SelectValue placeholder="Select an area" />
                             </SelectTrigger>
                             <SelectContent>
@@ -171,7 +171,7 @@ export default function BranchesPage() {
   
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Branches</CardTitle>
           <CardDescription>Manage your organization's branches.</CardDescription>
@@ -197,10 +197,10 @@ export default function BranchesPage() {
             <TableRow>
               <TableHead>Branch Name</TableHead>
               <TableHead>Bengali Name</TableHead>
-              <TableHead>Branch Code</TableHead>
+              <TableHead className="hidden md:table-cell">Branch Code</TableHead>
               <TableHead>Area</TableHead>
-              <TableHead>Zone</TableHead>
-              <TableHead>Region</TableHead>
+              <TableHead className="hidden md:table-cell">Zone</TableHead>
+              <TableHead className="hidden lg:table-cell">Region</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -209,10 +209,10 @@ export default function BranchesPage() {
               <TableRow key={branch.id}>
                 <TableCell className="font-medium">{branch.name}</TableCell>
                 <TableCell>{branch.bengaliName}</TableCell>
-                <TableCell>{branch.code}</TableCell>
+                <TableCell className="hidden md:table-cell">{branch.code}</TableCell>
                 <TableCell>{branch.area}</TableCell>
-                <TableCell>{branch.zone}</TableCell>
-                <TableCell>{branch.region}</TableCell>
+                <TableCell className="hidden md:table-cell">{branch.zone}</TableCell>
+                <TableCell className="hidden lg:table-cell">{branch.region}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
