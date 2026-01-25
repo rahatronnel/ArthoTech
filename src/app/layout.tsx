@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
+import { OrganizationProvider } from '@/context/OrganizationContext';
+import { AppMetadataUpdater } from '@/components/AppMetadataUpdater';
 
 export const metadata: Metadata = {
   title: 'ArthoTech',
@@ -23,8 +25,11 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        {children}
-        <Toaster />
+        <OrganizationProvider>
+          <AppMetadataUpdater />
+          {children}
+          <Toaster />
+        </OrganizationProvider>
       </body>
     </html>
   );

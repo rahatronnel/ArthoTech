@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from 'next/image';
 import {
   SidebarHeader,
   SidebarMenu,
@@ -25,6 +26,7 @@ import {
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
+import { useOrganization } from '@/context/OrganizationContext';
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -42,16 +44,22 @@ export function SidebarNav() {
   const pathname = usePathname();
   const { state } = useSidebar();
   const userAvatar = PlaceHolderImages.find(p => p.id === 'user-avatar');
+  const { orgInfo } = useOrganization();
 
   return (
     <>
       <SidebarHeader className="border-b border-sidebar-border">
         <div className="flex h-14 items-center gap-3 p-2">
-          <PiggyBank className="size-8 flex-shrink-0 text-primary" />
+          {orgInfo.logo ? (
+            <Image src={orgInfo.logo} alt={orgInfo.name} width={32} height={32} className="size-8 flex-shrink-0 object-contain" />
+          ) : (
+             <PiggyBank className="size-8 flex-shrink-0 text-primary" />
+          )}
+
           {state === 'expanded' && (
-            <div className="flex flex-col">
-              <h1 className="text-xl font-semibold">ArthoTech</h1>
-              <span className="text-xs text-muted-foreground">অর্থটেক</span>
+            <div className="flex flex-col overflow-hidden">
+              <h1 className="text-lg font-semibold truncate">{orgInfo.name}</h1>
+              <span className="text-xs text-muted-foreground truncate">{orgInfo.bengaliName}</span>
             </div>
           )}
         </div>
