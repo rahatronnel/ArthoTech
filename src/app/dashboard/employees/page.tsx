@@ -6,7 +6,7 @@ import type { Employee } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, MoreHorizontal, FileDown, FileUp } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FileDown, FileUp, Copy } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -49,6 +49,15 @@ export default function EmployeesPage() {
   const handleDialogClose = () => {
     setIsDialogOpen(false);
     setEditingEmployee(null);
+  };
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast({
+        title: "Copied!",
+        description: `Login ID "${text}" copied to clipboard.`,
+      });
+    });
   };
 
   const FormDialog = () => {
@@ -214,7 +223,20 @@ export default function EmployeesPage() {
                   <TableCell className="hidden md:table-cell">{employee.code}</TableCell>
                   <TableCell>{employee.role}</TableCell>
                   <TableCell>{employee.assignment}</TableCell>
-                  <TableCell className="hidden md:table-cell">{employee.loginId}</TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    <div className="flex items-center gap-1">
+                      <span>{employee.loginId}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6"
+                        onClick={() => handleCopy(employee.loginId)}
+                      >
+                        <Copy className="h-3 w-3" />
+                        <span className="sr-only">Copy Login ID</span>
+                      </Button>
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
