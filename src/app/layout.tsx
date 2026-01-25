@@ -5,6 +5,7 @@ import { OrganizationProvider } from '@/context/OrganizationContext';
 import { AppMetadataUpdater } from '@/components/AppMetadataUpdater';
 import { AuthProvider } from '@/context/AuthContext';
 import { MemberProvider } from '@/context/MemberContext';
+import { SavingsProvider } from '@/context/SavingsContext';
 
 export const metadata: Metadata = {
   title: 'ArthoTech',
@@ -30,9 +31,11 @@ export default function RootLayout({
         <OrganizationProvider>
           <AuthProvider>
             <MemberProvider>
-              <AppMetadataUpdater />
-              {children}
-              <Toaster />
+              <SavingsProvider>
+                <AppMetadataUpdater />
+                {children}
+                <Toaster />
+              </SavingsProvider>
             </MemberProvider>
           </AuthProvider>
         </OrganizationProvider>

@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useMember } from '@/context/MemberContext';
+import { useSavings } from '@/context/SavingsContext';
 
 export default function GroupsPage() {
   const { toast } = useToast();
@@ -24,6 +25,7 @@ export default function GroupsPage() {
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
   const { memberChanges } = useMember();
+  const { savingsTransactions } = useSavings(); 
 
   const weekDays = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
@@ -39,6 +41,16 @@ export default function GroupsPage() {
       .filter(c => c.groupId === groupId)
       .reduce((sum, change) => sum + change.dropped, 0);
     return initialMembers + totalAdded - totalDropped;
+  };
+
+  const calculateCurrentSavings = (groupId: string, initialSavings: number) => {
+    const totalDeposits = savingsTransactions
+        .filter(t => t.groupId === groupId)
+        .reduce((sum, t) => sum + t.deposit, 0);
+    const totalWithdrawals = savingsTransactions
+        .filter(t => t.groupId === groupId)
+        .reduce((sum, t) => sum + t.withdraw, 0);
+    return initialSavings + totalDeposits - totalWithdrawals;
   };
 
   const handleAddNewClick = () => {
@@ -74,6 +86,7 @@ export default function GroupsPage() {
     const [day, setDay] = useState(editingGroup?.day || '');
     const [leader, setLeader] = useState(editingGroup?.leader || '');
     const [initialMembers, setInitialMembers] = useState(editingGroup?.initialMembers || 0);
+    const [initialSavings, setInitialSavings] = useState(editingGroup?.initialSavings || 0);
     const [status, setStatus] = useState<Group['status'] | ''>(editingGroup?.status || '');
 
     const handleSubmit = () => {
@@ -86,7 +99,7 @@ export default function GroupsPage() {
         return;
       }
       if (editingGroup) { // Update
-        const updatedGroup: Group = { ...editingGroup, name, code, day, leader, status: status as Group['status'], initialMembers };
+        const updatedGroup: Group = { ...editingGroup, name, code, day, leader, status: status as Group['status'], initialMembers, initialSavings };
 
         setGroups(groups.map(g => (g.id === editingGroup.id ? updatedGroup : g)));
         toast({ title: "Group updated", description: `"${name}" has been updated.` });
@@ -98,9 +111,9 @@ export default function GroupsPage() {
           day,
           leader,
           initialMembers: initialMembers,
+          initialSavings: initialSavings,
           status: status as Group['status'],
           totalLoans: 0,
-          totalSavings: 0,
         };
         setGroups([...groups, newGroup]);
         toast({ title: "Group created", description: `"${name}" has been created.` });
@@ -118,53 +131,65 @@ export default function GroupsPage() {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="name">
-                            Group Name
-                        </Label>
-                        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Sunrise Group" />
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div className="grid gap-2">
+                            <Label htmlFor="name">
+                                Group Name
+                            </Label>
+                            <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Sunrise Group" />
+                        </div>
+                         <div className="grid gap-2">
+                            <Label htmlFor="code">
+                                Group Code
+                            </Label>
+                            <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., SG001" />
+                        </div>
                     </div>
-                     <div className="grid gap-2">
-                        <Label htmlFor="code">
-                            Group Code
-                        </Label>
-                        <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., SG001" />
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                         <div className="grid gap-2">
+                            <Label htmlFor="day">
+                               Group Day
+                            </Label>
+                            <Select onValueChange={setDay} value={day}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a day" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {weekDays.map(d => (
+                                         <SelectItem key={d} value={d}>{d}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="leader">
+                               Leader
+                            </Label>
+                            <Select onValueChange={setLeader} value={leader}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a leader" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {employees.map(e => (
+                                        <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                     </div>
-                     <div className="grid gap-2">
-                        <Label htmlFor="day">
-                           Group Day
-                        </Label>
-                        <Select onValueChange={setDay} value={day}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a day" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {weekDays.map(d => (
-                                     <SelectItem key={d} value={d}>{d}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="leader">
-                           Leader
-                        </Label>
-                        <Select onValueChange={setLeader} value={leader}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a leader" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {employees.map(e => (
-                                    <SelectItem key={e.id} value={e.name}>{e.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="grid gap-2">
-                        <Label htmlFor="members">
-                           Initial Members
-                        </Label>
-                        <Input id="members" type="number" value={initialMembers} onChange={(e) => setInitialMembers(Number(e.target.value))} placeholder="e.g., 10" />
+                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <div className="grid gap-2">
+                            <Label htmlFor="members">
+                               Initial Members
+                            </Label>
+                            <Input id="members" type="number" value={initialMembers} onChange={(e) => setInitialMembers(Number(e.target.value))} placeholder="e.g., 10" />
+                        </div>
+                        <div className="grid gap-2">
+                            <Label htmlFor="savings">
+                               Initial Savings
+                            </Label>
+                            <Input id="savings" type="number" value={initialSavings} onChange={(e) => setInitialSavings(Number(e.target.value))} placeholder="e.g., 12000" />
+                        </div>
                     </div>
                      <div className="grid gap-2">
                         <Label htmlFor="status">
@@ -232,7 +257,7 @@ export default function GroupsPage() {
                   <TableCell>{group.leader}</TableCell>
                   <TableCell className="text-right">{calculateCurrentMembers(group.id, group.initialMembers)}</TableCell>
                   <TableCell className="hidden text-right lg:table-cell">{formatCurrency(group.totalLoans)}</TableCell>
-                  <TableCell className="hidden text-right lg:table-cell">{formatCurrency(group.totalSavings)}</TableCell>
+                  <TableCell className="hidden text-right lg:table-cell">{formatCurrency(calculateCurrentSavings(group.id, group.initialSavings))}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

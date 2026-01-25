@@ -1,9 +1,21 @@
+"use client"; // Needs to be a client component to use hooks
+
 import { StatCard } from '@/components/dashboard/stat-card';
 import { Building2, Users, UserRound, Banknote } from 'lucide-react';
-import { branches, employees, groups } from '@/lib/data';
+import { branches, employees, groups as initialGroups } from '@/lib/data';
+import { useSavings } from '@/context/SavingsContext'; 
 
 export default function DashboardPage() {
-  const totalLoans = groups.reduce((sum, group) => sum + group.totalLoans, 0);
+  const { savingsTransactions } = useSavings();
+
+  // Calculate total loans (as before)
+  const totalLoans = initialGroups.reduce((sum, group) => sum + group.totalLoans, 0);
+
+  // Calculate total current savings
+  const totalInitialSavings = initialGroups.reduce((sum, group) => sum + group.initialSavings, 0);
+  const totalDeposits = savingsTransactions.reduce((sum, t) => sum + t.deposit, 0);
+  const totalWithdrawals = savingsTransactions.reduce((sum, t) => sum + t.withdraw, 0);
+  const totalCurrentSavings = totalInitialSavings + totalDeposits - totalWithdrawals;
 
   return (
     <div className="flex flex-col gap-6">
@@ -11,7 +23,7 @@ export default function DashboardPage() {
             <h1 className="text-3xl font-bold">Welcome back, Admin!</h1>
             <p className="text-muted-foreground">Here's a summary of your organization's activities.</p>
         </div>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <StatCard
             title="Total Branches"
             value={branches.length.toString()}
@@ -26,15 +38,15 @@ export default function DashboardPage() {
         />
         <StatCard
             title="Total Groups"
-            value={groups.length.toString()}
+            value={initialGroups.length.toString()}
             icon={UserRound}
             description="Number of client groups"
         />
         <StatCard
-            title="Total Loans Disbursed"
-            value={`$${(totalLoans / 1000).toFixed(1)}k`}
+            title="Total Savings"
+            value={`$${(totalCurrentSavings / 1000).toFixed(1)}k`}
             icon={Banknote}
-            description="Total loan amount across all groups"
+            description="Current total savings balance"
         />
         </div>
     </div>
