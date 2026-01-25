@@ -11,7 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useMember } from '@/context/MemberContext';
 import { groups } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
-import { parseISO, isBefore, isEqual } from 'date-fns';
+import { parseISO, isBefore } from 'date-fns';
+import { Upload } from 'lucide-react';
 
 type ReportRow = {
   groupId: string;
@@ -32,6 +33,9 @@ export default function MembersPage() {
   const [added, setAdded] = useState(0);
   const [dropped, setDropped] = useState(0);
   const [notes, setNotes] = useState('');
+
+  // State for bulk upload
+  const [file, setFile] = useState<File | null>(null);
 
   // State for the report
   const [searchDate, setSearchDate] = useState('');
@@ -57,6 +61,35 @@ export default function MembersPage() {
     setDropped(0);
     setNotes('');
   };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setFile(e.target.files[0]);
+    }
+  };
+
+  const handleBulkUpload = () => {
+    if (!file) {
+      toast({
+        variant: "destructive",
+        title: "No file selected",
+        description: "Please select an Excel file to upload.",
+      });
+      return;
+    }
+    // Here you would process the Excel file.
+    // For now, we'll just show a confirmation toast.
+    toast({
+      title: "File Uploaded",
+      description: `${file.name} is being processed. This is a placeholder; file parsing is not yet implemented.`,
+    });
+    setFile(null);
+    const fileInput = document.getElementById('bulk-upload') as HTMLInputElement;
+    if (fileInput) {
+        fileInput.value = '';
+    }
+  };
+
 
   const handleSearch = () => {
     if (!searchDate) {
@@ -99,8 +132,9 @@ export default function MembersPage() {
         <h1 className="text-3xl font-bold">Member Management</h1>
         <p className="text-muted-foreground">Record member changes and view daily balance reports.</p>
       </div>
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        <Card className="lg:col-span-2">
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
           <CardHeader>
             <CardTitle>Add Member Change</CardTitle>
             <CardDescription>Record the number of members added or dropped for a group on a specific date.</CardDescription>
@@ -141,53 +175,73 @@ export default function MembersPage() {
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-3">
+        <Card>
           <CardHeader>
-            <CardTitle>Member Balance Report</CardTitle>
-            <CardDescription>Select a date to see the member balance for each group.</CardDescription>
+            <CardTitle>Bulk Upload Member Changes</CardTitle>
+            <CardDescription>Upload an Excel file to add or drop multiple members at once.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
-              <div className="space-y-2 flex-grow">
-                <Label htmlFor="search-date">Report Date</Label>
-                <Input id="search-date" type="date" value={searchDate} onChange={(e) => setSearchDate(e.target.value)} />
-              </div>
-              <Button onClick={handleSearch} className="w-full sm:w-auto">Search</Button>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="bulk-upload">Excel File</Label>
+              <Input id="bulk-upload" type="file" accept=".xlsx, .xls" onChange={handleFileChange} />
+              <p className="text-xs text-muted-foreground">
+                The file should have columns: GroupID, Date (YYYY-MM-DD), MembersAdded, MembersDropped, Notes (optional).
+              </p>
             </div>
-            
-            <div className="mt-6">
-                {reportData ? (
-                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Group</TableHead>
-                                <TableHead className="text-right">Opening</TableHead>
-                                <TableHead className="text-right">Added</TableHead>
-                                <TableHead className="text-right">Dropped</TableHead>
-                                <TableHead className="text-right">Closing</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {reportData.map(row => (
-                                <TableRow key={row.groupId}>
-                                    <TableCell className="font-medium">{row.groupName}</TableCell>
-                                    <TableCell className="text-right">{row.openingBalance}</TableCell>
-                                    <TableCell className="text-right text-green-600">+{row.addedToday}</TableCell>
-                                    <TableCell className="text-right text-red-600">-{row.droppedToday}</TableCell>
-                                    <TableCell className="text-right font-bold">{row.closingBalance}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                ) : (
-                    <div className="text-center py-10 text-muted-foreground">
-                        <p>Please select a date and click "Search" to view the report.</p>
-                    </div>
-                )}
-            </div>
+            <Button onClick={handleBulkUpload} className="w-full">
+              <Upload className="mr-2 h-4 w-4" />
+              Upload File
+            </Button>
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Member Balance Report</CardTitle>
+          <CardDescription>Select a date to see the member balance for each group.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <div className="space-y-2 flex-grow">
+              <Label htmlFor="search-date">Report Date</Label>
+              <Input id="search-date" type="date" value={searchDate} onChange={(e) => setSearchDate(e.target.value)} />
+            </div>
+            <Button onClick={handleSearch} className="w-full sm:w-auto">Search</Button>
+          </div>
+          
+          <div className="mt-6">
+              {reportData ? (
+                   <Table>
+                      <TableHeader>
+                          <TableRow>
+                              <TableHead>Group</TableHead>
+                              <TableHead className="text-right">Opening</TableHead>
+                              <TableHead className="text-right">Added</TableHead>
+                              <TableHead className="text-right">Dropped</TableHead>
+                              <TableHead className="text-right">Closing</TableHead>
+                          </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                          {reportData.map(row => (
+                              <TableRow key={row.groupId}>
+                                  <TableCell className="font-medium">{row.groupName}</TableCell>
+                                  <TableCell className="text-right">{row.openingBalance}</TableCell>
+                                  <TableCell className="text-right text-green-600">+{row.addedToday}</TableCell>
+                                  <TableCell className="text-right text-red-600">-{row.droppedToday}</TableCell>
+                                  <TableCell className="text-right font-bold">{row.closingBalance}</TableCell>
+                              </TableRow>
+                          ))}
+                      </TableBody>
+                  </Table>
+              ) : (
+                  <div className="text-center py-10 text-muted-foreground">
+                      <p>Please select a date and click "Search" to view the report.</p>
+                  </div>
+              )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
