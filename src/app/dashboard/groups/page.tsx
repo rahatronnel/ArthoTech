@@ -22,6 +22,7 @@ export default function GroupsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
+  const weekDays = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -56,12 +57,14 @@ export default function GroupsPage() {
   
   const FormDialog = () => {
     const [name, setName] = useState(editingGroup?.name || '');
+    const [code, setCode] = useState(editingGroup?.code || '');
+    const [day, setDay] = useState(editingGroup?.day || '');
     const [leader, setLeader] = useState(editingGroup?.leader || '');
     const [members, setMembers] = useState(editingGroup?.members || 0);
     const [status, setStatus] = useState<Group['status'] | ''>(editingGroup?.status || '');
 
     const handleSubmit = () => {
-      if (!name || !leader || !status) {
+      if (!name || !code || !day || !leader || !status) {
         toast({
             variant: "destructive",
             title: "Validation Error",
@@ -70,13 +73,15 @@ export default function GroupsPage() {
         return;
       }
       if (editingGroup) { // Update
-        const updatedGroup: Group = { ...editingGroup, name, leader, members, status: status as Group['status'] };
+        const updatedGroup: Group = { ...editingGroup, name, code, day, leader, members, status: status as Group['status'] };
         setGroups(groups.map(g => (g.id === editingGroup.id ? updatedGroup : g)));
         toast({ title: "Group updated", description: `"${name}" has been updated.` });
       } else { // Create
         const newGroup: Group = {
           id: `G${String(groups.length + 1).padStart(3, '0')}`,
           name,
+          code,
+          day,
           leader,
           members,
           status: status as Group['status'],
@@ -104,6 +109,27 @@ export default function GroupsPage() {
                             Group Name
                         </Label>
                         <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Sunrise Group" className="col-span-3" />
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="code" className="text-right">
+                            Group Code
+                        </Label>
+                        <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., SG001" className="col-span-3" />
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="day" className="text-right">
+                           Group Day
+                        </Label>
+                        <Select onValueChange={setDay} value={day}>
+                            <SelectTrigger className="col-span-3">
+                                <SelectValue placeholder="Select a day" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {weekDays.map(d => (
+                                     <SelectItem key={d} value={d}>{d}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="leader" className="text-right">
@@ -178,6 +204,8 @@ export default function GroupsPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Group Name</TableHead>
+                <TableHead>Group Code</TableHead>
+                <TableHead>Group Day</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Leader</TableHead>
                 <TableHead className="text-right">Members</TableHead>
@@ -190,6 +218,8 @@ export default function GroupsPage() {
               {groups.map((group) => (
                 <TableRow key={group.id}>
                   <TableCell className="font-medium">{group.name}</TableCell>
+                  <TableCell>{group.code}</TableCell>
+                  <TableCell>{group.day}</TableCell>
                   <TableCell>
                     <Badge variant={group.status === 'Active' ? 'default' : 'secondary'}>{group.status}</Badge>
                   </TableCell>

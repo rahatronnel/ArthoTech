@@ -53,6 +53,8 @@ export type Group = {
   totalLoans: number;
   totalSavings: number;
   status: 'Active' | 'Inactive';
+  code: string;
+  day: string;
 };
 
 export type Role = {
@@ -100,11 +102,11 @@ export const employees: Employee[] = [
 ];
 
 export const groups: Group[] = [
-  { id: 'G001', name: 'Sunrise Group', leader: 'Grace Lee', members: 12, totalLoans: 50000, totalSavings: 12000, status: 'Active' },
-  { id: 'G002', name: 'Community Builders', leader: 'Henry Kim', members: 8, totalLoans: 32000, totalSavings: 8500, status: 'Active' },
-  { id: 'G003', name: 'Future Stars', leader: 'Ivy Chen', members: 15, totalLoans: 75000, totalSavings: 20000, status: 'Active' },
-  { id: 'G004', name: 'Old Timers', leader: 'Jack Davis', members: 5, totalLoans: 10000, totalSavings: 25000, status: 'Inactive' },
-  { id: 'G005', name: 'Innovators Circle', leader: 'Karen White', members: 10, totalLoans: 60000, totalSavings: 15000, status: 'Active' },
+  { id: 'G001', name: 'Sunrise Group', code: 'SG001', day: 'Monday', leader: 'Grace Lee', members: 12, totalLoans: 50000, totalSavings: 12000, status: 'Active' },
+  { id: 'G002', name: 'Community Builders', code: 'CB002', day: 'Tuesday', leader: 'Henry Kim', members: 8, totalLoans: 32000, totalSavings: 8500, status: 'Active' },
+  { id: 'G003', name: 'Future Stars', code: 'FS003', day: 'Wednesday', leader: 'Ivy Chen', members: 15, totalLoans: 75000, totalSavings: 20000, status: 'Active' },
+  { id: 'G004', name: 'Old Timers', code: 'OT004', day: 'Thursday', leader: 'Jack Davis', members: 5, totalLoans: 10000, totalSavings: 25000, status: 'Inactive' },
+  { id: 'G005', name: 'Innovators Circle', code: 'IC005', day: 'Friday', leader: 'Karen White', members: 10, totalLoans: 60000, totalSavings: 15000, status: 'Active' },
 ];
 
 export const roles: Role[] = [
