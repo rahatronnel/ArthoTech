@@ -40,19 +40,19 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-slate-900 to-purple-900">
+      <Card className="w-full max-w-sm bg-white/10 backdrop-blur-lg rounded-2xl border border-white/20 shadow-2xl">
         <CardHeader className="text-center">
             <div className="flex justify-center items-center mb-4">
-                <PiggyBank className="h-10 w-10 text-primary" />
+                <PiggyBank className="h-10 w-10 text-white" />
             </div>
-          <CardTitle className="text-2xl">Login</CardTitle>
-          <CardDescription>Enter your credentials to access your account</CardDescription>
+          <CardTitle className="text-2xl font-bold text-white">Login</CardTitle>
+          <CardDescription className="text-white/80">Enter your credentials to access your account</CardDescription>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="loginId">Login ID</Label>
+              <Label htmlFor="loginId" className="text-white/80">Login ID</Label>
               <Input
                 id="loginId"
                 type="text"
@@ -61,10 +61,11 @@ export default function LoginPage() {
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
                 disabled={isLoading}
+                className="bg-transparent border-white/30 text-white placeholder:text-white/60 focus:ring-white"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-white/80">Password</Label>
               <Input
                 id="password"
                 type="password"
@@ -72,6 +73,7 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
+                className="bg-transparent border-white/30 text-white placeholder:text-white/60 focus:ring-white"
               />
             </div>
           </CardContent>
