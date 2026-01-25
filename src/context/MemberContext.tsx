@@ -1,0 +1,37 @@
+"use client";
+
+import { createContext, useState, useContext, ReactNode } from 'react';
+import { groupMemberChanges as initialMemberChanges, GroupMemberChange, groups } from '@/lib/data';
+
+type MemberContextType = {
+  memberChanges: GroupMemberChange[];
+  addMemberChange: (change: Omit<GroupMemberChange, 'id'>) => void;
+};
+
+const MemberContext = createContext<MemberContextType | undefined>(undefined);
+
+export function MemberProvider({ children }: { children: ReactNode }) {
+  const [memberChanges, setMemberChanges] = useState<GroupMemberChange[]>(initialMemberChanges);
+
+  const addMemberChange = (change: Omit<GroupMemberChange, 'id'>) => {
+    const newChange: GroupMemberChange = {
+        id: `MC${memberChanges.length + 1}`,
+        ...change
+    };
+    setMemberChanges(prev => [...prev, newChange]);
+  };
+
+  return (
+    <MemberContext.Provider value={{ memberChanges, addMemberChange }}>
+      {children}
+    </MemberContext.Provider>
+  );
+}
+
+export function useMember() {
+  const context = useContext(MemberContext);
+  if (context === undefined) {
+    throw new Error('useMember must be used within a MemberProvider');
+  }
+  return context;
+}

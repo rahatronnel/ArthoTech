@@ -41,6 +41,7 @@ const navItems = [
   { href: "/dashboard/branches", icon: Building2, label: "Branches" },
   { href: "/dashboard/employees", icon: Users, label: "Employees" },
   { href: "/dashboard/groups", icon: UserRound, label: "Groups" },
+  { href: "/dashboard/members", icon: Users, label: "Members" },
   { href: "/dashboard/upload-bulk-data", icon: UploadCloud, label: "Upload Bulk Data" },
   { href: "/dashboard/roles", icon: ShieldCheck, label: "Roles" },
   { href: "/dashboard/configuration", icon: Settings, label: "Configuration" },
