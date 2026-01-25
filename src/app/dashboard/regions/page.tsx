@@ -1,6 +1,6 @@
 "use client";
 
-import { branches, regions, zones, areas } from '@/lib/data';
+import { regions, employees } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -11,87 +11,60 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+export default function RegionsPage() {
+  const getEmployeeName = (employeeId: string) => {
+    return employees.find(e => e.id === employeeId)?.name || 'N/A';
+  };
 
-export default function BranchesPage() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
-          <CardTitle>Branches</CardTitle>
-          <CardDescription>Manage your organization's branches.</CardDescription>
+          <CardTitle>Regions</CardTitle>
+          <CardDescription>Manage your organization's regions.</CardDescription>
         </div>
         <Dialog>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-1">
               <PlusCircle className="h-4 w-4" />
-              New Branch
+              New Region
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <DialogHeader>
-              <DialogTitle>Create New Branch</DialogTitle>
+              <DialogTitle>Create New Region</DialogTitle>
               <DialogDescription>
-                Add a new branch to your organization.
+                Add a new region and assign a responsible employee.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
               <div className="grid grid-cols-4 items-center gap-4">
                 <Label htmlFor="name" className="text-right">
-                  Branch Name
+                  Region Name
                 </Label>
-                <Input id="name" placeholder="e.g., Downtown Branch" className="col-span-3" />
+                <Input id="name" placeholder="e.g., Capital Region" className="col-span-3" />
               </div>
               <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="region" className="text-right">
-                  Region
+                <Label htmlFor="employee" className="text-right">
+                  Responsible Employee
                 </Label>
                 <Select>
                   <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select a region" />
+                    <SelectValue placeholder="Select an employee" />
                   </SelectTrigger>
                   <SelectContent>
-                    {regions.map(region => (
-                      <SelectItem key={region.id} value={region.name}>{region.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="zone" className="text-right">
-                  Zone
-                </Label>
-                <Select>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select a zone" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {zones.map(zone => (
-                      <SelectItem key={zone.id} value={zone.name}>{zone.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="area" className="text-right">
-                  Area
-                </Label>
-                <Select>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select an area" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {areas.map(area => (
-                      <SelectItem key={area.id} value={area.name}>{area.name}</SelectItem>
+                    {employees.filter(e => e.role === 'Regional User').map(employee => (
+                      <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
             </div>
             <DialogFooter>
-                <DialogClose asChild>
-                    <Button variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button type="submit">Save Branch</Button>
+              <DialogClose asChild>
+                <Button variant="outline">Cancel</Button>
+              </DialogClose>
+              <Button type="submit">Save Region</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -100,22 +73,18 @@ export default function BranchesPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Branch Name</TableHead>
-              <TableHead>Area</TableHead>
-              <TableHead>Zone</TableHead>
-              <TableHead>Region</TableHead>
+              <TableHead>Region Name</TableHead>
+              <TableHead>Responsible Employee</TableHead>
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {branches.map((branch) => (
-              <TableRow key={branch.id}>
-                <TableCell className="font-medium">{branch.name}</TableCell>
-                <TableCell>{branch.area}</TableCell>
-                <TableCell>{branch.zone}</TableCell>
-                <TableCell>{branch.region}</TableCell>
+            {regions.map((region) => (
+              <TableRow key={region.id}>
+                <TableCell className="font-medium">{region.name}</TableCell>
+                <TableCell>{getEmployeeName(region.responsibleEmployeeId)}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>

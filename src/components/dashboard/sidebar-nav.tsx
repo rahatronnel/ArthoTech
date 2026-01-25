@@ -19,12 +19,18 @@ import {
   ShieldCheck,
   PiggyBank,
   Settings,
+  Map,
+  MapPin,
+  Network,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { href: "/dashboard/regions", icon: Map, label: "Regions" },
+  { href: "/dashboard/zones", icon: MapPin, label: "Zones" },
+  { href: "/dashboard/areas", icon: Network, label: "Areas" },
   { href: "/dashboard/branches", icon: Building2, label: "Branches" },
   { href: "/dashboard/employees", icon: Users, label: "Employees" },
   { href: "/dashboard/groups", icon: UserRound, label: "Groups" },

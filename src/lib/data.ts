@@ -1,3 +1,24 @@
+export type Region = {
+  id: string;
+  name: string;
+  responsibleEmployeeId: string;
+};
+
+export type Zone = {
+  id: string;
+  name: string;
+  region: string;
+  responsibleEmployeeId: string;
+};
+
+export type Area = {
+  id: string;
+  name: string;
+  zone: string;
+  region: string;
+  responsibleEmployeeId: string;
+};
+
 export type Branch = {
   id: string;
   name: string;
@@ -28,11 +49,32 @@ export type Role = {
   description: string;
 };
 
+export const regions: Region[] = [
+  { id: 'R001', name: 'Capital Region', responsibleEmployeeId: 'E004' },
+  { id: 'R002', name: 'Western Region', responsibleEmployeeId: 'E004' },
+  { id: 'R003', name: 'Southern Region', responsibleEmployeeId: 'E004' },
+];
+
+export const zones: Zone[] = [
+  { id: 'Z001', name: 'Metro Zone', region: 'Capital Region', responsibleEmployeeId: 'E003'},
+  { id: 'Z002', name: 'Suburban Zone', region: 'Capital Region', responsibleEmployeeId: 'E003'},
+  { id: 'Z003', name: 'Coastal Zone', region: 'Southern Region', responsibleEmployeeId: 'E003'},
+  { id: 'Z004', name: 'Western Zone', region: 'Western Region', responsibleEmployeeId: 'E003'},
+];
+
+export const areas: Area[] = [
+  { id: 'A001', name: 'Central Area', zone: 'Metro Zone', region: 'Capital Region', responsibleEmployeeId: 'E002' },
+  { id: 'A002', name: 'North Area', zone: 'Metro Zone', region: 'Capital Region', responsibleEmployeeId: 'E002' },
+  { id: 'A003', name: 'West Area', zone: 'Suburban Zone', region: 'Capital Region', responsibleEmployeeId: 'E002' },
+  { id: 'A004', name: 'East Area', zone: 'Western Zone', region: 'Western Region', responsibleEmployeeId: 'E002' },
+  { id: 'A005', name: 'South Area', zone: 'Coastal Zone', region: 'Southern Region', responsibleEmployeeId: 'E002' },
+];
+
 export const branches: Branch[] = [
   { id: 'B001', name: 'Downtown Branch', area: 'Central Area', zone: 'Metro Zone', region: 'Capital Region' },
   { id: 'B002', name: 'Uptown Branch', area: 'North Area', zone: 'Metro Zone', region: 'Capital Region' },
   { id: 'B003', name: 'Westside Branch', area: 'West Area', zone: 'Suburban Zone', region: 'Capital Region' },
-  { id: 'B004', name: 'Eastville Branch', area: 'East Area', zone: 'Suburban Zone', region: 'Western Region' },
+  { id: 'B004', name: 'Eastville Branch', area: 'East Area', zone: 'Western Zone', region: 'Western Region' },
   { id: 'B005', name: 'Southport Branch', area: 'South Area', zone: 'Coastal Zone', region: 'Southern Region' },
 ];
 
