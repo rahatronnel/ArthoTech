@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useMember } from '@/context/MemberContext';
 import { useSavings } from '@/context/SavingsContext';
+import { useLoan } from '@/context/LoanContext';
 
 export default function GroupsPage() {
   const { toast } = useToast();
@@ -26,6 +27,7 @@ export default function GroupsPage() {
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
   const { memberChanges } = useMember();
   const { savingsTransactions } = useSavings(); 
+  const { loanDisbursements, loanCollections } = useLoan();
 
   const weekDays = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
@@ -51,6 +53,16 @@ export default function GroupsPage() {
         .filter(t => t.groupId === groupId)
         .reduce((sum, t) => sum + t.withdraw, 0);
     return initialSavings + totalDeposits - totalWithdrawals;
+  };
+
+  const calculateCurrentLoan = (groupId: string, initialLoan: number) => {
+    const totalDisbursed = loanDisbursements
+        .filter(t => t.groupId === groupId)
+        .reduce((sum, t) => sum + t.amount, 0);
+    const totalCollected = loanCollections
+        .filter(t => t.groupId === groupId)
+        .reduce((sum, t) => sum + t.amount, 0);
+    return initialLoan + totalDisbursed - totalCollected;
   };
 
   const handleAddNewClick = () => {
@@ -256,7 +268,7 @@ export default function GroupsPage() {
                   </TableCell>
                   <TableCell>{group.leader}</TableCell>
                   <TableCell className="text-right">{calculateCurrentMembers(group.id, group.initialMembers)}</TableCell>
-                  <TableCell className="hidden text-right lg:table-cell">{formatCurrency(group.totalLoans)}</TableCell>
+                  <TableCell className="hidden text-right lg:table-cell">{formatCurrency(calculateCurrentLoan(group.id, group.totalLoans))}</TableCell>
                   <TableCell className="hidden text-right lg:table-cell">{formatCurrency(calculateCurrentSavings(group.id, group.initialSavings))}</TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>

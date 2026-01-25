@@ -64,6 +64,22 @@ export type SavingsTransaction = {
   notes?: string;
 };
 
+export type LoanDisbursement = {
+  id: string;
+  date: string;
+  groupId: string;
+  amount: number;
+  notes?: string;
+};
+
+export type LoanCollection = {
+  id: string;
+  date: string;
+  groupId: string;
+  amount: number;
+  notes?: string;
+};
+
 export type Group = {
   id: string;
   name: string;
@@ -139,6 +155,14 @@ export const savingsTransactions: SavingsTransaction[] = [
   { id: 'ST001', date: '2024-07-25', groupId: 'G001', deposit: 500, withdraw: 0, notes: 'Weekly deposit' },
   { id: 'ST002', date: '2024-07-26', groupId: 'G001', deposit: 200, withdraw: 50, notes: 'Emergency withdrawal' },
   { id: 'ST003', date: '2024-07-27', groupId: 'G002', deposit: 1000, withdraw: 0 },
+];
+
+export const loanDisbursements: LoanDisbursement[] = [
+    { id: 'LD001', date: '2024-07-25', groupId: 'G001', amount: 10000, notes: 'Initial loan' },
+];
+
+export const loanCollections: LoanCollection[] = [
+    { id: 'LC001', date: '2024-07-28', groupId: 'G001', amount: 500, notes: 'First installment' },
 ];
 
 export const roles: Role[] = [
