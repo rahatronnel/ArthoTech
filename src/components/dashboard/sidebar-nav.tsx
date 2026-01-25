@@ -18,6 +18,7 @@ import {
   UserRound,
   ShieldCheck,
   PiggyBank,
+  Settings,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
@@ -28,6 +29,7 @@ const navItems = [
   { href: "/dashboard/employees", icon: Users, label: "Employees" },
   { href: "/dashboard/groups", icon: UserRound, label: "Groups" },
   { href: "/dashboard/roles", icon: ShieldCheck, label: "Roles" },
+  { href: "/dashboard/configuration", icon: Settings, label: "Configuration" },
 ];
 
 export function SidebarNav() {
@@ -41,7 +43,10 @@ export function SidebarNav() {
         <div className="flex h-14 items-center gap-3 p-2">
           <PiggyBank className="size-8 flex-shrink-0 text-primary" />
           {state === 'expanded' && (
-            <h1 className="text-xl font-semibold">LendEasy</h1>
+            <div className="flex flex-col">
+              <h1 className="text-xl font-semibold">ArthoTech</h1>
+              <span className="text-xs text-muted-foreground">অর্থটেক</span>
+            </div>
           )}
         </div>
       </SidebarHeader>
