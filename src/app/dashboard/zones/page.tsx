@@ -55,11 +55,13 @@ export default function ZonesPage() {
 
   const FormDialog = () => {
     const [name, setName] = useState(editingZone?.name || '');
+    const [bengaliName, setBengaliName] = useState(editingZone?.bengaliName || '');
+    const [code, setCode] = useState(editingZone?.code || '');
     const [region, setRegion] = useState(editingZone?.region || '');
     const [employeeId, setEmployeeId] = useState(editingZone?.responsibleEmployeeId || '');
 
     const handleSubmit = () => {
-       if (!name || !region || !employeeId) {
+       if (!name || !bengaliName || !code || !region || !employeeId) {
         toast({
             variant: "destructive",
             title: "Validation Error",
@@ -69,13 +71,15 @@ export default function ZonesPage() {
       }
 
       if (editingZone) { // Update
-        const updatedZone: Zone = { ...editingZone, name, region, responsibleEmployeeId: employeeId };
+        const updatedZone: Zone = { ...editingZone, name, bengaliName, code, region, responsibleEmployeeId: employeeId };
         setZones(zones.map(z => z.id === editingZone.id ? updatedZone : z));
         toast({ title: "Zone updated", description: `"${name}" has been updated.` });
       } else { // Create
         const newZone: Zone = {
           id: `Z${String(zones.length + 1).padStart(3, '0')}`,
           name,
+          bengaliName,
+          code,
           region,
           responsibleEmployeeId: employeeId,
         };
@@ -100,6 +104,18 @@ export default function ZonesPage() {
                 Zone Name
               </Label>
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Metro Zone" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="bengaliName" className="text-right">
+                Bengali Name
+              </Label>
+              <Input id="bengaliName" value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} placeholder="e.g., মেট্রো জোন" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="code" className="text-right">
+                Zone Code
+              </Label>
+              <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., MZ" className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="region" className="text-right">
@@ -168,6 +184,8 @@ export default function ZonesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Zone Name</TableHead>
+              <TableHead>Bengali Name</TableHead>
+              <TableHead>Zone Code</TableHead>
               <TableHead>Region</TableHead>
               <TableHead>Responsible Employee</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -177,6 +195,8 @@ export default function ZonesPage() {
             {zones.map((zone) => (
               <TableRow key={zone.id}>
                 <TableCell className="font-medium">{zone.name}</TableCell>
+                <TableCell>{zone.bengaliName}</TableCell>
+                <TableCell>{zone.code}</TableCell>
                 <TableCell>{zone.region}</TableCell>
                 <TableCell>{getEmployeeName(zone.responsibleEmployeeId)}</TableCell>
                 <TableCell className="text-right">

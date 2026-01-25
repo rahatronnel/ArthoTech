@@ -1,12 +1,16 @@
 export type Region = {
   id: string;
   name: string;
+  code: string;
+  bengaliName: string;
   responsibleEmployeeId: string;
 };
 
 export type Zone = {
   id: string;
   name: string;
+  code: string;
+  bengaliName: string;
   region: string;
   responsibleEmployeeId: string;
 };
@@ -14,6 +18,8 @@ export type Zone = {
 export type Area = {
   id: string;
   name: string;
+  code: string;
+  bengaliName: string;
   zone: string;
   region: string;
   responsibleEmployeeId: string;
@@ -22,6 +28,8 @@ export type Area = {
 export type Branch = {
   id: string;
   name: string;
+  code: string;
+  bengaliName: string;
   area: string;
   zone: string;
   region: string;
@@ -50,32 +58,32 @@ export type Role = {
 };
 
 export const regions: Region[] = [
-  { id: 'R001', name: 'Capital Region', responsibleEmployeeId: 'E004' },
-  { id: 'R002', name: 'Western Region', responsibleEmployeeId: 'E004' },
-  { id: 'R003', name: 'Southern Region', responsibleEmployeeId: 'E004' },
+  { id: 'R001', name: 'Capital Region', code: 'CR', bengaliName: 'রাজধানী অঞ্চল', responsibleEmployeeId: 'E004' },
+  { id: 'R002', name: 'Western Region', code: 'WR', bengaliName: 'পশ্চিম অঞ্চল', responsibleEmployeeId: 'E004' },
+  { id: 'R003', name: 'Southern Region', code: 'SR', bengaliName: 'দক্ষিণ অঞ্চল', responsibleEmployeeId: 'E004' },
 ];
 
 export const zones: Zone[] = [
-  { id: 'Z001', name: 'Metro Zone', region: 'Capital Region', responsibleEmployeeId: 'E003'},
-  { id: 'Z002', name: 'Suburban Zone', region: 'Capital Region', responsibleEmployeeId: 'E003'},
-  { id: 'Z003', name: 'Coastal Zone', region: 'Southern Region', responsibleEmployeeId: 'E003'},
-  { id: 'Z004', name: 'Western Zone', region: 'Western Region', responsibleEmployeeId: 'E003'},
+  { id: 'Z001', name: 'Metro Zone', code: 'MZ', bengaliName: 'মেট্রো জোন', region: 'Capital Region', responsibleEmployeeId: 'E003'},
+  { id: 'Z002', name: 'Suburban Zone', code: 'SZ', bengaliName: 'শহরতলী জোন', region: 'Capital Region', responsibleEmployeeId: 'E003'},
+  { id: 'Z003', name: 'Coastal Zone', code: 'CZ', bengaliName: 'উপকূলীয় জোন', region: 'Southern Region', responsibleEmployeeId: 'E003'},
+  { id: 'Z004', name: 'Western Zone', code: 'WZ', bengaliName: 'ওয়েস্টার্ন জোন', region: 'Western Region', responsibleEmployeeId: 'E003'},
 ];
 
 export const areas: Area[] = [
-  { id: 'A001', name: 'Central Area', zone: 'Metro Zone', region: 'Capital Region', responsibleEmployeeId: 'E002' },
-  { id: 'A002', name: 'North Area', zone: 'Metro Zone', region: 'Capital Region', responsibleEmployeeId: 'E002' },
-  { id: 'A003', name: 'West Area', zone: 'Suburban Zone', region: 'Capital Region', responsibleEmployeeId: 'E002' },
-  { id: 'A004', name: 'East Area', zone: 'Western Zone', region: 'Western Region', responsibleEmployeeId: 'E002' },
-  { id: 'A005', name: 'South Area', zone: 'Coastal Zone', region: 'Southern Region', responsibleEmployeeId: 'E002' },
+  { id: 'A001', name: 'Central Area', code: 'CA', bengaliName: 'কেন্দ্রীয় এলাকা', zone: 'Metro Zone', region: 'Capital Region', responsibleEmployeeId: 'E002' },
+  { id: 'A002', name: 'North Area', code: 'NA', bengaliName: 'উত্তর এলাকা', zone: 'Metro Zone', region: 'Capital Region', responsibleEmployeeId: 'E002' },
+  { id: 'A003', name: 'West Area', code: 'WA', bengaliName: 'পশ্চিম এলাকা', zone: 'Suburban Zone', region: 'Capital Region', responsibleEmployeeId: 'E002' },
+  { id: 'A004', name: 'East Area', code: 'EA', bengaliName: 'পূর্ব এলাকা', zone: 'Western Zone', region: 'Western Region', responsibleEmployeeId: 'E002' },
+  { id: 'A005', name: 'South Area', code: 'SA', bengaliName: 'দক্ষিণ এলাকা', zone: 'Coastal Zone', region: 'Southern Region', responsibleEmployeeId: 'E002' },
 ];
 
 export const branches: Branch[] = [
-  { id: 'B001', name: 'Downtown Branch', area: 'Central Area', zone: 'Metro Zone', region: 'Capital Region' },
-  { id: 'B002', name: 'Uptown Branch', area: 'North Area', zone: 'Metro Zone', region: 'Capital Region' },
-  { id: 'B003', name: 'Westside Branch', area: 'West Area', zone: 'Suburban Zone', region: 'Capital Region' },
-  { id: 'B004', name: 'Eastville Branch', area: 'East Area', zone: 'Western Zone', region: 'Western Region' },
-  { id: 'B005', name: 'Southport Branch', area: 'South Area', zone: 'Coastal Zone', region: 'Southern Region' },
+  { id: 'B001', name: 'Downtown Branch', code: 'DB', bengaliName: 'ডাউনটাউন শাখা', area: 'Central Area', zone: 'Metro Zone', region: 'Capital Region' },
+  { id: 'B002', name: 'Uptown Branch', code: 'UB', bengaliName: 'আপটাউন শাখা', area: 'North Area', zone: 'Metro Zone', region: 'Capital Region' },
+  { id: 'B003', name: 'Westside Branch', code: 'WB', bengaliName: 'ওয়েস্টসাইড শাখা', area: 'West Area', zone: 'Suburban Zone', region: 'Capital Region' },
+  { id: 'B004', name: 'Eastville Branch', code: 'EB', bengaliName: 'ইস্টভিল শাখা', area: 'East Area', zone: 'Western Zone', region: 'Western Region' },
+  { id: 'B005', name: 'Southport Branch', code: 'SB', bengaliName: 'সাউথপোর্ট শাখা', area: 'South Area', zone: 'Coastal Zone', region: 'Southern Region' },
 ];
 
 export const employees: Employee[] = [

@@ -55,12 +55,14 @@ export default function AreasPage() {
 
   const FormDialog = () => {
     const [name, setName] = useState(editingArea?.name || '');
+    const [bengaliName, setBengaliName] = useState(editingArea?.bengaliName || '');
+    const [code, setCode] = useState(editingArea?.code || '');
     const [region, setRegion] = useState(editingArea?.region || '');
     const [zone, setZone] = useState(editingArea?.zone || '');
     const [employeeId, setEmployeeId] = useState(editingArea?.responsibleEmployeeId || '');
 
     const handleSubmit = () => {
-      if (!name || !region || !zone || !employeeId) {
+      if (!name || !bengaliName || !code || !region || !zone || !employeeId) {
         toast({
             variant: "destructive",
             title: "Validation Error",
@@ -69,13 +71,15 @@ export default function AreasPage() {
         return;
       }
       if (editingArea) { // Update
-        const updatedArea: Area = { ...editingArea, name, region, zone, responsibleEmployeeId: employeeId };
+        const updatedArea: Area = { ...editingArea, name, bengaliName, code, region, zone, responsibleEmployeeId: employeeId };
         setAreas(areas.map(a => (a.id === editingArea.id ? updatedArea : a)));
         toast({ title: "Area updated", description: `"${name}" has been updated.` });
       } else { // Create
         const newArea: Area = {
           id: `A${String(areas.length + 1).padStart(3, '0')}`,
           name,
+          bengaliName,
+          code,
           zone,
           region,
           responsibleEmployeeId: employeeId,
@@ -101,6 +105,18 @@ export default function AreasPage() {
                             Area Name
                         </Label>
                         <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Central Area" className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="bengaliName" className="text-right">
+                           Bengali Name
+                        </Label>
+                        <Input id="bengaliName" value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} placeholder="e.g., কেন্দ্রীয় এলাকা" className="col-span-3" />
+                    </div>
+                    <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="code" className="text-right">
+                           Area Code
+                        </Label>
+                        <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., CA" className="col-span-3" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="region" className="text-right">
@@ -185,6 +201,8 @@ export default function AreasPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Area Name</TableHead>
+              <TableHead>Bengali Name</TableHead>
+              <TableHead>Area Code</TableHead>
               <TableHead>Zone</TableHead>
               <TableHead>Region</TableHead>
               <TableHead>Responsible Employee</TableHead>
@@ -195,6 +213,8 @@ export default function AreasPage() {
             {areas.map((area) => (
               <TableRow key={area.id}>
                 <TableCell className="font-medium">{area.name}</TableCell>
+                <TableCell>{area.bengaliName}</TableCell>
+                <TableCell>{area.code}</TableCell>
                 <TableCell>{area.zone}</TableCell>
                 <TableCell>{area.region}</TableCell>
                 <TableCell>{getEmployeeName(area.responsibleEmployeeId)}</TableCell>

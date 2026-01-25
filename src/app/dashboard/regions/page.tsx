@@ -55,10 +55,12 @@ export default function RegionsPage() {
 
   const FormDialog = () => {
     const [name, setName] = useState(editingRegion?.name || '');
+    const [bengaliName, setBengaliName] = useState(editingRegion?.bengaliName || '');
+    const [code, setCode] = useState(editingRegion?.code || '');
     const [employeeId, setEmployeeId] = useState(editingRegion?.responsibleEmployeeId || '');
   
     const handleSubmit = () => {
-      if (!name || !employeeId) {
+      if (!name || !bengaliName || !code || !employeeId) {
         toast({
             variant: "destructive",
             title: "Validation Error",
@@ -68,13 +70,15 @@ export default function RegionsPage() {
       }
 
       if (editingRegion) { // Update
-        const updatedRegion = { ...editingRegion, name, responsibleEmployeeId: employeeId };
+        const updatedRegion: Region = { ...editingRegion, name, bengaliName, code, responsibleEmployeeId: employeeId };
         setRegions(regions.map(r => (r.id === editingRegion.id ? updatedRegion : r)));
         toast({ title: "Region updated", description: `"${name}" has been updated.` });
       } else { // Create
-        const newRegion = {
+        const newRegion: Region = {
             id: `R${String(regions.length + 1).padStart(3, '0')}`,
             name,
+            bengaliName,
+            code,
             responsibleEmployeeId: employeeId,
         };
         setRegions([...regions, newRegion]);
@@ -98,6 +102,18 @@ export default function RegionsPage() {
                 Region Name
               </Label>
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Capital Region" className="col-span-3" />
+            </div>
+             <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="bengaliName" className="text-right">
+                Bengali Name
+              </Label>
+              <Input id="bengaliName" value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} placeholder="e.g., রাজধানী অঞ্চল" className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="code" className="text-right">
+                Region Code
+              </Label>
+              <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., CR" className="col-span-3" />
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="employee" className="text-right">
@@ -151,6 +167,8 @@ export default function RegionsPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Region Name</TableHead>
+              <TableHead>Bengali Name</TableHead>
+              <TableHead>Region Code</TableHead>
               <TableHead>Responsible Employee</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -159,6 +177,8 @@ export default function RegionsPage() {
             {regions.map((region) => (
               <TableRow key={region.id}>
                 <TableCell className="font-medium">{region.name}</TableCell>
+                <TableCell>{region.bengaliName}</TableCell>
+                <TableCell>{region.code}</TableCell>
                 <TableCell>{getEmployeeName(region.responsibleEmployeeId)}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>

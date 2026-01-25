@@ -51,12 +51,14 @@ export default function BranchesPage() {
 
   const FormDialog = () => {
     const [name, setName] = useState(editingBranch?.name || '');
+    const [bengaliName, setBengaliName] = useState(editingBranch?.bengaliName || '');
+    const [code, setCode] = useState(editingBranch?.code || '');
     const [region, setRegion] = useState(editingBranch?.region || '');
     const [zone, setZone] = useState(editingBranch?.zone || '');
     const [area, setArea] = useState(editingBranch?.area || '');
     
     const handleSubmit = () => {
-      if (!name || !region || !zone || !area ) {
+      if (!name || !bengaliName || !code || !region || !zone || !area ) {
         toast({
             variant: "destructive",
             title: "Validation Error",
@@ -65,13 +67,15 @@ export default function BranchesPage() {
         return;
       }
       if (editingBranch) { // Update
-        const updatedBranch: Branch = { ...editingBranch, name, region, zone, area };
+        const updatedBranch: Branch = { ...editingBranch, name, bengaliName, code, region, zone, area };
         setBranches(branches.map(b => b.id === editingBranch.id ? updatedBranch : b));
         toast({ title: "Branch updated", description: `"${name}" has been updated.` });
       } else { // Create
         const newBranch: Branch = {
             id: `B${String(branches.length + 1).padStart(3, '0')}`,
             name,
+            bengaliName,
+            code,
             area,
             zone,
             region,
@@ -97,6 +101,18 @@ export default function BranchesPage() {
                             Branch Name
                         </Label>
                         <Input id="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Downtown Branch" className="col-span-3" />
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="bengaliName" className="text-right">
+                            Bengali Name
+                        </Label>
+                        <Input id="bengaliName" value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} placeholder="e.g., ডাউনটাউন শাখা" className="col-span-3" />
+                    </div>
+                     <div className="grid grid-cols-4 items-center gap-4">
+                        <Label htmlFor="code" className="text-right">
+                            Branch Code
+                        </Label>
+                        <Input id="code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="e.g., DB" className="col-span-3" />
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="region" className="text-right">
@@ -180,6 +196,8 @@ export default function BranchesPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Branch Name</TableHead>
+              <TableHead>Bengali Name</TableHead>
+              <TableHead>Branch Code</TableHead>
               <TableHead>Area</TableHead>
               <TableHead>Zone</TableHead>
               <TableHead>Region</TableHead>
@@ -190,6 +208,8 @@ export default function BranchesPage() {
             {branches.map((branch) => (
               <TableRow key={branch.id}>
                 <TableCell className="font-medium">{branch.name}</TableCell>
+                <TableCell>{branch.bengaliName}</TableCell>
+                <TableCell>{branch.code}</TableCell>
                 <TableCell>{branch.area}</TableCell>
                 <TableCell>{branch.zone}</TableCell>
                 <TableCell>{branch.region}</TableCell>
