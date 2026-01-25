@@ -23,7 +23,6 @@ import {
   Map,
   MapPin,
   Network,
-  FileUp,
   Newspaper,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -40,7 +39,6 @@ const navItems = [
   { href: "/dashboard/employees", icon: Users, label: "Employees" },
   { href: "/dashboard/groups", icon: UserRound, label: "Groups" },
   { href: "/dashboard/roles", icon: ShieldCheck, label: "Roles" },
-  { href: "/dashboard/upload-bulk-data", icon: FileUp, label: "Upload Bulk Data" },
   { href: "/dashboard/configuration", icon: Settings, label: "Configuration" },
 ];
 
