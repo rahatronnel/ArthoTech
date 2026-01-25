@@ -24,10 +24,13 @@ import {
   MapPin,
   Network,
   Newspaper,
+  UploadCloud,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { useOrganization } from '@/context/OrganizationContext';
+import { useAuth } from "@/context/AuthContext";
+
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -39,6 +42,7 @@ const navItems = [
   { href: "/dashboard/employees", icon: Users, label: "Employees" },
   { href: "/dashboard/groups", icon: UserRound, label: "Groups" },
   { href: "/dashboard/roles", icon: ShieldCheck, label: "Roles" },
+  { href: "/dashboard/upload-bulk-data", icon: UploadCloud, label: "Upload Bulk Data" },
   { href: "/dashboard/configuration", icon: Settings, label: "Configuration" },
 ];
 
@@ -47,6 +51,7 @@ export function SidebarNav() {
   const { state } = useSidebar();
   const userAvatar = PlaceHolderImages.find(p => p.id === 'user-avatar');
   const { orgInfo } = useOrganization();
+  const { currentUser } = useAuth();
 
   return (
     <>
@@ -87,13 +92,13 @@ export function SidebarNav() {
       <SidebarFooter className="border-t border-sidebar-border p-2">
          <div className="flex items-center gap-3">
             <Avatar>
-              <AvatarImage src={userAvatar?.imageUrl} alt="Admin User" data-ai-hint="person face" />
-              <AvatarFallback>AU</AvatarFallback>
+              <AvatarImage src={userAvatar?.imageUrl} alt={currentUser?.name || 'User'} data-ai-hint="person face" />
+              <AvatarFallback>{currentUser?.name?.substring(0, 2).toUpperCase() || 'U'}</AvatarFallback>
             </Avatar>
-            {state === 'expanded' && (
+            {state === 'expanded' && currentUser && (
                 <div className="flex flex-col overflow-hidden">
-                    <span className="truncate font-semibold text-sm">Admin User</span>
-                    <span className="truncate text-xs text-muted-foreground">admin@lendeasy.com</span>
+                    <span className="truncate font-semibold text-sm">{currentUser.name}</span>
+                    <span className="truncate text-xs text-muted-foreground">{currentUser.loginId}</span>
                 </div>
             )}
          </div>

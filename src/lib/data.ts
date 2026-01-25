@@ -43,6 +43,7 @@ export type Employee = {
   role: 'Branch User' | 'Area User' | 'Zonal User' | 'Regional User' | 'Head Office' | 'Super Admin';
   assignment: string;
   loginId: string;
+  password?: string;
 };
 
 export type Group = {
@@ -92,13 +93,13 @@ export const branches: Branch[] = [
 ];
 
 export const employees: Employee[] = [
-  { id: 'E000', code: 'USA001', name: 'Ultra Superadmin', bengaliName: 'আলট্রা সুপারঅ্যাডমিন', role: 'Super Admin', assignment: 'Head Office', loginId: 'superadmin' },
-  { id: 'E001', code: 'E-001', name: 'Alice Johnson', bengaliName: 'অ্যালিস জনসন', role: 'Branch User', assignment: 'Downtown Branch', loginId: 'alice' },
-  { id: 'E002', code: 'E-002', name: 'Bob Williams', bengaliName: 'বব উইলিয়ামস', role: 'Area User', assignment: 'Central Area', loginId: 'bob' },
-  { id: 'E003', code: 'E-003', name: 'Charlie Brown', bengaliName: 'চার্লি ব্রাউন', role: 'Zonal User', assignment: 'Metro Zone', loginId: 'charlie' },
-  { id: 'E004', code: 'E-004', name: 'Diana Prince', bengaliName: 'ডায়ানা প্রিন্স', role: 'Regional User', assignment: 'Capital Region', loginId: 'diana' },
-  { id: 'E005', code: 'E-005', name: 'Ethan Hunt', bengaliName: 'এথান হান্ট', role: 'Head Office', assignment: 'Head Office', loginId: 'ethan' },
-  { id: 'E006', code: 'E-006', name: 'Fiona Glenanne', bengaliName: 'ফিওনা গ্লেনান', role: 'Branch User', assignment: 'Uptown Branch', loginId: 'fiona' },
+  { id: 'E000', code: 'USA001', name: 'Ultra Superadmin', bengaliName: 'আলট্রা সুপারঅ্যাডমিন', role: 'Super Admin', assignment: 'Head Office', loginId: 'superadmin', password: 'bangladesh' },
+  { id: 'E001', code: 'E-001', name: 'Alice Johnson', bengaliName: 'অ্যালিস জনসন', role: 'Branch User', assignment: 'Downtown Branch', loginId: 'alice', password: 'password123' },
+  { id: 'E002', code: 'E-002', name: 'Bob Williams', bengaliName: 'বব উইলিয়ামস', role: 'Area User', assignment: 'Central Area', loginId: 'bob', password: 'password123' },
+  { id: 'E003', code: 'E-003', name: 'Charlie Brown', bengaliName: 'চার্লি ব্রাউন', role: 'Zonal User', assignment: 'Metro Zone', loginId: 'charlie', password: 'password123' },
+  { id: 'E004', code: 'E-004', name: 'Diana Prince', bengaliName: 'ডায়ানা প্রিন্স', role: 'Regional User', assignment: 'Capital Region', loginId: 'diana', password: 'password123' },
+  { id: 'E005', code: 'E-005', name: 'Ethan Hunt', bengaliName: 'এথান হান্ট', role: 'Head Office', assignment: 'Head Office', loginId: 'ethan', password: 'password123' },
+  { id: 'E006', code: 'E-006', name: 'Fiona Glenanne', bengaliName: 'ফিওনা গ্লেনান', role: 'Branch User', assignment: 'Uptown Branch', loginId: 'fiona', password: 'password123' },
 ];
 
 export const groups: Group[] = [

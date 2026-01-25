@@ -3,6 +3,7 @@ import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { OrganizationProvider } from '@/context/OrganizationContext';
 import { AppMetadataUpdater } from '@/components/AppMetadataUpdater';
+import { AuthProvider } from '@/context/AuthContext';
 
 export const metadata: Metadata = {
   title: 'ArthoTech',
@@ -26,9 +27,11 @@ export default function RootLayout({
       </head>
       <body className="font-body antialiased">
         <OrganizationProvider>
-          <AppMetadataUpdater />
-          {children}
-          <Toaster />
+          <AuthProvider>
+            <AppMetadataUpdater />
+            {children}
+            <Toaster />
+          </AuthProvider>
         </OrganizationProvider>
       </body>
     </html>
