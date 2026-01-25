@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { groups as initialGroups, employees } from '@/lib/data';
-import type { Group } from '@/lib/data';
+import type { Group, MemberChangeEvent } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -15,6 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function GroupsPage() {
   const { toast } = useToast();
@@ -22,10 +24,15 @@ export default function GroupsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
+  const [memberManagementGroup, setMemberManagementGroup] = useState<Group | null>(null);
   const weekDays = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  };
+  
+  const calculateCurrentMembers = (history: MemberChangeEvent[]) => {
+    return history.reduce((total, change) => total + change.added - change.dropped, 0);
   };
 
   const handleAddNewClick = () => {
@@ -60,7 +67,7 @@ export default function GroupsPage() {
     const [code, setCode] = useState(editingGroup?.code || '');
     const [day, setDay] = useState(editingGroup?.day || '');
     const [leader, setLeader] = useState(editingGroup?.leader || '');
-    const [members, setMembers] = useState(editingGroup?.members || 0);
+    const [initialMembers, setInitialMembers] = useState(0);
     const [status, setStatus] = useState<Group['status'] | ''>(editingGroup?.status || '');
 
     const handleSubmit = () => {
@@ -73,8 +80,10 @@ export default function GroupsPage() {
         return;
       }
       if (editingGroup) { // Update
-        const updatedGroup: Group = { ...editingGroup, name, code, day, leader, members, status: status as Group['status'] };
-        setGroups(groups.map(g => (g.id === editingGroup.id ? updatedGroup : g)));
+        const updatedGroup: Partial<Group> = { ...editingGroup, name, code, day, leader, status: status as Group['status'] };
+        delete updatedGroup.memberHistory; // Member history is managed separately
+
+        setGroups(groups.map(g => (g.id === editingGroup.id ? {...g, ...updatedGroup} : g)));
         toast({ title: "Group updated", description: `"${name}" has been updated.` });
       } else { // Create
         const newGroup: Group = {
@@ -83,7 +92,7 @@ export default function GroupsPage() {
           code,
           day,
           leader,
-          members,
+          memberHistory: [{ date: new Date().toISOString().split('T')[0], added: initialMembers, dropped: 0, notes: 'Initial members' }],
           status: status as Group['status'],
           totalLoans: 0,
           totalSavings: 0,
@@ -148,9 +157,9 @@ export default function GroupsPage() {
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="members">
-                           Members
+                           Initial Members
                         </Label>
-                        <Input id="members" type="number" value={members} onChange={(e) => setMembers(Number(e.target.value))} placeholder="e.g., 10" />
+                        <Input id="members" type="number" value={initialMembers} onChange={(e) => setInitialMembers(Number(e.target.value))} placeholder="e.g., 10" disabled={!!editingGroup} />
                     </div>
                      <div className="grid gap-2">
                         <Label htmlFor="status">
@@ -170,6 +179,113 @@ export default function GroupsPage() {
                 <DialogFooter>
                     <Button variant="outline" onClick={handleDialogClose}>Cancel</Button>
                     <Button type="submit" onClick={handleSubmit}>Save</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+  };
+
+  const ManageMembersDialog = () => {
+    if (!memberManagementGroup) return null;
+
+    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [added, setAdded] = useState(0);
+    const [dropped, setDropped] = useState(0);
+    const [notes, setNotes] = useState('');
+
+    const handleAddChange = () => {
+        if (added === 0 && dropped === 0) {
+             toast({
+                variant: "destructive",
+                title: "No Change",
+                description: "Please enter a value for added or dropped members.",
+            });
+            return;
+        }
+
+        const newChange: MemberChangeEvent = { date, added, dropped, notes };
+
+        const updatedGroup = {
+            ...memberManagementGroup,
+            memberHistory: [...memberManagementGroup.memberHistory, newChange],
+        };
+
+        setGroups(groups.map(g => g.id === updatedGroup.id ? updatedGroup : g));
+        toast({ title: "Member history updated", description: `Changes for "${memberManagementGroup.name}" have been saved.` });
+        
+        const newMemberManagementGroup = { ...memberManagementGroup, memberHistory: [...memberManagementGroup.memberHistory, newChange] };
+        setMemberManagementGroup(newMemberManagementGroup);
+        
+        // Reset form
+        setAdded(0);
+        setDropped(0);
+        setNotes('');
+    };
+    
+    const currentMembers = calculateCurrentMembers(memberManagementGroup.memberHistory);
+
+    return (
+        <Dialog open={!!memberManagementGroup} onOpenChange={(open) => !open && setMemberManagementGroup(null)}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Manage Members for {memberManagementGroup.name}</DialogTitle>
+                    <DialogDescription>
+                        Current Members: {currentMembers}. View history and record new member additions or dropouts.
+                    </DialogDescription>
+                </DialogHeader>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 className="font-semibold mb-2">New Change</h3>
+                        <div className="grid gap-4 py-4">
+                             <div className="grid gap-2">
+                                <Label htmlFor="change-date">Date</Label>
+                                <Input id="change-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+                             </div>
+                             <div className="grid gap-2">
+                                <Label htmlFor="added-members">Members Added</Label>
+                                <Input id="added-members" type="number" min="0" value={added} onChange={e => setAdded(Number(e.target.value))} />
+                             </div>
+                             <div className="grid gap-2">
+                                <Label htmlFor="dropped-members">Members Dropped</Label>
+                                <Input id="dropped-members" type="number" min="0" value={dropped} onChange={e => setDropped(Number(e.target.value))} />
+                             </div>
+                             <div className="grid gap-2">
+                                <Label htmlFor="notes">Notes</Label>
+                                <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes..."/>
+                             </div>
+                             <Button onClick={handleAddChange}>Add Change</Button>
+                        </div>
+                    </div>
+                    <div>
+                        <h3 className="font-semibold mb-2">Change History</h3>
+                        <ScrollArea className="h-72">
+                             <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Added</TableHead>
+                                        <TableHead>Dropped</TableHead>
+                                        <TableHead>Notes</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {memberManagementGroup.memberHistory.slice().reverse().map((change, index) => (
+                                        <TableRow key={index}>
+                                            <TableCell>{new Date(change.date).toLocaleDateString()}</TableCell>
+                                            <TableCell>{change.added}</TableCell>
+                                            <TableCell>{change.dropped}</TableCell>
+                                            <TableCell>{change.notes}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => setMemberManagementGroup(null)}>Close</Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -216,7 +332,7 @@ export default function GroupsPage() {
                     <Badge variant={group.status === 'Active' ? 'default' : 'secondary'}>{group.status}</Badge>
                   </TableCell>
                   <TableCell>{group.leader}</TableCell>
-                  <TableCell className="text-right">{group.members}</TableCell>
+                  <TableCell className="text-right">{calculateCurrentMembers(group.memberHistory)}</TableCell>
                   <TableCell className="hidden text-right lg:table-cell">{formatCurrency(group.totalLoans)}</TableCell>
                   <TableCell className="hidden text-right lg:table-cell">{formatCurrency(group.totalSavings)}</TableCell>
                   <TableCell className="text-right">
@@ -230,6 +346,7 @@ export default function GroupsPage() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuItem onSelect={() => handleEditClick(group)}>Edit</DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => setMemberManagementGroup(group)}>Manage Members</DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => handleDeleteClick(group)} className="text-destructive focus:bg-destructive/30 focus:text-destructive-foreground">Delete</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -242,6 +359,7 @@ export default function GroupsPage() {
       </Card>
       
       {isDialogOpen && <FormDialog />}
+      {memberManagementGroup && <ManageMembersDialog />}
 
       <AlertDialog open={!!groupToDelete} onOpenChange={() => setGroupToDelete(null)}>
         <AlertDialogContent>

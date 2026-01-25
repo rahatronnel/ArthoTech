@@ -46,11 +46,18 @@ export type Employee = {
   password?: string;
 };
 
+export type MemberChangeEvent = {
+  date: string;
+  added: number;
+  dropped: number;
+  notes?: string;
+};
+
 export type Group = {
   id: string;
   name: string;
   leader: string;
-  members: number;
+  memberHistory: MemberChangeEvent[];
   totalLoans: number;
   totalSavings: number;
   status: 'Active' | 'Inactive';
@@ -103,11 +110,11 @@ export const employees: Employee[] = [
 ];
 
 export const groups: Group[] = [
-  { id: 'G001', name: 'Sunrise Group', code: 'SG001', day: 'Monday', leader: 'Grace Lee', members: 12, totalLoans: 50000, totalSavings: 12000, status: 'Active' },
-  { id: 'G002', name: 'Community Builders', code: 'CB002', day: 'Tuesday', leader: 'Henry Kim', members: 8, totalLoans: 32000, totalSavings: 8500, status: 'Active' },
-  { id: 'G003', name: 'Future Stars', code: 'FS003', day: 'Wednesday', leader: 'Ivy Chen', members: 15, totalLoans: 75000, totalSavings: 20000, status: 'Active' },
-  { id: 'G004', name: 'Old Timers', code: 'OT004', day: 'Thursday', leader: 'Jack Davis', members: 5, totalLoans: 10000, totalSavings: 25000, status: 'Inactive' },
-  { id: 'G005', name: 'Innovators Circle', code: 'IC005', day: 'Friday', leader: 'Karen White', members: 10, totalLoans: 60000, totalSavings: 15000, status: 'Active' },
+    { id: 'G001', name: 'Sunrise Group', code: 'SG001', day: 'Monday', leader: 'Grace Lee', memberHistory: [{ date: '2023-01-01', added: 12, dropped: 0, notes: 'Initial members' }], totalLoans: 50000, totalSavings: 12000, status: 'Active' },
+    { id: 'G002', name: 'Community Builders', code: 'CB002', day: 'Tuesday', leader: 'Henry Kim', memberHistory: [{ date: '2023-01-01', added: 8, dropped: 0, notes: 'Initial members' }], totalLoans: 32000, totalSavings: 8500, status: 'Active' },
+    { id: 'G003', name: 'Future Stars', code: 'FS003', day: 'Wednesday', leader: 'Ivy Chen', memberHistory: [{ date: '2023-01-01', added: 15, dropped: 0, notes: 'Initial members' }], totalLoans: 75000, totalSavings: 20000, status: 'Active' },
+    { id: 'G004', name: 'Old Timers', code: 'OT004', day: 'Thursday', leader: 'Jack Davis', memberHistory: [{ date: '2023-01-01', added: 5, dropped: 0, notes: 'Initial members' }], totalLoans: 10000, totalSavings: 25000, status: 'Inactive' },
+    { id: 'G005', name: 'Innovators Circle', code: 'IC005', day: 'Friday', leader: 'Karen White', memberHistory: [{ date: '2023-01-01', added: 10, dropped: 0, notes: 'Initial members' }], totalLoans: 60000, totalSavings: 15000, status: 'Active' },
 ];
 
 export const roles: Role[] = [
