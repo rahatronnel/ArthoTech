@@ -282,12 +282,12 @@ export default function OthersDataPage() {
                     {currentUser?.role === 'Super Admin' && (
                         <div className="space-y-2 flex-grow">
                             <Label htmlFor="filter-branch">Branch</Label>
-                            <Select onValueChange={setFilterBranch} value={filterBranch}>
+                            <Select onValueChange={(value) => setFilterBranch(value === 'all-branches' ? '' : value)} value={filterBranch}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="All Branches" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="">All Branches</SelectItem>
+                                    <SelectItem value="all-branches">All Branches</SelectItem>
                                     {branches.map(b => (
                                         <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>
                                     ))}
