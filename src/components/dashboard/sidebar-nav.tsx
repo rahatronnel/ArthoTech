@@ -24,7 +24,6 @@ import {
   MapPin,
   Network,
   Newspaper,
-  UploadCloud,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
@@ -42,7 +41,6 @@ const navItems = [
   { href: "/dashboard/employees", icon: Users, label: "Employees" },
   { href: "/dashboard/groups", icon: UserRound, label: "Groups" },
   { href: "/dashboard/roles", icon: ShieldCheck, label: "Roles" },
-  { href: "/dashboard/upload-bulk-data", icon: UploadCloud, label: "Upload Bulk Data" },
   { href: "/dashboard/configuration", icon: Settings, label: "Configuration" },
 ];
 
