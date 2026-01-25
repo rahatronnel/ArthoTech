@@ -24,7 +24,7 @@ import {
   MapPin,
   Network,
   Newspaper,
-  UploadCloud,
+  Archive,
   Wallet,
   Landmark,
   HandCoins,
@@ -48,7 +48,7 @@ const navItems = [
   { href: "/dashboard/savings-balance", icon: Wallet, label: "Savings Balance" },
   { href: "/dashboard/loan-disbursement", icon: Landmark, label: "Loan Disbursement" },
   { href: "/dashboard/loan-collection", icon: HandCoins, label: "Loan Collection" },
-  { href: "/dashboard/upload-bulk-data", icon: UploadCloud, label: "Upload Bulk Data" },
+  { href: "/dashboard/upload-bulk-data", icon: Archive, label: "Others Data" },
   { href: "/dashboard/roles", icon: ShieldCheck, label: "Roles" },
   { href: "/dashboard/configuration", icon: Settings, label: "Configuration" },
 ];

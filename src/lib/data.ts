@@ -80,6 +80,15 @@ export type LoanCollection = {
   notes?: string;
 };
 
+export type OtherDataEntry = {
+  id: string;
+  date: string;
+  branch: string;
+  type: 'Others Expenses' | 'Cash' | 'Bank' | 'Afternoon Collection' | 'Today Total Cash';
+  amount: number;
+  notes?: string;
+};
+
 export type Group = {
   id: string;
   name: string;
@@ -163,6 +172,11 @@ export const loanDisbursements: LoanDisbursement[] = [
 
 export const loanCollections: LoanCollection[] = [
     { id: 'LC001', date: '2024-07-28', groupId: 'G001', amount: 500, notes: 'First installment' },
+];
+
+export const othersData: OtherDataEntry[] = [
+  { id: 'OD001', date: '2024-07-28', branch: 'Downtown Branch', type: 'Others Expenses', amount: 150, notes: 'Office supplies' },
+  { id: 'OD002', date: '2024-07-28', branch: 'Uptown Branch', type: 'Cash', amount: 5000, notes: 'Petty cash refill' },
 ];
 
 export const roles: Role[] = [
