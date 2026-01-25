@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -102,13 +102,11 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean, onOpenCha
 
 function UserNav() {
   const { currentUser, logout } = useAuth();
-  const router = useRouter();
   const userAvatar = PlaceHolderImages.find(p => p.id === 'user-avatar');
   const [isPasswordDialogOpen, setIsPasswordDialogOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
-    router.push('/login');
   };
 
   if (!currentUser) return null;
