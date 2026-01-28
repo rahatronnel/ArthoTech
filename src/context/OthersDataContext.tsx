@@ -2,7 +2,6 @@
 
 import { createContext, useState, useContext, ReactNode } from 'react';
 import { OtherDataEntry } from '@/lib/data';
-import { othersData as initialOthersData } from '@/lib/data';
 
 type OthersDataContextType = {
   othersData: OtherDataEntry[];
@@ -14,7 +13,7 @@ type OthersDataContextType = {
 const OthersDataContext = createContext<OthersDataContextType | undefined>(undefined);
 
 export function OthersDataProvider({ children }: { children: ReactNode }) {
-  const [othersData, setOthersData] = useState<OtherDataEntry[]>(initialOthersData);
+  const [othersData, setOthersData] = useState<OtherDataEntry[]>([]);
 
   const addBulkOthersData = (entries: Omit<OtherDataEntry, 'id'>[]) => {
     const newEntries = entries.map((entry, index) => ({

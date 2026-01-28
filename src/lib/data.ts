@@ -11,7 +11,7 @@ export type Zone = {
   name: string;
   code: string;
   bengaliName: string;
-  region: string;
+  regionId: string;
   responsibleEmployeeId: string;
 };
 
@@ -20,8 +20,7 @@ export type Area = {
   name: string;
   code: string;
   bengaliName: string;
-  zone: string;
-  region: string;
+  zoneId: string;
   responsibleEmployeeId: string;
 };
 
@@ -30,9 +29,7 @@ export type Branch = {
   name: string;
   code: string;
   bengaliName: string;
-  area: string;
-  zone: string;
-  region: string;
+  areaId: string;
 };
 
 export type Employee = {
@@ -101,6 +98,7 @@ export type Group = {
   status: 'Active' | 'Inactive';
   code: string;
   day: string;
+  branchId: string;
 };
 
 export type Role = {
@@ -108,21 +106,14 @@ export type Role = {
   description: string;
 };
 
-export const regions: Region[] = [];
-export const zones: Zone[] = [];
-export const areas: Area[] = [];
-export const branches: Branch[] = [];
-export const employees: Employee[] = [];
-export const groups: Group[] = [];
-export const groupMemberChanges: GroupMemberChange[] = [];
-export const savingsTransactions: SavingsTransaction[] = [];
-export const loanDisbursements: LoanDisbursement[] = [];
-export const loanCollections: LoanCollection[] = [];
-export const othersData: OtherDataEntry[] = [];
+// Mock data is no longer needed as all data will come from Firestore.
+// The types above will be used with Firestore data.
+
 export const roles: Role[] = [
     { name: 'Branch User', description: 'Manages operations within a single branch. Can create and manage groups, members, loans, and savings for their branch.' },
     { name: 'Area User', description: 'Oversees multiple branches within a specific area. Has read-only access to all data within their area and can generate reports.' },
     { name: 'Zonal User', description: 'Supervises several areas within a zone. Monitors performance and provides support to Area Users.' },
     { name: 'Regional User', description: 'Manages all zones within a region. Responsible for regional strategy, performance, and high-level reporting.' },
     { name: 'Head Office', description: 'Has full administrative access to the entire system. Manages system settings, user roles, and overall organization data.' },
+    { name: 'Super Admin', description: 'Has complete control over the application, including deleting all data.' },
 ];

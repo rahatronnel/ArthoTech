@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useState, useContext, ReactNode } from 'react';
-import { savingsTransactions as initialSavingsTransactions, SavingsTransaction } from '@/lib/data';
+import { SavingsTransaction } from '@/lib/data';
 
 type SavingsContextType = {
   savingsTransactions: SavingsTransaction[];
@@ -11,7 +11,7 @@ type SavingsContextType = {
 const SavingsContext = createContext<SavingsContextType | undefined>(undefined);
 
 export function SavingsProvider({ children }: { children: ReactNode }) {
-  const [savingsTransactions, setSavingsTransactions] = useState<SavingsTransaction[]>(initialSavingsTransactions);
+  const [savingsTransactions, setSavingsTransactions] = useState<SavingsTransaction[]>([]);
 
   const addSavingsTransaction = (transaction: Omit<SavingsTransaction, 'id'>) => {
     const newTransaction: SavingsTransaction = {

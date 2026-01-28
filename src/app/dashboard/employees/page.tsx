@@ -2,11 +2,10 @@
 
 import { useState, useMemo } from 'react';
 import type { Employee } from '@/lib/data';
-import { branches } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, MoreHorizontal, FileDown, FileUp, Copy } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FileDown, FileUp, Copy, Trash2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -16,22 +15,28 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 export default function EmployeesPage() {
   const { toast } = useToast();
+  const { currentUser } = useAuth();
   const firestore = useFirestore();
-  const auth = useAuth();
-  
+  const auth = useAuth().firebaseUser?.auth; // Use the auth instance from the context
+
   const employeesQuery = useMemoFirebase(() => collection(firestore, 'employees'), [firestore]);
   const { data: employeesData, isLoading } = useCollection<Employee>(employeesQuery);
+  
+  const branchesQuery = useMemoFirebase(() => collection(firestore, 'branches'), [firestore]);
+  const { data: branchesData } = useCollection(branchesQuery);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+  const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+  
   const roles: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office'];
-  const assignments = ['Head Office', ...branches.map(b => b.name)];
+  const assignments = ['Head Office', ...(branchesData?.map(b => b.name) || [])];
 
   const employees = useMemo(() => {
     return employeesData?.filter(e => e.role !== 'Super Admin') || [];
@@ -62,6 +67,23 @@ export default function EmployeesPage() {
         setEmployeeToDelete(null);
       }
     }
+  };
+
+  const handleDeleteAll = async () => {
+    if (currentUser?.role !== 'Super Admin' || !employeesData) return;
+    
+    try {
+      const employeesToDelete = employeesData.filter(e => e.role !== 'Super Admin');
+      const batch = writeBatch(firestore);
+      employeesToDelete.forEach(emp => {
+        batch.delete(doc(firestore, "employees", emp.id));
+      });
+      await batch.commit();
+      toast({ title: "All non-admin employees deleted." });
+    } catch (error: any) {
+       toast({ variant: "destructive", title: "Error deleting employees", description: error.message });
+    }
+    setIsDeleteAllOpen(false);
   };
 
   const handleDialogClose = () => {
@@ -96,6 +118,11 @@ export default function EmployeesPage() {
         });
         return;
       }
+      
+      if (!auth || !auth.app.options.authDomain) {
+          toast({ variant: "destructive", title: "Authentication Error", description: "Firebase Auth is not configured correctly." });
+          return;
+      }
 
       try {
         if (editingEmployee) { // Update
@@ -104,10 +131,8 @@ export default function EmployeesPage() {
           await setDoc(employeeDocRef, updatedData, { merge: true });
           toast({ title: "Employee updated", description: `"${name}" has been updated.` });
         } else { // Create
-          if(!auth.firebaseUser) throw new Error("Authentication error");
-          // This is a simplified creation process. In a real app, this should be a secure backend operation.
-          const email = `${loginId}@${auth.firebaseUser.auth.app.options.authDomain}`;
-          const userCredential = await createUserWithEmailAndPassword(auth.firebaseUser.auth, email, password);
+          const email = `${loginId}@${auth.app.options.authDomain}`;
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const uid = userCredential.user.uid;
 
           const newEmployee: Omit<Employee, 'id'> = {
@@ -195,7 +220,7 @@ export default function EmployeesPage() {
               <Label htmlFor="loginId">
                 Login ID
               </Label>
-              <Input id="loginId" value={loginId} onChange={(e) => setLoginId(e.target.value)} placeholder="e.g., johndoe" />
+              <Input id="loginId" value={loginId} onChange={(e) => setLoginId(e.target.value)} placeholder="e.g., johndoe" disabled={!!editingEmployee} />
             </div>
              <div className="grid gap-2">
               <Label htmlFor="password">
@@ -230,6 +255,12 @@ export default function EmployeesPage() {
                     <FileUp className="h-4 w-4" />
                     Upload
                 </Button>
+                {currentUser?.role === 'Super Admin' && (
+                  <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}>
+                    <Trash2 className="h-4 w-4" />
+                    Delete All
+                  </Button>
+                )}
               <Button size="sm" className="gap-1" onClick={handleAddNewClick}>
                   <PlusCircle className="h-4 w-4" />
                   New Employee
@@ -311,6 +342,21 @@ export default function EmployeesPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isDeleteAllOpen} onOpenChange={setIsDeleteAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete ALL employees except for the Super Admin user.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAll} className="bg-destructive hover:bg-destructive/90">Delete All</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

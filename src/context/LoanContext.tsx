@@ -2,8 +2,6 @@
 
 import { createContext, useState, useContext, ReactNode } from 'react';
 import { 
-    loanDisbursements as initialLoanDisbursements, 
-    loanCollections as initialLoanCollections, 
     LoanDisbursement, 
     LoanCollection 
 } from '@/lib/data';
@@ -18,8 +16,8 @@ type LoanContextType = {
 const LoanContext = createContext<LoanContextType | undefined>(undefined);
 
 export function LoanProvider({ children }: { children: ReactNode }) {
-  const [loanDisbursements, setLoanDisbursements] = useState<LoanDisbursement[]>(initialLoanDisbursements);
-  const [loanCollections, setLoanCollections] = useState<LoanCollection[]>(initialLoanCollections);
+  const [loanDisbursements, setLoanDisbursements] = useState<LoanDisbursement[]>([]);
+  const [loanCollections, setLoanCollections] = useState<LoanCollection[]>([]);
 
   const addLoanDisbursement = (disbursement: Omit<LoanDisbursement, 'id'>) => {
     const newDisbursement: LoanDisbursement = {

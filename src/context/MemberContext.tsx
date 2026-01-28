@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useState, useContext, ReactNode } from 'react';
-import { groupMemberChanges as initialMemberChanges, GroupMemberChange, groups } from '@/lib/data';
+import { GroupMemberChange } from '@/lib/data';
 
 type MemberContextType = {
   memberChanges: GroupMemberChange[];
@@ -11,7 +11,7 @@ type MemberContextType = {
 const MemberContext = createContext<MemberContextType | undefined>(undefined);
 
 export function MemberProvider({ children }: { children: ReactNode }) {
-  const [memberChanges, setMemberChanges] = useState<GroupMemberChange[]>(initialMemberChanges);
+  const [memberChanges, setMemberChanges] = useState<GroupMemberChange[]>([]);
 
   const addMemberChange = (change: Omit<GroupMemberChange, 'id'>) => {
     const newChange: GroupMemberChange = {

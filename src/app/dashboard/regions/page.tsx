@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from 'react';
-import { regions as initialRegions, employees } from '@/lib/data';
-import type { Region } from '@/lib/data';
+import type { Region, Employee } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, MoreHorizontal, FileDown, FileUp } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FileDown, FileUp, Trash2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -14,16 +13,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/context/AuthContext';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
 
 export default function RegionsPage() {
   const { toast } = useToast();
-  const [regions, setRegions] = useState(initialRegions);
+  const { currentUser } = useAuth();
+  const firestore = useFirestore();
+
+  const regionsQuery = useMemoFirebase(() => collection(firestore, 'regions'), [firestore]);
+  const { data: regions, isLoading } = useCollection<Region>(regionsQuery);
+
+  const employeesQuery = useMemoFirebase(() => collection(firestore, 'employees'), [firestore]);
+  const { data: employees } = useCollection<Employee>(employeesQuery);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRegion, setEditingRegion] = useState<Region | null>(null);
   const [regionToDelete, setRegionToDelete] = useState<Region | null>(null);
+  const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
 
   const getEmployeeName = (employeeId: string) => {
-    return employees.find(e => e.id === employeeId)?.name || 'N/A';
+    return employees?.find(e => e.id === employeeId)?.name || 'N/A';
   };
 
   const handleAddNewClick = () => {
@@ -40,12 +51,32 @@ export default function RegionsPage() {
     setRegionToDelete(region);
   };
   
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (regionToDelete) {
-      setRegions(regions.filter(r => r.id !== regionToDelete.id));
-      toast({ title: "Region deleted", description: `"${regionToDelete.name}" has been deleted.` });
-      setRegionToDelete(null);
+      try {
+        await deleteDoc(doc(firestore, "regions", regionToDelete.id));
+        toast({ title: "Region deleted", description: `"${regionToDelete.name}" has been deleted.` });
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error deleting region', description: error.message });
+      } finally {
+        setRegionToDelete(null);
+      }
     }
+  };
+
+  const handleDeleteAll = async () => {
+    try {
+      const regionsSnapshot = await getDocs(regionsQuery);
+      const batch = writeBatch(firestore);
+      regionsSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+      toast({ title: 'All regions have been deleted.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error deleting all regions', description: error.message });
+    }
+    setIsDeleteAllOpen(false);
   };
 
   const handleDialogClose = () => {
@@ -59,7 +90,7 @@ export default function RegionsPage() {
     const [code, setCode] = useState(editingRegion?.code || '');
     const [employeeId, setEmployeeId] = useState(editingRegion?.responsibleEmployeeId || '');
   
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
       if (!name || !bengaliName || !code || !employeeId) {
         toast({
             variant: "destructive",
@@ -68,23 +99,29 @@ export default function RegionsPage() {
         });
         return;
       }
-
-      if (editingRegion) { // Update
-        const updatedRegion: Region = { ...editingRegion, name, bengaliName, code, responsibleEmployeeId: employeeId };
-        setRegions(regions.map(r => (r.id === editingRegion.id ? updatedRegion : r)));
-        toast({ title: "Region updated", description: `"${name}" has been updated.` });
-      } else { // Create
-        const newRegion: Region = {
-            id: `R${String(regions.length + 1).padStart(3, '0')}`,
-            name,
-            bengaliName,
-            code,
-            responsibleEmployeeId: employeeId,
-        };
-        setRegions([...regions, newRegion]);
-        toast({ title: "Region created", description: `"${name}" has been added.` });
+      
+      try {
+        if (editingRegion) { // Update
+          const regionDocRef = doc(firestore, 'regions', editingRegion.id);
+          const updatedData: Partial<Region> = { name, bengaliName, code, responsibleEmployeeId: employeeId };
+          await setDoc(regionDocRef, updatedData, { merge: true });
+          toast({ title: "Region updated", description: `"${name}" has been updated.` });
+        } else { // Create
+          const newDocRef = doc(collection(firestore, 'regions'));
+          const newRegion: Region = {
+              id: newDocRef.id,
+              name,
+              bengaliName,
+              code,
+              responsibleEmployeeId: employeeId,
+          };
+          await setDoc(newDocRef, newRegion);
+          toast({ title: "Region created", description: `"${name}" has been added.` });
+        }
+        handleDialogClose();
+      } catch (error: any) {
+          toast({ variant: 'destructive', title: 'Save failed', description: error.message });
       }
-      handleDialogClose();
     };
   
     return (
@@ -124,7 +161,7 @@ export default function RegionsPage() {
                   <SelectValue placeholder="Select an employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.filter(e => e.role === 'Regional User').map(employee => (
+                  {employees?.filter(e => e.role === 'Regional User').map(employee => (
                     <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -156,6 +193,12 @@ export default function RegionsPage() {
                 <FileUp className="h-4 w-4" />
                 Upload
             </Button>
+            {currentUser?.role === 'Super Admin' && (
+              <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}>
+                <Trash2 className="h-4 w-4" />
+                Delete All
+              </Button>
+            )}
             <Button size="sm" className="gap-1" onClick={handleAddNewClick}>
                 <PlusCircle className="h-4 w-4" />
                 New Region
@@ -163,6 +206,7 @@ export default function RegionsPage() {
         </div>
       </CardHeader>
       <CardContent>
+        {isLoading ? <p>Loading...</p> : (
         <Table>
           <TableHeader>
             <TableRow>
@@ -174,7 +218,7 @@ export default function RegionsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {regions.map((region) => (
+            {regions?.map((region) => (
               <TableRow key={region.id}>
                 <TableCell className="font-medium">{region.name}</TableCell>
                 <TableCell>{region.bengaliName}</TableCell>
@@ -199,6 +243,7 @@ export default function RegionsPage() {
             ))}
           </TableBody>
         </Table>
+        )}
       </CardContent>
       {isDialogOpen && <FormDialog />}
       <AlertDialog open={!!regionToDelete} onOpenChange={() => setRegionToDelete(null)}>
@@ -213,6 +258,20 @@ export default function RegionsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      <AlertDialog open={isDeleteAllOpen} onOpenChange={setIsDeleteAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete ALL regions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAll} className="bg-destructive hover:bg-destructive/90">Delete All</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
