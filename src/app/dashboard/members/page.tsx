@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -11,12 +11,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useMember } from '@/context/MemberContext';
-import { groups } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { parseISO, isBefore } from 'date-fns';
 import { Upload, Download } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collectionGroup, query } from 'firebase/firestore';
+import type { Group } from '@/lib/data';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type ReportRow = {
   groupId: string;
@@ -39,10 +42,18 @@ export default function MembersPage() {
   const { toast } = useToast();
   const { memberChanges, addMemberChange } = useMember();
   const { currentUser } = useAuth();
-  
-  const userVisibleGroups = currentUser?.role === 'Super Admin'
-    ? groups
-    : groups.filter(g => g.responsibleEmployeeId === currentUser?.id);
+  const firestore = useFirestore();
+
+  const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
+  const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
+
+  const userVisibleGroups = useMemo(() => {
+    if (!groupsData) return [];
+    if (currentUser?.role === 'Super Admin') {
+      return groupsData;
+    }
+    return groupsData.filter(g => g.responsibleEmployeeId === currentUser?.id);
+  }, [groupsData, currentUser]);
 
   // State for the entry form
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -73,7 +84,7 @@ export default function MembersPage() {
     addMemberChange({ date, groupId, added, dropped, notes });
     toast({
       title: "Change Recorded",
-      description: `Member change for ${groups.find(g => g.id === groupId)?.name} on ${date} has been saved.`
+      description: `Member change for ${groupsData?.find(g => g.id === groupId)?.name} on ${date} has been saved.`
     });
     // Reset form
     setGroupId('');
@@ -228,9 +239,9 @@ export default function MembersPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="group">Group</Label>
-              <Select onValueChange={setGroupId} value={groupId}>
+              <Select onValueChange={setGroupId} value={groupId} disabled={groupsLoading}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a group" />
+                  <SelectValue placeholder={groupsLoading ? "Loading groups..." : "Select a group"} />
                 </SelectTrigger>
                 <SelectContent>
                   {userVisibleGroups.map(g => (
@@ -253,7 +264,7 @@ export default function MembersPage() {
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes..."/>
             </div>
-            <Button onClick={handleAddChange} className="w-full">Save Change</Button>
+            <Button onClick={handleAddChange} className="w-full" disabled={groupsLoading}>Save Change</Button>
           </CardContent>
         </Card>
 
@@ -263,9 +274,9 @@ export default function MembersPage() {
             <CardDescription>Download the template, fill it out, and upload it here.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-             <Button onClick={handleDownloadTemplate} variant="outline" className="w-full">
+             <Button onClick={handleDownloadTemplate} variant="outline" className="w-full" disabled={groupsLoading}>
                 <Download className="mr-2 h-4 w-4" />
-                Download Template
+                {groupsLoading ? "Loading..." : "Download Template"}
             </Button>
             <div className="space-y-2">
               <Label htmlFor="bulk-upload">Upload Filled Template</Label>
@@ -274,9 +285,9 @@ export default function MembersPage() {
                 File must be the downloaded template with your data filled in.
               </p>
             </div>
-            <Button onClick={handleProcessUpload} className="w-full" disabled={!file}>
+            <Button onClick={handleProcessUpload} className="w-full" disabled={!file || groupsLoading}>
               <Upload className="mr-2 h-4 w-4" />
-              Upload and Preview
+              {groupsLoading ? "Loading..." : "Upload and Preview"}
             </Button>
           </CardContent>
         </Card>
@@ -293,11 +304,17 @@ export default function MembersPage() {
               <Label htmlFor="search-date">Report Date</Label>
               <Input id="search-date" type="date" value={searchDate} onChange={(e) => setSearchDate(e.target.value)} />
             </div>
-            <Button onClick={handleSearch} className="w-full sm:w-auto">Search</Button>
+            <Button onClick={handleSearch} className="w-full sm:w-auto" disabled={groupsLoading}>Search</Button>
           </div>
           
           <div className="mt-6">
-              {reportData ? (
+              {groupsLoading ? (
+                 <div className="space-y-2">
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                    <Skeleton className="h-8 w-full" />
+                 </div>
+              ) : reportData ? (
                    <Table>
                       <TableHeader>
                           <TableRow>
