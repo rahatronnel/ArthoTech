@@ -1,11 +1,11 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, MoreHorizontal, Trash2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2, FileDown, FileUp } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -22,14 +22,14 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, collectionGroup, query, getDocs } from 'firebase/firestore';
 import type { Group, Employee, Branch } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
-
+import * as XLSX from 'xlsx';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function GroupsPage() {
   const { toast } = useToast();
   const { currentUser } = useAuth();
   const firestore = useFirestore();
 
-  // Firestore data fetching
   const employeesQuery = useMemoFirebase(() => collection(firestore, 'employees'), [firestore]);
   const { data: employees, isLoading: employeesLoading } = useCollection<Employee>(employeesQuery);
 
@@ -43,8 +43,12 @@ export default function GroupsPage() {
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [uploadedGroups, setUploadedGroups] = useState<any[]>([]);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
-  // These contexts are not yet migrated to Firestore and will return empty/initial values.
   const { memberChanges } = useMember();
   const { savingsTransactions } = useSavings(); 
   const { loanDisbursements, loanCollections } = useLoan();
@@ -67,6 +71,10 @@ export default function GroupsPage() {
     return employees?.find(e => e.id === employeeId)?.name || 'N/A';
   };
   
+  const getBranchName = (branchId: string) => {
+    return branches?.find(b => b.id === branchId)?.name || 'N/A';
+  }
+
   const calculateCurrentMembers = (groupId: string, initialMembers: number) => {
     const totalAdded = memberChanges
       .filter(c => c.groupId === groupId)
@@ -96,6 +104,113 @@ export default function GroupsPage() {
         .reduce((sum, t) => sum + t.amount, 0);
     return initialLoan + totalDisbursed - totalCollected;
   };
+
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        "Group Name": "",
+        "Code": "",
+        "Day": "Saturday",
+        "Branch Code": "",
+        "Leader Login ID": "",
+        "Initial Members": 0,
+        "Initial Savings": 0,
+        "Status": "Active"
+      }
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Groups");
+    XLSX.writeFile(workbook, "GroupsTemplate.xlsx");
+    toast({ title: "Template Downloaded" });
+  };
+  
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      processUpload(file);
+      event.target.value = '';
+    }
+  };
+
+  const processUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+        const errors: string[] = [];
+        const validGroups: any[] = [];
+        const employeeMap = new Map(employees?.filter(e => e.role === 'Branch User').map(e => [e.loginId, e.id]));
+        const branchMap = new Map(branches?.map(b => [b.code, b.id]));
+
+        jsonData.forEach((row, index) => {
+          const { "Group Name": name, "Code": code, "Day": day, "Branch Code": branchCode, "Leader Login ID": leaderId, "Initial Members": initialMembers, "Initial Savings": initialSavings, "Status": status } = row;
+          if (!name || !code || !day || !branchCode || !leaderId || !status) {
+            errors.push(`Row ${index + 2}: Missing required fields.`);
+            return;
+          }
+          if (!branchMap.has(branchCode)) {
+            errors.push(`Row ${index + 2}: Branch with code "${branchCode}" not found.`);
+            return;
+          }
+          if (!employeeMap.has(leaderId)) {
+            errors.push(`Row ${index + 2}: Leader with login ID "${leaderId}" not found or is not a 'Branch User'.`);
+            return;
+          }
+          const branchId = branchMap.get(branchCode)!;
+          const responsibleEmployeeId = employeeMap.get(leaderId)!;
+          validGroups.push({ name, code, day, branchId, responsibleEmployeeId, initialMembers: Number(initialMembers) || 0, initialSavings: Number(initialSavings) || 0, status });
+        });
+
+        setUploadedGroups(validGroups);
+        setUploadErrors(errors);
+        setIsUploadDialogOpen(true);
+
+      } catch (error) {
+        toast({ variant: 'destructive', title: 'Error processing file' });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  
+  const handleConfirmUpload = async () => {
+    if (uploadedGroups.length === 0) return;
+    const batch = writeBatch(firestore);
+    uploadedGroups.forEach(groupData => {
+      const newDocRef = doc(collection(firestore, 'branches', groupData.branchId, 'groups'));
+      const newGroup: Group = {
+        id: newDocRef.id,
+        name: groupData.name,
+        code: groupData.code,
+        day: groupData.day,
+        status: groupData.status,
+        responsibleEmployeeId: groupData.responsibleEmployeeId,
+        initialMembers: groupData.initialMembers,
+        initialSavings: groupData.initialSavings,
+        totalLoans: 0, // default value
+        branchId: groupData.branchId,
+      };
+      batch.set(newDocRef, newGroup);
+    });
+
+    try {
+        await batch.commit();
+        toast({ title: `${uploadedGroups.length} groups uploaded successfully.` });
+        setIsUploadDialogOpen(false);
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+    }
+  };
+
 
   const handleAddNewClick = () => {
     setEditingGroup(null);
@@ -312,12 +427,21 @@ export default function GroupsPage() {
   return (
     <>
       <Card>
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Groups / Centers</CardTitle>
             <CardDescription>Manage client groups and their financial activities.</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" className="gap-1" onClick={handleDownloadTemplate}>
+                  <FileDown className="h-4 w-4" />
+                  Download
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1" onClick={handleUploadClick}>
+                  <FileUp className="h-4 w-4" />
+                  Upload
+              </Button>
               {currentUser?.role === 'Super Admin' && (
                 <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}>
                   <Trash2 className="h-4 w-4" />
@@ -390,6 +514,56 @@ export default function GroupsPage() {
       
       {isDialogOpen && <FormDialog />}
 
+      <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent className="max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>Confirm Upload</DialogTitle>
+                <DialogDescription>
+                    Review the data below. {uploadErrors.length > 0 ? 'Please fix the errors and re-upload.' : 'Click "Confirm" to upload.'}
+                </DialogDescription>
+            </DialogHeader>
+            {uploadErrors.length > 0 ? (
+                <div className="my-4 space-y-2 rounded-md bg-destructive/10 p-4">
+                    <h3 className="font-semibold text-destructive">Upload Errors</h3>
+                    <ScrollArea className="h-40">
+                        <ul className="list-disc pl-5 text-sm text-destructive">
+                            {uploadErrors.map((err, i) => <li key={i}>{err}</li>)}
+                        </ul>
+                    </ScrollArea>
+                </div>
+            ) : (
+                <ScrollArea className="h-64">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Group Name</TableHead>
+                                <TableHead>Code</TableHead>
+                                <TableHead>Branch</TableHead>
+                                <TableHead>Leader</TableHead>
+                                <TableHead>Status</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {uploadedGroups.map((group, index) => (
+                                <TableRow key={index}>
+                                    <TableCell>{group.name}</TableCell>
+                                    <TableCell>{group.code}</TableCell>
+                                    <TableCell>{getBranchName(group.branchId)}</TableCell>
+                                    <TableCell>{getEmployeeName(group.responsibleEmployeeId)}</TableCell>
+                                    <TableCell><Badge variant={group.status === 'Active' ? 'default' : 'secondary'}>{group.status}</Badge></TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            )}
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleConfirmUpload} disabled={uploadErrors.length > 0 || uploadedGroups.length === 0}>Confirm Upload</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AlertDialog open={!!groupToDelete} onOpenChange={() => setGroupToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -423,5 +597,3 @@ export default function GroupsPage() {
     </>
   );
 }
-
-    

@@ -1,7 +1,8 @@
+
 "use client";
 
-import { useState, useMemo } from 'react';
-import type { Employee } from '@/lib/data';
+import { useState, useMemo, useRef } from 'react';
+import type { Employee, Branch } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,24 +19,33 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import * as XLSX from 'xlsx';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Progress } from '@/components/ui/progress';
 
 export default function EmployeesPage() {
   const { toast } = useToast();
   const { currentUser } = useAuth();
   const firestore = useFirestore();
-  const auth = useAuth().firebaseUser?.auth; // Use the auth instance from the context
+  const auth = useAuth().firebaseUser?.auth;
 
   const employeesQuery = useMemoFirebase(() => collection(firestore, 'employees'), [firestore]);
   const { data: employeesData, isLoading } = useCollection<Employee>(employeesQuery);
   
   const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
-  const { data: branchesData } = useCollection(branchesQuery);
+  const { data: branchesData } = useCollection<Branch>(branchesQuery);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
   
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [uploadedEmployees, setUploadedEmployees] = useState<any[]>([]);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   const roles: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office'];
   const assignments = ['Head Office', ...(branchesData?.map(b => b.name) || [])];
 
@@ -60,6 +70,112 @@ export default function EmployeesPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
     XLSX.writeFile(workbook, "EmployeesTemplate.xlsx");
     toast({ title: "Template Downloaded", description: "Fill in the template and upload it." });
+  };
+  
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      processUpload(file);
+      event.target.value = '';
+    }
+  };
+
+  const processUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+        const errors: string[] = [];
+        const validEmployees: any[] = [];
+        const existingLoginIds = new Set(employeesData?.map(e => e.loginId));
+        const validAssignments = new Set(assignments);
+
+        jsonData.forEach((row, index) => {
+          const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Role': role, 'Assignment (Branch Name or \'Head Office\')': assignment, 'Login ID': loginId, 'Password': password } = row;
+          if (!name || !code || !role || !assignment || !loginId || !password) {
+            errors.push(`Row ${index + 2}: Missing required fields.`);
+            return;
+          }
+          if (password.length < 6) {
+            errors.push(`Row ${index + 2}: Password for ${loginId} must be at least 6 characters.`);
+            return;
+          }
+          if (existingLoginIds.has(loginId)) {
+            errors.push(`Row ${index + 2}: Login ID "${loginId}" already exists.`);
+            return;
+          }
+          if (!roles.includes(role)) {
+             errors.push(`Row ${index + 2}: Invalid role "${role}".`);
+            return;
+          }
+          if (!validAssignments.has(assignment)) {
+             errors.push(`Row ${index + 2}: Invalid assignment "${assignment}".`);
+            return;
+          }
+
+          validEmployees.push({ name, bengaliName, code, role, assignment, loginId, password });
+        });
+
+        setUploadedEmployees(validEmployees);
+        setUploadErrors(errors);
+        setIsUploadDialogOpen(true);
+
+      } catch (error) {
+        toast({ variant: 'destructive', title: 'Error processing file' });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  
+  const handleConfirmUpload = async () => {
+    if (uploadedEmployees.length === 0 || !auth?.app.options.authDomain) return;
+    
+    setIsUploading(true);
+    setUploadProgress(0);
+    let successCount = 0;
+    const uploadProcessErrors: string[] = [];
+
+    for (let i = 0; i < uploadedEmployees.length; i++) {
+        const emp = uploadedEmployees[i];
+        try {
+            const email = `${emp.loginId}@${auth.app.options.authDomain}`;
+            const userCredential = await createUserWithEmailAndPassword(auth, email, emp.password);
+            const uid = userCredential.user.uid;
+
+            const newEmployee: Omit<Employee, 'id' | 'password'> = {
+                name: emp.name,
+                bengaliName: emp.bengaliName,
+                code: emp.code,
+                role: emp.role,
+                assignment: emp.assignment,
+                loginId: emp.loginId,
+            };
+            await setDoc(doc(firestore, "employees", uid), newEmployee);
+            successCount++;
+        } catch (error: any) {
+            uploadProcessErrors.push(`Failed to create employee ${emp.name} (${emp.loginId}): ${error.message}`);
+        }
+        setUploadProgress(((i + 1) / uploadedEmployees.length) * 100);
+    }
+    
+    setIsUploading(false);
+    
+    if(uploadProcessErrors.length > 0) {
+        setUploadErrors(uploadProcessErrors);
+        toast({ variant: 'destructive', title: `Upload partially failed.`, description: `${successCount} employees created. ${uploadProcessErrors.length} failed.` });
+    } else {
+        toast({ title: 'Upload Successful', description: `${successCount} employees created successfully.`});
+        setIsUploadDialogOpen(false);
+    }
   };
 
   const handleAddNewClick = () => {
@@ -155,7 +271,7 @@ export default function EmployeesPage() {
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const uid = userCredential.user.uid;
 
-          const newEmployee: Omit<Employee, 'id'> = {
+          const newEmployee: Omit<Employee, 'id' | 'password'> = {
             name,
             bengaliName,
             code,
@@ -261,6 +377,7 @@ export default function EmployeesPage() {
   return (
     <>
       <Card>
+        <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <CardTitle>Employees</CardTitle>
@@ -271,7 +388,7 @@ export default function EmployeesPage() {
                     <FileDown className="h-4 w-4" />
                     Download
                 </Button>
-                <Button size="sm" variant="outline" className="gap-1">
+                <Button size="sm" variant="outline" className="gap-1" onClick={handleUploadClick}>
                     <FileUp className="h-4 w-4" />
                     Upload
                 </Button>
@@ -349,6 +466,65 @@ export default function EmployeesPage() {
       </Card>
 
       {isDialogOpen && <FormDialog />}
+
+       <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent className="max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>Confirm Upload</DialogTitle>
+                <DialogDescription>
+                    {isUploading ? "Uploading employees... Please do not close this window." :
+                     uploadErrors.length > 0 ? 'Please fix the errors and re-upload.' : 'Review the data below. Click "Confirm" to create new employee accounts.'
+                    }
+                </DialogDescription>
+            </DialogHeader>
+            {isUploading ? (
+                 <div className="flex flex-col items-center justify-center gap-4 py-8">
+                    <p>Creating {uploadedEmployees.length} employee(s)...</p>
+                    <Progress value={uploadProgress} className="w-full" />
+                 </div>
+            ) : uploadErrors.length > 0 ? (
+                <div className="my-4 space-y-2 rounded-md bg-destructive/10 p-4">
+                    <h3 className="font-semibold text-destructive">Upload Errors</h3>
+                    <ScrollArea className="h-40">
+                        <ul className="list-disc pl-5 text-sm text-destructive">
+                            {uploadErrors.map((err, i) => <li key={i}>{err}</li>)}
+                        </ul>
+                    </ScrollArea>
+                </div>
+            ) : (
+                <ScrollArea className="h-64">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Code</TableHead>
+                                <TableHead>Role</TableHead>
+                                <TableHead>Assignment</TableHead>
+                                <TableHead>Login ID</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {uploadedEmployees.map((emp, index) => (
+                                <TableRow key={index}>
+                                    <TableCell>{emp.name}</TableCell>
+                                    <TableCell>{emp.code}</TableCell>
+                                    <TableCell>{emp.role}</TableCell>
+                                    <TableCell>{emp.assignment}</TableCell>
+                                    <TableCell>{emp.loginId}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            )}
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)} disabled={isUploading}>Cancel</Button>
+                <Button onClick={handleConfirmUpload} disabled={isUploading || uploadErrors.length > 0 || uploadedEmployees.length === 0}>
+                  {isUploading ? 'Uploading...' : 'Confirm Upload'}
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!employeeToDelete} onOpenChange={() => setEmployeeToDelete(null)}>
         <AlertDialogContent>

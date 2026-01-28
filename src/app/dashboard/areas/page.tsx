@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import type { Area, Zone, Region, Employee } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -18,8 +18,8 @@ import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-// New Area type with regionId for easier data handling
 type FullArea = Area & { regionId: string };
 
 export default function AreasPage() {
@@ -43,6 +43,11 @@ export default function AreasPage() {
   const [editingArea, setEditingArea] = useState<FullArea | null>(null);
   const [areaToDelete, setAreaToDelete] = useState<FullArea | null>(null);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [uploadedAreas, setUploadedAreas] = useState<any[]>([]);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
   const getEmployeeName = (employeeId?: string) => {
     if (!employeeId) return 'N/A';
@@ -73,6 +78,96 @@ export default function AreasPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Areas");
     XLSX.writeFile(workbook, "AreasTemplate.xlsx");
     toast({ title: "Template Downloaded", description: "Fill in the template and upload it." });
+  };
+  
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      processUpload(file);
+      event.target.value = '';
+    }
+  };
+
+  const processUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+        const errors: string[] = [];
+        const validAreas: any[] = [];
+        const employeeMap = new Map(employees?.filter(e => e.role === 'Area User').map(e => [e.loginId, e.id]));
+        const zoneMap = new Map(zones?.map(z => [z.code, { id: z.id, regionId: z.regionId }]));
+
+        jsonData.forEach((row, index) => {
+          const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Zone Code': zoneCode, 'Responsible Employee Login ID': loginId } = row;
+          if (!name || !bengaliName || !code || !zoneCode) {
+            errors.push(`Row ${index + 2}: Missing required fields (Name, Bengali Name, Code, Zone Code).`);
+            return;
+          }
+          if (!zoneMap.has(zoneCode)) {
+            errors.push(`Row ${index + 2}: Zone with code "${zoneCode}" not found.`);
+            return;
+          }
+          const { id: zoneId, regionId } = zoneMap.get(zoneCode)!;
+
+          let responsibleEmployeeId: string | undefined = undefined;
+          if (loginId) {
+            if(employeeMap.has(loginId)) {
+                responsibleEmployeeId = employeeMap.get(loginId);
+            } else {
+                errors.push(`Row ${index + 2}: Employee with login ID "${loginId}" not found or they do not have the 'Area User' role.`);
+                return;
+            }
+          }
+          validAreas.push({ name, bengaliName, code, zoneId, regionId, responsibleEmployeeId });
+        });
+
+        setUploadedAreas(validAreas);
+        setUploadErrors(errors);
+        setIsUploadDialogOpen(true);
+
+      } catch (error) {
+        toast({ variant: 'destructive', title: 'Error processing file', description: 'Please make sure it is a valid .xlsx file.' });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  
+  const handleConfirmUpload = async () => {
+    if (uploadedAreas.length === 0) {
+        toast({ variant: 'destructive', title: 'No valid data to upload.' });
+        return;
+    }
+    const batch = writeBatch(firestore);
+    uploadedAreas.forEach(areaData => {
+      const newDocRef = doc(collection(firestore, 'regions', areaData.regionId, 'zones', areaData.zoneId, 'areas'));
+      const newArea: Omit<Area, 'id'> = {
+        name: areaData.name,
+        bengaliName: areaData.bengaliName,
+        code: areaData.code,
+        zoneId: areaData.zoneId,
+        responsibleEmployeeId: areaData.responsibleEmployeeId,
+      };
+      batch.set(newDocRef, { ...newArea, id: newDocRef.id });
+    });
+
+    try {
+        await batch.commit();
+        toast({ title: `${uploadedAreas.length} areas uploaded successfully.` });
+        setIsUploadDialogOpen(false);
+        setUploadedAreas([]);
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+    }
   };
 
   const handleAddNewClick = () => {
@@ -134,7 +229,7 @@ export default function AreasPage() {
     const [code, setCode] = useState(editingArea?.code || '');
     const [regionId, setRegionId] = useState(editingArea?.regionId || '');
     const [zoneId, setZoneId] = useState(editingArea?.zoneId || '');
-    const [employeeId, setEmployeeId] = useState(editingArea?.responsibleEmployeeId || '');
+    const [employeeId, setEmployeeId] = useState(editingArea?.responsibleEmployeeId || 'none');
     
     const filteredZones = useMemo(() => {
         if (!regionId || !zones) return [];
@@ -161,13 +256,12 @@ export default function AreasPage() {
           toast({ title: "Area updated", description: `"${name}" has been updated.` });
         } else { // Create
           const newDocRef = doc(collection(firestore, 'regions', regionId, 'zones', zoneId, 'areas'));
-          const newArea: Area & { regionId: string } = {
+          const newArea: Area = {
             id: newDocRef.id,
             name,
             bengaliName,
             code,
             zoneId,
-            regionId,
             responsibleEmployeeId: finalEmployeeId,
           };
           await setDoc(newDocRef, newArea);
@@ -239,11 +333,11 @@ export default function AreasPage() {
                     </div>
                     <div className="grid gap-2">
                         <Label htmlFor="employee">
-                            Responsible Employee
+                            Responsible Employee (optional)
                         </Label>
                         <Select onValueChange={setEmployeeId} value={employeeId}>
                             <SelectTrigger>
-                                <SelectValue placeholder="Select an employee (optional)" />
+                                <SelectValue placeholder="Select an employee" />
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="none">None</SelectItem>
@@ -267,6 +361,7 @@ export default function AreasPage() {
 
   return (
     <Card>
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Areas</CardTitle>
@@ -277,7 +372,7 @@ export default function AreasPage() {
                 <FileDown className="h-4 w-4" />
                 Download
             </Button>
-            <Button size="sm" variant="outline" className="gap-1">
+            <Button size="sm" variant="outline" className="gap-1" onClick={handleUploadClick}>
                 <FileUp className="h-4 w-4" />
                 Upload
             </Button>
@@ -338,6 +433,55 @@ export default function AreasPage() {
         )}
       </CardContent>
       {isDialogOpen && <FormDialog />}
+       <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent className="max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>Confirm Upload</DialogTitle>
+                <DialogDescription>
+                    Review the data below. {uploadErrors.length > 0 ? 'Please fix the errors and re-upload.' : 'Click "Confirm" to upload.'}
+                </DialogDescription>
+            </DialogHeader>
+            {uploadErrors.length > 0 ? (
+                <div className="my-4 space-y-2 rounded-md bg-destructive/10 p-4">
+                    <h3 className="font-semibold text-destructive">Upload Errors</h3>
+                    <ScrollArea className="h-40">
+                        <ul className="list-disc pl-5 text-sm text-destructive">
+                            {uploadErrors.map((err, i) => <li key={i}>{err}</li>)}
+                        </ul>
+                    </ScrollArea>
+                </div>
+            ) : (
+                <ScrollArea className="h-64">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Area Name</TableHead>
+                                <TableHead>Bengali Name</TableHead>
+                                <TableHead>Code</TableHead>
+                                <TableHead>Zone</TableHead>
+                                <TableHead>Responsible Employee</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {uploadedAreas.map((area, index) => (
+                                <TableRow key={index}>
+                                    <TableCell>{area.name}</TableCell>
+                                    <TableCell>{area.bengaliName}</TableCell>
+                                    <TableCell>{area.code}</TableCell>
+                                    <TableCell>{getZoneName(area.zoneId)}</TableCell>
+                                    <TableCell>{getEmployeeName(area.responsibleEmployeeId) || 'None'}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            )}
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleConfirmUpload} disabled={uploadErrors.length > 0 || uploadedAreas.length === 0}>Confirm Upload</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={!!areaToDelete} onOpenChange={() => setAreaToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -370,5 +514,3 @@ export default function AreasPage() {
     </Card>
   );
 }
-
-    

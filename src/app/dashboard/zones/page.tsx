@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import type { Zone, Region, Employee } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -18,6 +18,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function ZonesPage() {
   const { toast } = useToast();
@@ -37,6 +38,11 @@ export default function ZonesPage() {
   const [editingZone, setEditingZone] = useState<Zone | null>(null);
   const [zoneToDelete, setZoneToDelete] = useState<Zone | null>(null);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [uploadedZones, setUploadedZones] = useState<any[]>([]);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
   const getEmployeeName = (employeeId?: string) => {
     if (!employeeId) return 'N/A';
@@ -62,6 +68,96 @@ export default function ZonesPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Zones");
     XLSX.writeFile(workbook, "ZonesTemplate.xlsx");
     toast({ title: "Template Downloaded", description: "Fill in the template and upload it." });
+  };
+  
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      processUpload(file);
+      event.target.value = '';
+    }
+  };
+
+  const processUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+        const errors: string[] = [];
+        const validZones: any[] = [];
+        const employeeMap = new Map(employees?.filter(e => e.role === 'Zonal User').map(e => [e.loginId, e.id]));
+        const regionMap = new Map(regions?.map(r => [r.code, r.id]));
+
+        jsonData.forEach((row, index) => {
+          const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Region Code': regionCode, 'Responsible Employee Login ID': loginId } = row;
+          if (!name || !bengaliName || !code || !regionCode) {
+            errors.push(`Row ${index + 2}: Missing required fields (Name, Bengali Name, Code, Region Code).`);
+            return;
+          }
+          if (!regionMap.has(regionCode)) {
+            errors.push(`Row ${index + 2}: Region with code "${regionCode}" not found.`);
+            return;
+          }
+          const regionId = regionMap.get(regionCode)!;
+
+          let responsibleEmployeeId: string | undefined = undefined;
+          if (loginId) {
+            if(employeeMap.has(loginId)) {
+                responsibleEmployeeId = employeeMap.get(loginId);
+            } else {
+                errors.push(`Row ${index + 2}: Employee with login ID "${loginId}" not found or they do not have the 'Zonal User' role.`);
+                return;
+            }
+          }
+          validZones.push({ name, bengaliName, code, regionId, responsibleEmployeeId });
+        });
+
+        setUploadedZones(validZones);
+        setUploadErrors(errors);
+        setIsUploadDialogOpen(true);
+
+      } catch (error) {
+        toast({ variant: 'destructive', title: 'Error processing file', description: 'Please make sure it is a valid .xlsx file.' });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  const handleConfirmUpload = async () => {
+    if (uploadedZones.length === 0) {
+        toast({ variant: 'destructive', title: 'No valid data to upload.' });
+        return;
+    }
+    const batch = writeBatch(firestore);
+    uploadedZones.forEach(zoneData => {
+      const newDocRef = doc(collection(firestore, 'regions', zoneData.regionId, 'zones'));
+      const newZone: Omit<Zone, 'id'> = {
+        name: zoneData.name,
+        bengaliName: zoneData.bengaliName,
+        code: zoneData.code,
+        regionId: zoneData.regionId,
+        responsibleEmployeeId: zoneData.responsibleEmployeeId,
+      };
+      batch.set(newDocRef, { ...newZone, id: newDocRef.id });
+    });
+
+    try {
+        await batch.commit();
+        toast({ title: `${uploadedZones.length} zones uploaded successfully.` });
+        setIsUploadDialogOpen(false);
+        setUploadedZones([]);
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+    }
   };
 
   const handleAddNewClick = () => {
@@ -122,7 +218,7 @@ export default function ZonesPage() {
     const [bengaliName, setBengaliName] = useState(editingZone?.bengaliName || '');
     const [code, setCode] = useState(editingZone?.code || '');
     const [regionId, setRegionId] = useState(editingZone?.regionId || '');
-    const [employeeId, setEmployeeId] = useState(editingZone?.responsibleEmployeeId || '');
+    const [employeeId, setEmployeeId] = useState(editingZone?.responsibleEmployeeId || 'none');
 
     const handleSubmit = async () => {
        if (!name || !bengaliName || !code || !regionId) {
@@ -206,11 +302,11 @@ export default function ZonesPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="employee">
-                Responsible Employee
+                Responsible Employee (optional)
               </Label>
               <Select onValueChange={setEmployeeId} value={employeeId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select an employee (optional)" />
+                  <SelectValue placeholder="Select an employee" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>
@@ -234,6 +330,7 @@ export default function ZonesPage() {
 
   return (
     <Card>
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Zones</CardTitle>
@@ -244,7 +341,7 @@ export default function ZonesPage() {
                 <FileDown className="h-4 w-4" />
                 Download
             </Button>
-            <Button size="sm" variant="outline" className="gap-1">
+            <Button size="sm" variant="outline" className="gap-1" onClick={handleUploadClick}>
                 <FileUp className="h-4 w-4" />
                 Upload
             </Button>
@@ -303,6 +400,55 @@ export default function ZonesPage() {
         )}
       </CardContent>
       {isDialogOpen && <FormDialog />}
+       <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent className="max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>Confirm Upload</DialogTitle>
+                <DialogDescription>
+                    Review the data below. {uploadErrors.length > 0 ? 'Please fix the errors and re-upload.' : 'Click "Confirm" to upload.'}
+                </DialogDescription>
+            </DialogHeader>
+            {uploadErrors.length > 0 ? (
+                <div className="my-4 space-y-2 rounded-md bg-destructive/10 p-4">
+                    <h3 className="font-semibold text-destructive">Upload Errors</h3>
+                    <ScrollArea className="h-40">
+                        <ul className="list-disc pl-5 text-sm text-destructive">
+                            {uploadErrors.map((err, i) => <li key={i}>{err}</li>)}
+                        </ul>
+                    </ScrollArea>
+                </div>
+            ) : (
+                <ScrollArea className="h-64">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Zone Name</TableHead>
+                                <TableHead>Bengali Name</TableHead>
+                                <TableHead>Code</TableHead>
+                                <TableHead>Region</TableHead>
+                                <TableHead>Responsible Employee</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {uploadedZones.map((zone, index) => (
+                                <TableRow key={index}>
+                                    <TableCell>{zone.name}</TableCell>
+                                    <TableCell>{zone.bengaliName}</TableCell>
+                                    <TableCell>{zone.code}</TableCell>
+                                    <TableCell>{getRegionName(zone.regionId)}</TableCell>
+                                    <TableCell>{getEmployeeName(zone.responsibleEmployeeId) || 'None'}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            )}
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleConfirmUpload} disabled={uploadErrors.length > 0 || uploadedZones.length === 0}>Confirm Upload</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <AlertDialog open={!!zoneToDelete} onOpenChange={() => setZoneToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -335,5 +481,3 @@ export default function ZonesPage() {
     </Card>
   );
 }
-
-    

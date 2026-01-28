@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import type { Branch, Region, Zone, Area } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -17,10 +18,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-// Composite type for branch data including parent IDs for easier data handling
 type FullBranch = Branch & { regionId: string; zoneId: string };
-// Composite type for area data including parent ID
 type FullArea = Area & { regionId: string };
 
 export default function BranchesPage() {
@@ -28,7 +28,6 @@ export default function BranchesPage() {
   const { currentUser } = useAuth();
   const firestore = useFirestore();
 
-  // Firestore collections
   const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
   const { data: branches, isLoading: branchesLoading } = useCollection<FullBranch>(branchesQuery);
 
@@ -41,18 +40,20 @@ export default function BranchesPage() {
   const regionsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'regions') : null, [firestore]);
   const { data: regions, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
 
-  // UI State
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingBranch, setEditingBranch] = useState<FullBranch | null>(null);
   const [branchToDelete, setBranchToDelete] = useState<FullBranch | null>(null);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [uploadedBranches, setUploadedBranches] = useState<any[]>([]);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
 
-  // Helper functions to get names from IDs
   const getAreaName = (areaId: string) => areas?.find(a => a.id === areaId)?.name || 'N/A';
   const getZoneName = (zoneId: string) => zones?.find(z => z.id === zoneId)?.name || 'N/A';
   const getRegionName = (regionId: string) => regions?.find(r => r.id === regionId)?.name || 'N/A';
 
-  // Handlers
   const handleDownloadTemplate = () => {
     const templateData = [
       {
@@ -69,6 +70,86 @@ export default function BranchesPage() {
     XLSX.utils.book_append_sheet(workbook, worksheet, "Branches");
     XLSX.writeFile(workbook, "BranchesTemplate.xlsx");
     toast({ title: "Template Downloaded", description: "Fill in the template and upload it." });
+  };
+  
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      processUpload(file);
+      event.target.value = '';
+    }
+  };
+
+  const processUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+        const errors: string[] = [];
+        const validBranches: any[] = [];
+        const areaMap = new Map(areas?.map(a => [a.code, { id: a.id, zoneId: a.zoneId, regionId: a.regionId }]));
+
+        jsonData.forEach((row, index) => {
+          const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Address': address, 'Contact Number': contactNumber, 'Area Code': areaCode } = row;
+          if (!name || !bengaliName || !code || !address || !contactNumber || !areaCode) {
+            errors.push(`Row ${index + 2}: Missing required fields.`);
+            return;
+          }
+          if (!areaMap.has(areaCode)) {
+            errors.push(`Row ${index + 2}: Area with code "${areaCode}" not found.`);
+            return;
+          }
+          const { id: areaId, zoneId, regionId } = areaMap.get(areaCode)!;
+          validBranches.push({ name, bengaliName, code, address, contactNumber, areaId, zoneId, regionId });
+        });
+
+        setUploadedBranches(validBranches);
+        setUploadErrors(errors);
+        setIsUploadDialogOpen(true);
+
+      } catch (error) {
+        toast({ variant: 'destructive', title: 'Error processing file', description: 'Please make sure it is a valid .xlsx file.' });
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+  
+  const handleConfirmUpload = async () => {
+    if (uploadedBranches.length === 0) {
+        toast({ variant: 'destructive', title: 'No valid data to upload.' });
+        return;
+    }
+    const batch = writeBatch(firestore);
+    uploadedBranches.forEach(branchData => {
+      const newDocRef = doc(collection(firestore, 'regions', branchData.regionId, 'zones', branchData.zoneId, 'areas', branchData.areaId, 'branches'));
+      const newBranch: Omit<Branch, 'id'> = {
+        name: branchData.name,
+        bengaliName: branchData.bengaliName,
+        code: branchData.code,
+        address: branchData.address,
+        contactNumber: branchData.contactNumber,
+        areaId: branchData.areaId,
+      };
+      batch.set(newDocRef, { ...newBranch, id: newDocRef.id });
+    });
+
+    try {
+        await batch.commit();
+        toast({ title: `${uploadedBranches.length} branches uploaded successfully.` });
+        setIsUploadDialogOpen(false);
+        setUploadedBranches([]);
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+    }
   };
 
   const handleAddNewClick = () => {
@@ -125,7 +206,6 @@ export default function BranchesPage() {
     setEditingBranch(null);
   };
 
-  // The Form Dialog component
   const FormDialog = () => {
     const [name, setName] = useState(editingBranch?.name || '');
     const [bengaliName, setBengaliName] = useState(editingBranch?.bengaliName || '');
@@ -136,7 +216,6 @@ export default function BranchesPage() {
     const [selectedZoneId, setSelectedZoneId] = useState(editingBranch?.zoneId || '');
     const [selectedAreaId, setSelectedAreaId] = useState(editingBranch?.areaId || '');
     
-    // Cascading dropdown logic
     const filteredZones = useMemo(() => zones?.filter(z => z.regionId === selectedRegionId) || [], [selectedRegionId, zones]);
     const filteredAreas = useMemo(() => areas?.filter(a => a.zoneId === selectedZoneId) || [], [selectedZoneId, areas]);
 
@@ -161,7 +240,7 @@ export default function BranchesPage() {
           toast({ title: "Branch updated", description: `"${name}" has been updated.` });
         } else { // Create
           const newDocRef = doc(collection(firestore, 'regions', regionId, 'zones', zoneId, 'areas', selectedAreaId, 'branches'));
-          const newBranch: FullBranch = {
+          const newBranch: Branch = {
             id: newDocRef.id,
             name,
             bengaliName,
@@ -169,8 +248,6 @@ export default function BranchesPage() {
             address,
             contactNumber,
             areaId: selectedAreaId,
-            zoneId,
-            regionId,
           };
           await setDoc(newDocRef, newBranch);
           toast({ title: "Branch created", description: `"${name}" has been created.` });
@@ -248,6 +325,7 @@ export default function BranchesPage() {
 
   return (
     <Card>
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx, .xls" />
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <CardTitle>Branches</CardTitle>
@@ -255,7 +333,7 @@ export default function BranchesPage() {
         </div>
         <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" className="gap-1" onClick={handleDownloadTemplate}><FileDown className="h-4 w-4" />Download</Button>
-            <Button size="sm" variant="outline" className="gap-1"><FileUp className="h-4 w-4" />Upload</Button>
+            <Button size="sm" variant="outline" className="gap-1" onClick={handleUploadClick}><FileUp className="h-4 w-4" />Upload</Button>
             {currentUser?.role === 'Super Admin' && (
               <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}><Trash2 className="h-4 w-4" />Delete All</Button>
             )}
@@ -301,7 +379,53 @@ export default function BranchesPage() {
         </Table>
         )}
       </CardContent>
-       {isDialogOpen && <FormDialog />}
+       <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
+        <DialogContent className="max-w-4xl">
+            <DialogHeader>
+                <DialogTitle>Confirm Upload</DialogTitle>
+                <DialogDescription>
+                    Review the data below. {uploadErrors.length > 0 ? 'Please fix the errors and re-upload.' : 'Click "Confirm" to upload.'}
+                </DialogDescription>
+            </DialogHeader>
+            {uploadErrors.length > 0 ? (
+                <div className="my-4 space-y-2 rounded-md bg-destructive/10 p-4">
+                    <h3 className="font-semibold text-destructive">Upload Errors</h3>
+                    <ScrollArea className="h-40">
+                        <ul className="list-disc pl-5 text-sm text-destructive">
+                            {uploadErrors.map((err, i) => <li key={i}>{err}</li>)}
+                        </ul>
+                    </ScrollArea>
+                </div>
+            ) : (
+                <ScrollArea className="h-64">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>Name</TableHead>
+                                <TableHead>Code</TableHead>
+                                <TableHead>Area</TableHead>
+                                <TableHead>Address</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {uploadedBranches.map((branch, index) => (
+                                <TableRow key={index}>
+                                    <TableCell>{branch.name}</TableCell>
+                                    <TableCell>{branch.code}</TableCell>
+                                    <TableCell>{getAreaName(branch.areaId)}</TableCell>
+                                    <TableCell>{branch.address}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                </ScrollArea>
+            )}
+            <DialogFooter>
+                <Button variant="outline" onClick={() => setIsUploadDialogOpen(false)}>Cancel</Button>
+                <Button onClick={handleConfirmUpload} disabled={uploadErrors.length > 0 || uploadedBranches.length === 0}>Confirm Upload</Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
        <AlertDialog open={!!branchToDelete} onOpenChange={() => setBranchToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
