@@ -4,7 +4,7 @@ import { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/context/AuthContext';
 import { useOthersData } from '@/context/OthersDataContext';
-import { branches, OtherDataEntry, otherDataTypes as allDataTypes } from '@/lib/data';
+import { type Branch, type OtherDataEntry, otherDataTypes as allDataTypes } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,9 @@ import { Upload, Download, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collectionGroup, query } from 'firebase/firestore';
+
 
 // These are the data types managed by THIS page's bulk upload template.
 const templateDataTypes: Readonly<OtherDataEntry['type'][]> = ['Others Expenses', 'Cash', 'Bank', 'Afternoon Collection', 'Today Total Cash'];
@@ -36,6 +39,11 @@ export default function OthersDataPage() {
     const { toast } = useToast();
     const { currentUser } = useAuth();
     const { othersData, addBulkOthersData, updateOthersData, deleteOthersData } = useOthersData();
+
+    const firestore = useFirestore();
+    const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
+    const { data: branchesData, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
+    const branches = branchesData || [];
 
     // State for filtering
     const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
@@ -61,6 +69,11 @@ export default function OthersDataPage() {
     }
     
     const handleDownloadTemplate = () => {
+        if (branchesLoading) {
+            toast({ title: "Please wait", description: "Branches are loading..." });
+            return;
+        }
+
         const branchesForTemplate = filterBranch ? userBranches.filter(b => b.name === filterBranch) : userBranches;
 
         if (branchesForTemplate.length === 0) {
@@ -91,6 +104,11 @@ export default function OthersDataPage() {
     const handleProcessUpload = () => {
         if (!file) {
             toast({ variant: "destructive", title: "No file selected" });
+            return;
+        }
+
+        if (branchesLoading) {
+            toast({ title: "Please wait", description: "Branches are loading..." });
             return;
         }
 
@@ -269,15 +287,16 @@ export default function OthersDataPage() {
                         <CardDescription>Download a template, fill it with data for one or more branches, and upload it.</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        <Button onClick={handleDownloadTemplate} variant="outline" className="w-full">
-                            <Download className="mr-2 h-4 w-4" /> Download Template
+                        <Button onClick={handleDownloadTemplate} variant="outline" className="w-full" disabled={branchesLoading}>
+                            <Download className="mr-2 h-4 w-4" /> {branchesLoading ? 'Loading...' : 'Download Template'}
                         </Button>
                         <div className="space-y-2">
                             <Label htmlFor="bulk-upload-others">Upload Filled Template</Label>
                             <Input id="bulk-upload-others" type="file" accept=".xlsx, .xls" onChange={handleFileChange} className="file:text-foreground" />
                         </div>
-                        <Button onClick={handleProcessUpload} className="w-full" disabled={!file}>
-                            <Upload className="mr-2 h-4 w-4" /> Upload and Preview
+                        <Button onClick={handleProcessUpload} className="w-full" disabled={!file || branchesLoading}>
+                            <Upload className="mr-2 h-4 w-4" />
+                            {branchesLoading ? 'Loading Branches...' : 'Upload and Preview'}
                         </Button>
                     </CardContent>
                 </Card>
