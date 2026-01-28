@@ -20,12 +20,12 @@ const columns: string[] = [
     'Samity ID',
     'Samity Name',
     'Component',
-    'Savings Collection Amount',
     'Savings Collection RS',
-    'Interest On Savings Amount',
+    'Savings Collection Amount',
     'Interest On Savings RS',
-    'Savings Refund Amount',
+    'Interest On Savings Amount',
     'Savings Refund RS',
+    'Savings Refund Amount',
     'Additional Fees Collection',
     'Disbursement Amount',
     'Regular Recovarable',
@@ -217,12 +217,12 @@ export default function RawDataEntryPage() {
                                     <TableHead className="font-bold text-foreground border-r">Name</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">ID</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Name</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">RS</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">RS</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">RS</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Regular</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Due</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Advance</TableHead>
