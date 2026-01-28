@@ -31,7 +31,7 @@ const LoanTransactionSchema = z.object({
 });
 
 // Define the overall output structure from the AI analysis
-export const AnalyzeFileOutputSchema = z.object({
+const AnalyzeFileOutputSchema = z.object({
     memberChanges: z.array(MemberChangeSchema).describe('List of all member changes found in the document.'),
     savingsTransactions: z.array(SavingsTransactionSchema).describe('List of all savings transactions found in the document.'),
     loanTransactions: z.array(LoanTransactionSchema).describe('List of all loan transactions found in the document.'),
