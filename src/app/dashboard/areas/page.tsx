@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
+import * as XLSX from 'xlsx';
 
 // New Area type with regionId for easier data handling
 type FullArea = Area & { regionId: string };
@@ -43,7 +44,8 @@ export default function AreasPage() {
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
 
   const getEmployeeName = (employeeId: string) => {
-    return employees?.find(e => e.id === employeeId)?.name || 'N/A';
+    const employee = employees?.find(e => e.id === employeeId);
+    return employee?.name || 'N/A';
   };
 
   const getZoneName = (zoneId: string) => {
@@ -54,6 +56,23 @@ export default function AreasPage() {
     return regions?.find(r => r.id === regionId)?.name || 'N/A';
   };
   
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        "Name": "",
+        "Bengali Name": "",
+        "Code": "",
+        "Zone Code": "",
+        "Responsible Employee Login ID": ""
+      }
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Areas");
+    XLSX.writeFile(workbook, "AreasTemplate.xlsx");
+    toast({ title: "Template Downloaded", description: "Fill in the template and upload it." });
+  };
+
   const handleAddNewClick = () => {
     setEditingArea(null);
     setIsDialogOpen(true);
@@ -249,7 +268,7 @@ export default function AreasPage() {
           <CardDescription>Manage your organization's areas.</CardDescription>
         </div>
         <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="gap-1">
+            <Button size="sm" variant="outline" className="gap-1" onClick={handleDownloadTemplate}>
                 <FileDown className="h-4 w-4" />
                 Download
             </Button>

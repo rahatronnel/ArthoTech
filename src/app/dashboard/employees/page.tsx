@@ -15,8 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import * as XLSX from 'xlsx';
 
 export default function EmployeesPage() {
   const { toast } = useToast();
@@ -27,7 +28,7 @@ export default function EmployeesPage() {
   const employeesQuery = useMemoFirebase(() => collection(firestore, 'employees'), [firestore]);
   const { data: employeesData, isLoading } = useCollection<Employee>(employeesQuery);
   
-  const branchesQuery = useMemoFirebase(() => collection(firestore, 'branches'), [firestore]);
+  const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
   const { data: branchesData } = useCollection(branchesQuery);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -41,6 +42,25 @@ export default function EmployeesPage() {
   const employees = useMemo(() => {
     return employeesData?.filter(e => e.role !== 'Super Admin') || [];
   }, [employeesData]);
+
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        "Name": "",
+        "Bengali Name": "",
+        "Code": "",
+        "Role": "Branch User | Area User | Zonal User | Regional User | Head Office",
+        "Assignment (Branch Name or 'Head Office')": "",
+        "Login ID": "",
+        "Password": ""
+      }
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Employees");
+    XLSX.writeFile(workbook, "EmployeesTemplate.xlsx");
+    toast({ title: "Template Downloaded", description: "Fill in the template and upload it." });
+  };
 
   const handleAddNewClick = () => {
     setEditingEmployee(null);
@@ -247,7 +267,7 @@ export default function EmployeesPage() {
             <CardDescription>Manage staff and their roles.</CardDescription>
           </div>
           <div className="flex items-center gap-2">
-                <Button size="sm" variant="outline" className="gap-1">
+                <Button size="sm" variant="outline" className="gap-1" onClick={handleDownloadTemplate}>
                     <FileDown className="h-4 w-4" />
                     Download
                 </Button>

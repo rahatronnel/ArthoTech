@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
+import * as XLSX from 'xlsx';
 
 // Composite type for branch data including parent IDs for easier data handling
 type FullBranch = Branch & { regionId: string; zoneId: string };
@@ -52,6 +53,24 @@ export default function BranchesPage() {
   const getRegionName = (regionId: string) => regions?.find(r => r.id === regionId)?.name || 'N/A';
 
   // Handlers
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        "Name": "",
+        "Bengali Name": "",
+        "Code": "",
+        "Address": "",
+        "Contact Number": "",
+        "Area Code": ""
+      }
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Branches");
+    XLSX.writeFile(workbook, "BranchesTemplate.xlsx");
+    toast({ title: "Template Downloaded", description: "Fill in the template and upload it." });
+  };
+
   const handleAddNewClick = () => {
     setEditingBranch(null);
     setIsDialogOpen(true);
@@ -235,7 +254,7 @@ export default function BranchesPage() {
           <CardDescription>Manage your organization's branches.</CardDescription>
         </div>
         <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="gap-1"><FileDown className="h-4 w-4" />Download</Button>
+            <Button size="sm" variant="outline" className="gap-1" onClick={handleDownloadTemplate}><FileDown className="h-4 w-4" />Download</Button>
             <Button size="sm" variant="outline" className="gap-1"><FileUp className="h-4 w-4" />Upload</Button>
             {currentUser?.role === 'Super Admin' && (
               <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}><Trash2 className="h-4 w-4" />Delete All</Button>

@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
+import * as XLSX from 'xlsx';
 
 export default function ZonesPage() {
   const { toast } = useToast();
@@ -42,6 +43,23 @@ export default function ZonesPage() {
   
   const getRegionName = (regionId: string) => {
     return regions?.find(r => r.id === regionId)?.name || 'N/A';
+  };
+
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        "Name": "",
+        "Bengali Name": "",
+        "Code": "",
+        "Region Code": "",
+        "Responsible Employee Login ID": ""
+      }
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Zones");
+    XLSX.writeFile(workbook, "ZonesTemplate.xlsx");
+    toast({ title: "Template Downloaded", description: "Fill in the template and upload it." });
   };
 
   const handleAddNewClick = () => {
@@ -217,7 +235,7 @@ export default function ZonesPage() {
           <CardDescription>Manage your organization's zones.</CardDescription>
         </div>
         <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="gap-1">
+            <Button size="sm" variant="outline" className="gap-1" onClick={handleDownloadTemplate}>
                 <FileDown className="h-4 w-4" />
                 Download
             </Button>

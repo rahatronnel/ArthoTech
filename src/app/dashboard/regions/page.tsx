@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
+import * as XLSX from 'xlsx';
 
 export default function RegionsPage() {
   const { toast } = useToast();
@@ -35,6 +36,22 @@ export default function RegionsPage() {
 
   const getEmployeeName = (employeeId: string) => {
     return employees?.find(e => e.id === employeeId)?.name || 'N/A';
+  };
+
+  const handleDownloadTemplate = () => {
+    const templateData = [
+      {
+        "Name": "",
+        "Bengali Name": "",
+        "Code": "",
+        "Responsible Employee Login ID": ""
+      }
+    ];
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Regions");
+    XLSX.writeFile(workbook, "RegionsTemplate.xlsx");
+    toast({ title: "Template Downloaded", description: "Fill in the template and upload it." });
   };
 
   const handleAddNewClick = () => {
@@ -65,6 +82,7 @@ export default function RegionsPage() {
   };
 
   const handleDeleteAll = async () => {
+    if(!regionsQuery) return;
     try {
       const regionsSnapshot = await getDocs(regionsQuery);
       const batch = writeBatch(firestore);
@@ -185,7 +203,7 @@ export default function RegionsPage() {
           <CardDescription>Manage your organization's regions.</CardDescription>
         </div>
         <div className="flex items-center gap-2">
-            <Button size="sm" variant="outline" className="gap-1">
+            <Button size="sm" variant="outline" className="gap-1" onClick={handleDownloadTemplate}>
                 <FileDown className="h-4 w-4" />
                 Download
             </Button>
