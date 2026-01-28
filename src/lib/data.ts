@@ -84,10 +84,12 @@ export type OtherDataEntry = {
   id: string;
   date: string;
   branch: string;
-  type: 'Others Expenses' | 'Cash' | 'Bank' | 'Afternoon Collection' | 'Today Total Cash';
+  type: 'Others Expenses' | 'Cash' | 'Bank' | 'Afternoon Collection' | 'Today Total Cash' | 'Risk Fund' | 'Processing Fee' | 'Passbook Fee' | 'Admission Fee';
   amount: number;
   notes?: string;
 };
+
+export const otherDataTypes: Readonly<OtherDataEntry['type'][]> = ['Others Expenses', 'Cash', 'Bank', 'Afternoon Collection', 'Today Total Cash', 'Risk Fund', 'Processing Fee', 'Passbook Fee', 'Admission Fee'];
 
 export type Group = {
   id: string;

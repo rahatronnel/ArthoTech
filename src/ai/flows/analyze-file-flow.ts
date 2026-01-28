@@ -28,19 +28,35 @@ const fileAnalysisPrompt = ai.definePrompt({
     name: 'fileAnalysisPrompt',
     input: { schema: z.object({ fileContent: z.string() }) },
     output: { schema: AnalyzeFileOutputSchema },
-    prompt: `You are an expert financial data analyst for a microfinance company. Your task is to analyze the provided text content, which has been extracted from an Excel file, and identify all relevant transactions.
+    prompt: `You are an expert financial data analyst for a microfinance company. Your task is to analyze the provided text content, which has been extracted from an Excel file, and identify all relevant transactions for each "Samity" (which means "Group").
 
-The content contains daily transaction data for various groups. You must extract the following information:
-1.  **Member Changes**: Look for any mention of new members being added or existing members being dropped from a group.
-2.  **Savings Transactions**: Identify all savings deposits and withdrawals for each group.
-3.  **Loan Transactions**: Find all loan disbursements (money given out) and loan collections (repayments received).
+The content contains daily transaction data. You must extract the following information and structure it into the specified JSON format.
 
-RULES:
-- Carefully read through the entire text to find all data.
-- Aggregate the data for each group. For example, if a group has multiple savings deposits, sum them up.
-- Pay close attention to column headers and row data to correctly associate values with groups and transaction types.
+**DATA EXTRACTION RULES:**
+
+1.  **Member Changes**:
+    - Find any new members added or existing members dropped for each group.
+
+2.  **Savings Transactions**:
+    - Calculate 'deposit' by summing the 'Savings Collection' and 'Interest On Savings' columns for each group.
+    - The 'withdraw' amount comes from the 'Savings Refund' column.
+
+3.  **Loan Transactions**:
+    - The 'disbursement' amount comes from the 'Disbursement Amount' column.
+    - Calculate 'collection' by summing the 'Loan Received principle' and 'service charge' columns for each group.
+
+4.  **Fee Transactions**:
+    - Extract the values for the following fee types for each group. These are separate from the main loan and savings transactions.
+    - 'riskFund': From the 'Risk fund' column. Usually collected during loan disbursement.
+    - 'processingFee': From the 'Procession Fees' or 'form fees' column. Usually charged during loan disbursement.
+    - 'passbookFee': From the 'Passbook fees' column. Usually charged for new members.
+    - 'admissionFee': From the 'Addmission fees' column. Usually charged for new members.
+
+**OUTPUT STRUCTURE:**
+- Your final output must be a single JSON object matching the provided output schema.
+- Aggregate the data for each group.
 - If a value is not present for a certain transaction type for a group, treat it as 0. Do not guess or invent data.
-- Structure your final output as a single JSON object matching the provided schema, with arrays for memberChanges, savingsTransactions, and loanTransactions.
+- Pay close attention to column headers like 'Field Worker', 'Samity', and 'Component' to correctly associate values.
 
 Here is the file content:
 ---

@@ -9,11 +9,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { analyzeFile } from '@/ai/flows/analyze-file-flow';
-import { type AnalyzeFileOutput } from '@/ai/schemas';
+import { type AnalyzeFileOutput, type FeeTransactionSchema } from '@/ai/schemas';
 import { useMember } from '@/context/MemberContext';
 import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
-import { groups } from '@/lib/data';
+import { useOthersData } from '@/context/OthersDataContext';
+import { groups, employees, branches, OtherDataEntry } from '@/lib/data';
 import { Loader2 } from 'lucide-react';
 
 export default function UploadDailyTransactionPage() {
@@ -21,6 +22,7 @@ export default function UploadDailyTransactionPage() {
     const { addMemberChange } = useMember();
     const { addSavingsTransaction } = useSavings();
     const { addLoanDisbursement, addLoanCollection } = useLoan();
+    const { addBulkOthersData } = useOthersData();
 
     const [file, setFile] = useState<File | null>(null);
     const [analysisResult, setAnalysisResult] = useState<AnalyzeFileOutput | null>(null);
@@ -73,8 +75,6 @@ export default function UploadDailyTransactionPage() {
             };
 
         } catch (err: any) {
-            // This catch block might not be strictly necessary with the one in reader.onload
-            // but it's good for catching synchronous errors if any occur.
             setError(err.message || 'An unexpected error occurred.');
             toast({ variant: 'destructive', title: 'Error', description: err.message });
             setIsLoading(false);
@@ -83,6 +83,16 @@ export default function UploadDailyTransactionPage() {
     
     const findGroupIdByName = (name: string): string | undefined => {
         return groups.find(g => g.name.toLowerCase() === name.toLowerCase())?.id;
+    };
+
+    const getBranchForGroup = (groupId: string): string | undefined => {
+        const group = groups.find(g => g.id === groupId);
+        if (!group) return undefined;
+        const employee = employees.find(e => e.id === group.responsibleEmployeeId);
+        if (!employee) return undefined;
+        // The branch name is in the employee's assignment
+        const branch = branches.find(b => b.name === employee.assignment);
+        return branch?.name;
     };
 
     const handleSave = () => {
@@ -97,7 +107,6 @@ export default function UploadDailyTransactionPage() {
         
         let savedCount = 0;
 
-        // Save Member Changes
         analysisResult.memberChanges.forEach(mc => {
             const groupId = findGroupIdByName(mc.groupName);
             if (groupId && (mc.added > 0 || mc.dropped > 0)) {
@@ -106,7 +115,6 @@ export default function UploadDailyTransactionPage() {
             }
         });
         
-        // Save Savings Transactions
         analysisResult.savingsTransactions.forEach(st => {
             const groupId = findGroupIdByName(st.groupName);
             if(groupId && (st.deposit > 0 || st.withdraw > 0)) {
@@ -115,7 +123,6 @@ export default function UploadDailyTransactionPage() {
             }
         });
 
-        // Save Loan Transactions
         analysisResult.loanTransactions.forEach(lt => {
             const groupId = findGroupIdByName(lt.groupName);
             if(groupId) {
@@ -129,6 +136,33 @@ export default function UploadDailyTransactionPage() {
                 }
             }
         });
+
+        const feeEntriesToAdd: Omit<OtherDataEntry, 'id'>[] = [];
+        analysisResult.feeTransactions?.forEach(ft => {
+            const groupId = findGroupIdByName(ft.groupName);
+            if (!groupId) return;
+
+            const branchName = getBranchForGroup(groupId);
+            if (!branchName) return;
+
+            if (ft.riskFund > 0) {
+                feeEntriesToAdd.push({ date, branch: branchName, type: 'Risk Fund', amount: ft.riskFund, notes: 'AI Bulk Import' });
+            }
+            if (ft.processingFee > 0) {
+                feeEntriesToAdd.push({ date, branch: branchName, type: 'Processing Fee', amount: ft.processingFee, notes: 'AI Bulk Import' });
+            }
+            if (ft.passbookFee > 0) {
+                feeEntriesToAdd.push({ date, branch: branchName, type: 'Passbook Fee', amount: ft.passbookFee, notes: 'AI Bulk Import' });
+            }
+            if (ft.admissionFee > 0) {
+                feeEntriesToAdd.push({ date, branch: branchName, type: 'Admission Fee', amount: ft.admissionFee, notes: 'AI Bulk Import' });
+            }
+        });
+
+        if (feeEntriesToAdd.length > 0) {
+            addBulkOthersData(feeEntriesToAdd);
+            savedCount += feeEntriesToAdd.length;
+        }
         
         toast({ title: 'Save Successful', description: `Successfully saved ${savedCount} transaction records.` });
         setAnalysisResult(null);
@@ -216,6 +250,34 @@ export default function UploadDailyTransactionPage() {
                             <TableBody>
                                 {analysisResult.loanTransactions.map((item, i) => (
                                     <TableRow key={`lt-${i}`}><TableCell>{item.groupName}</TableCell><TableCell className="text-right">{formatCurrency(item.disbursement)}</TableCell><TableCell className="text-right">{formatCurrency(item.collection)}</TableCell></TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                )}
+
+                {analysisResult.feeTransactions && analysisResult.feeTransactions.length > 0 && (
+                     <div>
+                        <h3 className="text-lg font-semibold mb-2">Fee Transactions</h3>
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Group Name</TableHead>
+                                    <TableHead className="text-right">Risk Fund</TableHead>
+                                    <TableHead className="text-right">Processing Fee</TableHead>
+                                    <TableHead className="text-right">Passbook Fee</TableHead>
+                                    <TableHead className="text-right">Admission Fee</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {analysisResult.feeTransactions.map((item, i) => (
+                                    <TableRow key={`ft-${i}`}>
+                                        <TableCell>{item.groupName}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(item.riskFund)}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(item.processingFee)}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(item.passbookFee)}</TableCell>
+                                        <TableCell className="text-right">{formatCurrency(item.admissionFee)}</TableCell>
+                                    </TableRow>
                                 ))}
                             </TableBody>
                         </Table>

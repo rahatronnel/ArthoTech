@@ -4,7 +4,7 @@ import { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/context/AuthContext';
 import { useOthersData } from '@/context/OthersDataContext';
-import { branches, OtherDataEntry } from '@/lib/data';
+import { branches, OtherDataEntry, otherDataTypes as allDataTypes } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,8 +18,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
-// This is an array of the data types.
-const dataTypes: Readonly<OtherDataEntry['type'][]> = ['Others Expenses', 'Cash', 'Bank', 'Afternoon Collection', 'Today Total Cash'];
+// These are the data types managed by THIS page's bulk upload template.
+const templateDataTypes: Readonly<OtherDataEntry['type'][]> = ['Others Expenses', 'Cash', 'Bank', 'Afternoon Collection', 'Today Total Cash'];
 
 // Shape of a row in the uploaded Excel file
 type UploadedRow = {
@@ -68,15 +68,12 @@ export default function OthersDataPage() {
             return;
         }
 
-        const templateData = branchesForTemplate.map(b => ({
-            'Branch': b.name,
-            'Others Expenses': 0,
-            'Cash': 0,
-            'Bank': 0,
-            'Afternoon Collection': 0,
-            'Today Total Cash': 0,
-            'Notes': ''
-        }));
+        const templateData = branchesForTemplate.map(b => {
+            const row: any = { 'Branch': b.name };
+            templateDataTypes.forEach(dt => row[dt] = 0);
+            row['Notes'] = '';
+            return row;
+        });
         
         const worksheet = XLSX.utils.json_to_sheet(templateData);
         const workbook = XLSX.utils.book_new();
@@ -109,10 +106,10 @@ export default function OthersDataPage() {
                 const validData: UploadedRow[] = jsonData.filter(row => 
                     row.Branch &&
                     userBranches.some(b => b.name === row.Branch) && // Ensure branch is valid for user
-                    dataTypes.some(dt => Number(row[dt]) > 0) // Ensure at least one value is present
+                    templateDataTypes.some(dt => Number(row[dt]) > 0) // Ensure at least one value is present
                 ).map(row => {
                     const newRow: any = { Branch: String(row.Branch), Notes: String(row.Notes || '') };
-                    dataTypes.forEach(dt => {
+                    templateDataTypes.forEach(dt => {
                         newRow[dt] = Number(row[dt]) || 0;
                     });
                     return newRow as UploadedRow;
@@ -140,7 +137,7 @@ export default function OthersDataPage() {
         
         const entriesToAdd: Omit<OtherDataEntry, 'id'>[] = [];
         uploadedData.forEach(row => {
-            dataTypes.forEach(type => {
+            templateDataTypes.forEach(type => {
                 const amount = row[type as keyof UploadedRow] as number;
                 if (amount > 0) {
                     entriesToAdd.push({
@@ -187,7 +184,7 @@ export default function OthersDataPage() {
 
     const filteredAndSortedData = othersData
         .filter(d => d.date === filterDate && (currentUser?.role === 'Super Admin' ? (filterBranch ? d.branch === filterBranch : true) : d.branch === currentUser?.assignment))
-        .sort((a,b) => a.branch.localeCompare(b.branch) || dataTypes.indexOf(a.type) - dataTypes.indexOf(b.type));
+        .sort((a,b) => a.branch.localeCompare(b.branch) || allDataTypes.indexOf(a.type) - allDataTypes.indexOf(b.type));
     
     const EditDialog = () => {
         const [amount, setAmount] = useState(editingEntry?.amount || 0);
@@ -299,10 +296,13 @@ export default function OthersDataPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {dataTypes.map(type => {
+                                {allDataTypes.map(type => {
                                     const total = filteredAndSortedData
                                         .filter(d => d.type === type)
                                         .reduce((sum, d) => sum + d.amount, 0);
+                                    
+                                    if(total === 0) return null;
+
                                     return (
                                         <TableRow key={type}>
                                             <TableCell className="font-medium">{type}</TableCell>
@@ -383,14 +383,14 @@ export default function OthersDataPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Branch</TableHead>
-                                    {dataTypes.map(dt => <TableHead key={dt} className="text-right">{dt}</TableHead>)}
+                                    {templateDataTypes.map(dt => <TableHead key={dt} className="text-right">{dt}</TableHead>)}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {uploadedData.map((row, index) => (
                                     <TableRow key={index}>
                                         <TableCell className="font-medium">{row.Branch}</TableCell>
-                                        {dataTypes.map(dt => <TableCell key={dt} className="text-right">{formatCurrency(row[dt] as number)}</TableCell>)}
+                                        {templateDataTypes.map(dt => <TableCell key={dt} className="text-right">{formatCurrency(row[dt] as number)}</TableCell>)}
                                     </TableRow>
                                 ))}
                             </TableBody>
