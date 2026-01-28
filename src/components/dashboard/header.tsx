@@ -41,7 +41,6 @@ function getTitleFromPath(path: string): string {
 function ChangePasswordDialog({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void }) {
     const { updatePassword } = useAuth();
     const { toast } = useToast();
-    const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [error, setError] = useState('');
@@ -58,7 +57,7 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean, onOpenCha
         }
 
         try {
-            await updatePassword(currentPassword, newPassword);
+            await updatePassword(newPassword);
             toast({
                 title: "Password Changed",
                 description: "Your password has been updated successfully.",
@@ -66,6 +65,11 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean, onOpenCha
             onOpenChange(false);
         } catch (err: any) {
             setError(err.message);
+            toast({
+                variant: 'destructive',
+                title: 'Failed to Change Password',
+                description: err.message,
+            });
         }
     };
     
@@ -74,13 +78,9 @@ function ChangePasswordDialog({ open, onOpenChange }: { open: boolean, onOpenCha
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>Change Password</DialogTitle>
-                    <DialogDescription>Update your login password.</DialogDescription>
+                    <DialogDescription>Update your login password. You may be required to log in again.</DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
-                    <div className="grid gap-2">
-                        <Label htmlFor="current-password">Current Password</Label>
-                        <Input id="current-password" type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} />
-                    </div>
                     <div className="grid gap-2">
                         <Label htmlFor="new-password">New Password</Label>
                         <Input id="new-password" type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} />

@@ -2,68 +2,86 @@
 
 import { createContext, useState, useContext, ReactNode, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { employees as initialEmployees, Employee } from '@/lib/data';
+import type { Employee } from '@/lib/data';
+import { useAuth as useFirebaseAuth, useFirestore, useUser } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { signInWithEmailAndPassword, signOut, updatePassword as fbUpdatePassword, User } from 'firebase/auth';
 
 type AuthContextType = {
   currentUser: Employee | null;
+  firebaseUser: User | null;
   loading: boolean;
   login: (loginId: string, password?: string) => Promise<void>;
   logout: () => void;
-  updatePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  updatePassword: (newPassword: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  const { user: firebaseUser, isUserLoading: isFirebaseUserLoading } = useUser();
+  const auth = useFirebaseAuth();
+  const firestore = useFirestore();
   const router = useRouter();
 
   useEffect(() => {
-    // In a real app, you might check for a session here
-    setLoading(false);
-  }, []);
-
-  const login = (loginId: string, password?: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      const user = employees.find(e => e.loginId === loginId);
-      if (user && user.password === password) {
-        setCurrentUser(user);
-        resolve();
-      } else {
-        reject(new Error('Invalid login ID or password.'));
+    const fetchUserProfile = async () => {
+      if (firebaseUser) {
+        setAuthLoading(true);
+        const userDocRef = doc(firestore, 'employees', firebaseUser.uid);
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          setCurrentUser({ id: userDoc.id, ...userDoc.data() } as Employee);
+        } else {
+          setCurrentUser(null);
+          console.warn(`No employee profile found for user ${firebaseUser.uid}`);
+        }
+        setAuthLoading(false);
+      } else if (!isFirebaseUserLoading) {
+        setCurrentUser(null);
+        setAuthLoading(false);
       }
-    });
+    };
+
+    fetchUserProfile();
+  }, [firebaseUser, isFirebaseUserLoading, firestore]);
+
+  const login = async (loginId: string, password?: string): Promise<void> => {
+    if (!password) {
+      throw new Error("Password is required.");
+    }
+    // This assumes the user's email is formatted as loginId@<auth-domain>
+    // This is a workaround as we don't store emails, only login IDs.
+    const email = `${loginId}@${auth.app.options.authDomain}`;
+    await signInWithEmailAndPassword(auth, email, password);
+    // The useEffect hook will handle fetching the user profile from Firestore.
   };
 
-  const logout = () => {
-    setCurrentUser(null);
+  const logout = async () => {
+    await signOut(auth);
     router.push('/login');
   };
-  
-  const updatePassword = (currentPassword: string, newPassword: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (!currentUser) {
-        return reject(new Error("No user is logged in."));
-      }
 
-      if (currentUser.password !== currentPassword) {
-        return reject(new Error("Incorrect current password."));
-      }
-      
-      const updatedUser = { ...currentUser, password: newPassword };
-      setCurrentUser(updatedUser);
-
-      setEmployees(prevEmployees => 
-        prevEmployees.map(emp => emp.id === currentUser.id ? updatedUser : emp)
-      );
-
-      resolve();
-    });
+  const updatePassword = async (newPassword: string): Promise<void> => {
+    if (!auth.currentUser) {
+      throw new Error("No user is logged in.");
+    }
+    // Note: Firebase's updatePassword requires the user to have signed in recently.
+    // If this fails, the user may need to log out and log back in.
+    await fbUpdatePassword(auth.currentUser, newPassword);
   };
 
-  const value = { currentUser, loading, login, logout, updatePassword };
+  const value: AuthContextType = {
+    currentUser,
+    firebaseUser,
+    loading: isFirebaseUserLoading || authLoading,
+    login,
+    logout,
+    updatePassword,
+  };
 
   return (
     <AuthContext.Provider value={value}>

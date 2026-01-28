@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from 'react';
-import { employees as initialEmployees, branches } from '@/lib/data';
+import { useState, useMemo } from 'react';
 import type { Employee } from '@/lib/data';
+import { branches } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -14,15 +14,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/context/AuthContext';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, doc, setDoc, deleteDoc } from 'firebase/firestore';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 
 export default function EmployeesPage() {
   const { toast } = useToast();
-  const [employees, setEmployees] = useState(initialEmployees.filter(e => e.role !== 'Super Admin'));
+  const firestore = useFirestore();
+  const auth = useAuth();
+  
+  const employeesQuery = useMemoFirebase(() => collection(firestore, 'employees'), [firestore]);
+  const { data: employeesData, isLoading } = useCollection<Employee>(employeesQuery);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
   const roles: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office'];
   const assignments = ['Head Office', ...branches.map(b => b.name)];
+
+  const employees = useMemo(() => {
+    return employeesData?.filter(e => e.role !== 'Super Admin') || [];
+  }, [employeesData]);
 
   const handleAddNewClick = () => {
     setEditingEmployee(null);
@@ -38,11 +51,16 @@ export default function EmployeesPage() {
     setEmployeeToDelete(employee);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (employeeToDelete) {
-      setEmployees(employees.filter(e => e.id !== employeeToDelete.id));
-      toast({ title: "Employee deleted", description: `"${employeeToDelete.name}" has been deleted.` });
-      setEmployeeToDelete(null);
+      try {
+        await deleteDoc(doc(firestore, "employees", employeeToDelete.id));
+        toast({ title: "Employee deleted", description: `"${employeeToDelete.name}" has been deleted.` });
+      } catch (error: any) {
+        toast({ variant: "destructive", title: "Error deleting employee", description: error.message });
+      } finally {
+        setEmployeeToDelete(null);
+      }
     }
   };
 
@@ -69,7 +87,7 @@ export default function EmployeesPage() {
     const [loginId, setLoginId] = useState(editingEmployee?.loginId || '');
     const [password, setPassword] = useState('');
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
       if (!name || !bengaliName || !code || !role || !assignment || !loginId || (!editingEmployee && !password)) {
         toast({
           variant: "destructive",
@@ -79,24 +97,40 @@ export default function EmployeesPage() {
         return;
       }
 
-      if (editingEmployee) { // Update
-        const updatedEmployee: Employee = { ...editingEmployee, name, bengaliName, code, role: role as Employee['role'], assignment, loginId };
-        setEmployees(employees.map(e => (e.id === editingEmployee.id ? updatedEmployee : e)));
-        toast({ title: "Employee updated", description: `"${name}" has been updated.` });
-      } else { // Create
-        const newEmployee: Employee = {
-          id: `E${String(initialEmployees.length + 1).padStart(3, '0')}`,
-          name,
-          bengaliName,
-          code,
-          role: role as Employee['role'],
-          assignment,
-          loginId,
-        };
-        setEmployees([...employees, newEmployee]);
-        toast({ title: "Employee created", description: `"${name}" has been added.` });
+      try {
+        if (editingEmployee) { // Update
+          const employeeDocRef = doc(firestore, 'employees', editingEmployee.id);
+          const updatedData: Partial<Employee> = { name, bengaliName, code, role: role as Employee['role'], assignment, loginId };
+          await setDoc(employeeDocRef, updatedData, { merge: true });
+          toast({ title: "Employee updated", description: `"${name}" has been updated.` });
+        } else { // Create
+          if(!auth.firebaseUser) throw new Error("Authentication error");
+          // This is a simplified creation process. In a real app, this should be a secure backend operation.
+          const email = `${loginId}@${auth.firebaseUser.auth.app.options.authDomain}`;
+          const userCredential = await createUserWithEmailAndPassword(auth.firebaseUser.auth, email, password);
+          const uid = userCredential.user.uid;
+
+          const newEmployee: Omit<Employee, 'id'> = {
+            name,
+            bengaliName,
+            code,
+            role: role as Employee['role'],
+            assignment,
+            loginId,
+          };
+          
+          await setDoc(doc(firestore, "employees", uid), newEmployee);
+          toast({ title: "Employee created", description: `"${name}" has been added.` });
+        }
+        handleDialogClose();
+      } catch (error: any) {
+        console.error("Form submission error:", error);
+        toast({
+          variant: "destructive",
+          title: "An error occurred",
+          description: error.message || "Could not save employee.",
+        });
       }
-      handleDialogClose();
     };
 
     return (
@@ -203,6 +237,9 @@ export default function EmployeesPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {isLoading ? (
+            <p>Loading employees...</p>
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -256,6 +293,7 @@ export default function EmployeesPage() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
 
@@ -267,7 +305,7 @@ export default function EmployeesPage() {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the employee
-              "{employeeToDelete?.name}".
+              "{employeeToDelete?.name}". The associated login will remain, but will not have access.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -8,6 +8,7 @@ import { MemberProvider } from '@/context/MemberContext';
 import { SavingsProvider } from '@/context/SavingsContext';
 import { LoanProvider } from '@/context/LoanContext';
 import { OthersDataProvider } from '@/context/OthersDataContext';
+import { FirebaseClientProvider } from '@/firebase';
 
 export const metadata: Metadata = {
   title: 'ArthoTech',
@@ -30,21 +31,23 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <OrganizationProvider>
-          <AuthProvider>
-            <MemberProvider>
-              <SavingsProvider>
-                <LoanProvider>
-                  <OthersDataProvider>
-                    <AppMetadataUpdater />
-                    {children}
-                    <Toaster />
-                  </OthersDataProvider>
-                </LoanProvider>
-              </SavingsProvider>
-            </MemberProvider>
-          </AuthProvider>
-        </OrganizationProvider>
+        <FirebaseClientProvider>
+          <OrganizationProvider>
+            <AuthProvider>
+              <MemberProvider>
+                <SavingsProvider>
+                  <LoanProvider>
+                    <OthersDataProvider>
+                      <AppMetadataUpdater />
+                      {children}
+                      <Toaster />
+                    </OthersDataProvider>
+                  </LoanProvider>
+                </SavingsProvider>
+              </MemberProvider>
+            </AuthProvider>
+          </OrganizationProvider>
+        </FirebaseClientProvider>
       </body>
     </html>
   );

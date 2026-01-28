@@ -12,30 +12,33 @@ import { PiggyBank } from 'lucide-react';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, loading } = useAuth();
   const { toast } = useToast();
   const [loginId, setLoginId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setIsLoading(true);
     try {
       await login(loginId, password);
       toast({ title: "Login Successful", description: "Welcome back!" });
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message);
+      let message = 'An unexpected error occurred.';
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
+        message = 'Invalid login ID or password.';
+      } else {
+        console.error(err);
+        message = err.message;
+      }
+      setError(message);
       toast({
         variant: 'destructive',
         title: 'Login Failed',
-        description: err.message,
+        description: message,
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -60,7 +63,7 @@ export default function LoginPage() {
                 required
                 value={loginId}
                 onChange={(e) => setLoginId(e.target.value)}
-                disabled={isLoading}
+                disabled={loading}
                 className="bg-transparent border-white/30 text-white placeholder:text-white/60 focus:ring-white"
               />
             </div>
@@ -72,14 +75,14 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
+                disabled={loading}
                 className="bg-transparent border-white/30 text-white placeholder:text-white/60 focus:ring-white"
               />
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </CardFooter>
         </form>
