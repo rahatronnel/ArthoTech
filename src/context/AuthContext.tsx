@@ -38,8 +38,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
       }
       
-      const loginId = 'admin';
-      const password = 'password';
+      const loginId = 'superadmin';
+      const password = 'bbb';
       const email = `${loginId}@${auth.app.options.authDomain}`;
 
       try {
@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const adminEmployee: Omit<Employee, 'id'> = {
           name: 'Super Admin',
           bengaliName: 'সুপার অ্যাডমিন',
-          code: 'ADMIN-001',
+          code: 'SADMIN-001',
           role: 'Super Admin',
           assignment: 'Head Office',
           loginId: loginId,
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Sign out the newly created admin so the user has to login manually.
         await signOut(auth);
 
-        console.log('Super Admin seeded successfully. You can now log in with Login ID: "admin" and Password: "password"');
+        console.log('Super Admin seeded successfully. You can now log in with Login ID: "superadmin" and Password: "bbb"');
 
       } catch (authError: any) {
         if (authError.code === 'auth/email-already-in-use') {
