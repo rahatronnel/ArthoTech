@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { analyzeFile, type AnalyzeFileOutput } from '@/ai/flows/analyze-file-flow';
+import { analyzeFile } from '@/ai/flows/analyze-file-flow';
+import { type AnalyzeFileOutput } from '@/ai/schemas';
 import { useMember } from '@/context/MemberContext';
 import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
@@ -50,18 +51,32 @@ export default function UploadDailyTransactionPage() {
             reader.readAsDataURL(file);
             reader.onload = async (event) => {
                 const fileDataUri = event.target?.result as string;
-                const result = await analyzeFile({ fileDataUri, fileName: file.name });
-                setAnalysisResult(result);
-                toast({ title: 'Analysis Complete', description: 'Review the extracted data below.' });
+                if (!fileDataUri) {
+                    setError('Failed to read file.');
+                    setIsLoading(false);
+                    return;
+                }
+                try {
+                    const result = await analyzeFile({ fileDataUri, fileName: file.name });
+                    setAnalysisResult(result);
+                    toast({ title: 'Analysis Complete', description: 'Review the extracted data below.' });
+                } catch (err: any) {
+                    setError(err.message || 'An error occurred during analysis.');
+                    toast({ variant: 'destructive', title: 'Analysis Failed', description: err.message });
+                } finally {
+                    setIsLoading(false);
+                }
             };
             reader.onerror = () => {
                 setError('Failed to read file.');
+                setIsLoading(false);
             };
 
         } catch (err: any) {
-            setError(err.message || 'An error occurred during analysis.');
-            toast({ variant: 'destructive', title: 'Analysis Failed', description: err.message });
-        } finally {
+            // This catch block might not be strictly necessary with the one in reader.onload
+            // but it's good for catching synchronous errors if any occur.
+            setError(err.message || 'An unexpected error occurred.');
+            toast({ variant: 'destructive', title: 'Error', description: err.message });
             setIsLoading(false);
         }
     };
