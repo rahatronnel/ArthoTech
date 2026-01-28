@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/context/AuthContext';
-import { groups, employees } from '@/lib/data';
+import { groups } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -59,29 +59,41 @@ export default function RawDataEntryPage() {
             'Field Worker', null, 'Samity', null, 'Component', 'Savings Collection', 'Interest On Savings', 'Savings Refund', 'Additional Fees Collection', 'Disbursement Amount', 'Regular Recovarable', 'Loan Collection', null, null, null, null, null, null, 'Risk fund', 'Processing Fees / Form fees', 'Passbook fees', 'Admission fees', 'Total Collection'
         ];
         const headerRow2 = [
-            'ID', 'Name', 'ID', 'Name', null, 'RS', 'RS', 'RS', null, null, null, 'Regular', 'Due', 'Advance', 'Rebate', 'Loan Received (principle)', 'Loan Received (Service Charge)', 'Total', null, null, null, null, null
+            'ID', 'Name', 'ID', 'Name', null, 'RS', 'RS', 'RS', null, null, null, 'Regular', 'Due', 'Advance', 'Rebate', 'Total Collection', null, null, null, null, null, null, null
+        ];
+        const headerRow3 = [
+            null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 'Loan Received (principle)', 'Loan Received (Service Charge)', 'Total', null, null, null, null, null
         ];
 
-        const worksheetData = [headerRow1, headerRow2];
+        const worksheetData = [headerRow1, headerRow2, headerRow3];
         const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
         
         worksheet['!merges'] = [
             // s = start, e = end, r = row, c = col
             { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },  // Field Worker
+            { s: { r: 1, c: 0 }, e: { r: 2, c: 0 } },  // Field Worker ID
+            { s: { r: 1, c: 1 }, e: { r: 2, c: 1 } },  // Field Worker Name
             { s: { r: 0, c: 2 }, e: { r: 0, c: 3 } },  // Samity
-            { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } },  // Component
+            { s: { r: 1, c: 2 }, e: { r: 2, c: 2 } },  // Samity ID
+            { s: { r: 1, c: 3 }, e: { r: 2, c: 3 } },  // Samity Name
+            { s: { r: 0, c: 4 }, e: { r: 2, c: 4 } },  // Component
             { s: { r: 0, c: 5 }, e: { r: 1, c: 5 } },  // Savings Collection
-            { s: { r: 0, c: 6 }, e: { r: 1, c: 6 } },  // Interest on Savings
+            { s: { r: 0, c: 6 }, e: { r: 1, c: 6 } },  // Interest On Savings
             { s: { r: 0, c: 7 }, e: { r: 1, c: 7 } },  // Savings Refund
-            { s: { r: 0, c: 8 }, e: { r: 1, c: 8 } },  // Additional Fees Collection
-            { s: { r: 0, c: 9 }, e: { r: 1, c: 9 } },  // Disbursement Amount
-            { s: { r: 0, c: 10 }, e: { r: 1, c: 10 } },// Regular Recovarable
+            { s: { r: 0, c: 8 }, e: { r: 2, c: 8 } },  // Additional Fees Collection
+            { s: { r: 0, c: 9 }, e: { r: 2, c: 9 } },  // Disbursement Amount
+            { s: { r: 0, c: 10 }, e: { r: 2, c: 10 } },// Regular Recovarable
             { s: { r: 0, c: 11 }, e: { r: 0, c: 17 } },// Loan Collection
-            { s: { r: 0, c: 18 }, e: { r: 1, c: 18 } },// Risk fund
-            { s: { r: 0, c: 19 }, e: { r: 1, c: 19 } },// Processing Fees / Form fees
-            { s: { r: 0, c: 20 }, e: { r: 1, c: 20 } },// Passbook fees
-            { s: { r: 0, c: 21 }, e: { r: 1, c: 21 } },// Admission fees
-            { s: { r: 0, c: 22 }, e: { r: 1, c: 22 } },// Total Collection
+            { s: { r: 1, c: 11 }, e: { r: 2, c: 11 } },// Regular
+            { s: { r: 1, c: 12 }, e: { r: 2, c: 12 } },// Due
+            { s: { r: 1, c: 13 }, e: { r: 2, c: 13 } },// Advance
+            { s: { r: 1, c: 14 }, e: { r: 2, c: 14 } },// Rebate
+            { s: { r: 1, c: 15 }, e: { r: 1, c: 17 } },// Total Collection (under loan)
+            { s: { r: 0, c: 18 }, e: { r: 2, c: 18 } },// Risk fund
+            { s: { r: 0, c: 19 }, e: { r: 2, c: 19 } },// Processing Fees / Form fees
+            { s: { r: 0, c: 20 }, e: { r: 2, c: 20 } },// Passbook fees
+            { s: { r: 0, c: 21 }, e: { r: 2, c: 21 } },// Admission fees
+            { s: { r: 0, c: 22 }, e: { r: 2, c: 22 } },// Total Collection (final)
         ];
         
         const workbook = XLSX.utils.book_new();
@@ -105,7 +117,7 @@ export default function RawDataEntryPage() {
                 
                 const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
 
-                if (rawData.length < 3) {
+                if (rawData.length < 4) { // 3 header rows + at least 1 data row
                     toast({
                         variant: "destructive",
                         title: "Empty or Invalid File",
@@ -114,13 +126,13 @@ export default function RawDataEntryPage() {
                     return;
                 }
                 
-                const dataRows = rawData.slice(2).filter(row => row && row.length > 0 && row.some(cell => cell !== null && cell !== ''));
+                const dataRows = rawData.slice(3).filter(row => row && row.length > 0 && row.some(cell => cell !== null && cell !== ''));
 
                 if(dataRows.length === 0) {
                      toast({
                         variant: "destructive",
                         title: "No Data Rows Found",
-                        description: "No data rows were found after the header. Please ensure your data starts on row 3.",
+                        description: "No data rows were found after the header. Please ensure your data starts on row 4.",
                     });
                     return;
                 }
@@ -159,12 +171,12 @@ export default function RawDataEntryPage() {
                         'Total Collection': Number(row[22]) || 0,
                     };
                 });
-
+                
                 const validData = allProcessedData.filter(row => userVisibleGroupCodes.has(row['Samity ID']));
 
                 if (allProcessedData.length > 0 && validData.length === 0) {
                     const foundIds = [...new Set(allProcessedData.map(row => row['Samity ID']).filter(id => id))];
-                    const description = `The file contains data, but none of the Samity IDs match the Group Codes of your assigned groups. Found IDs: ${foundIds.slice(0, 5).join(', ')}.`;
+                    const description = `The file contains data, but none of the Samity IDs match the Group Codes of your assigned groups. Found Samity IDs in file: ${foundIds.slice(0, 5).join(', ')}.`;
                      toast({
                         variant: "destructive",
                         title: "No Matching Data",
@@ -247,39 +259,39 @@ export default function RawDataEntryPage() {
                 <CardContent>
                    <ScrollArea className="w-full whitespace-nowrap">
                         <Table>
-                            <TableHeader>
+                             <TableHeader>
                                 <TableRow className="bg-muted/50">
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Field Worker</TableHead>
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Samity</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Component</TableHead>
-                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Savings Collection</TableHead>
-                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
-                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Savings Refund</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Additional Fees Collection</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Disbursement Amount</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Regular Recovarable</TableHead>
+                                    <TableHead rowSpan={3} className="align-middle text-center font-bold text-foreground border-r">Component</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Savings Collection</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Savings Refund</TableHead>
+                                    <TableHead rowSpan={3} className="align-middle text-center font-bold text-foreground border-r">Additional Fees Collection</TableHead>
+                                    <TableHead rowSpan={3} className="align-middle text-center font-bold text-foreground border-r">Disbursement Amount</TableHead>
+                                    <TableHead rowSpan={3} className="align-middle text-center font-bold text-foreground border-r">Regular Recovarable</TableHead>
                                     <TableHead colSpan={7} className="text-center font-bold text-foreground border-r">Loan Collection</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Risk fund</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Processing Fees / Form fees</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Passbook fees</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Admission fees</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground">Total Collection</TableHead>
+                                    <TableHead rowSpan={3} className="align-middle text-center font-bold text-foreground border-r">Risk fund</TableHead>
+                                    <TableHead rowSpan={3} className="align-middle text-center font-bold text-foreground border-r">Processing Fees / Form fees</TableHead>
+                                    <TableHead rowSpan={3} className="align-middle text-center font-bold text-foreground border-r">Passbook fees</TableHead>
+                                    <TableHead rowSpan={3} className="align-middle text-center font-bold text-foreground border-r">Admission fees</TableHead>
+                                    <TableHead rowSpan={3} className="align-middle text-center font-bold text-foreground">Total Collection</TableHead>
                                 </TableRow>
                                 <TableRow className="bg-muted/50">
-                                    <TableHead className="font-bold text-foreground border-r">ID</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Name</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">ID</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Name</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle font-bold text-foreground border-r">ID</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle font-bold text-foreground border-r">Name</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle font-bold text-foreground border-r">ID</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle font-bold text-foreground border-r">Name</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Regular</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Due</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Advance</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Rebate</TableHead>
+                                    <TableHead colSpan={3} className="text-center font-bold text-foreground border-r">Total Collection</TableHead>
+                                </TableRow>
+                                <TableRow className="bg-muted/50">
                                     <TableHead className="font-bold text-foreground border-r">RS</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">RS</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">RS</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Regular</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Due</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Advance</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Rebate</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Loan Received (principle)</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Loan Received (Service Charge)</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Total</TableHead>
