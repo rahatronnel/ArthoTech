@@ -48,6 +48,24 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // -------------------------------------------------------------------------
+    // Collection Group Rules for Dashboard Queries
+    // -------------------------------------------------------------------------
+    // These rules are necessary for dashboard statistics that need to read across
+    // multiple branches (e.g., total groups, total savings).
+    match /{path=**}/branches/{branchId} {
+      allow get, list: if isSignedIn();
+    }
+    match /{path=**}/groups/{groupId} {
+      allow get, list: if isSignedIn();
+    }
+    match /{path=**}/loans/{loanId} {
+      allow get, list: if isSignedIn();
+    }
+    match /{path=**}/savings/{savingsId} {
+      allow get, list: if isSignedIn();
+    }
+
+    // -------------------------------------------------------------------------
     // Helper Functions
     // -------------------------------------------------------------------------
 
