@@ -191,10 +191,7 @@ export default function RawDataEntryPage() {
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Disbursement Amount</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Regular Recovarable</TableHead>
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Loan Collection</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Risk fund</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Processing Fees / Form fees</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Passbook fees</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Admission fees</TableHead>
+                                    <TableHead colSpan={4} className="text-center font-bold text-foreground border-r">Additional Fees Collection</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground">Total Collection</TableHead>
                                 </TableRow>
                                 <TableRow className="bg-muted/50">
@@ -207,6 +204,10 @@ export default function RawDataEntryPage() {
                                     <TableHead className="font-bold text-foreground border-r">Savings Refund</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Loan Received principle</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">service charge</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Risk fund</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Processing Fees / Form fees</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Passbook fees</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Admission fees</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
