@@ -65,7 +65,7 @@ export default function RawDataEntryPage() {
         }
 
         const headerRow1 = [
-            'Field Worker', null, 'Samity (Group)', null, 'Component', 'Savings Collection', 'Interest On Savings', 'Savings Refund', 'Additional Fees Collection', 'Disbursement Amount', 'Regular Recovarable', 'Loan Collection', null, null, null, null, null, null, 'Risk fund', 'Processing Fees / Form fees', 'Passbook fees', 'Admission fees', 'Total Collection'
+            'Field Worker', null, 'Samity', null, 'Component', 'Savings Collection', 'Interest On Savings', 'Savings Refund', 'Additional Fees Collection', 'Disbursement Amount', 'Regular Recovarable', 'Loan Collection', null, null, null, null, null, null, 'Risk fund', 'Processing Fees / Form fees', 'Passbook fees', 'Admission fees', 'Total Collection'
         ];
         const headerRow2 = [
             'ID', 'Name', 'ID', 'Name', null, 'RS', 'RS', 'RS', null, null, null, 'Regular', 'Due', 'Advance', 'Rebate', 'Loan Received (principle)', 'Loan Received (Service Charge)', 'Total', null, null, null, null, null
@@ -107,7 +107,7 @@ export default function RawDataEntryPage() {
         worksheet['!merges'] = [
             // s = start, e = end, r = row, c = col
             { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },  // Field Worker
-            { s: { r: 0, c: 2 }, e: { r: 0, c: 3 } },  // Samity (Group)
+            { s: { r: 0, c: 2 }, e: { r: 0, c: 3 } },  // Samity
             { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } },  // Component
             { s: { r: 0, c: 5 }, e: { r: 1, c: 5 } },  // Savings Collection
             { s: { r: 0, c: 6 }, e: { r: 1, c: 6 } },  // Interest on Savings
@@ -254,7 +254,7 @@ export default function RawDataEntryPage() {
                             <TableHeader>
                                 <TableRow className="bg-muted/50">
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Field Worker</TableHead>
-                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Samity (Group)</TableHead>
+                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Samity</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Component</TableHead>
                                     <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Savings Collection</TableHead>
                                     <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
