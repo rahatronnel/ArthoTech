@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'firebase/auth';
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
@@ -45,6 +45,7 @@ export default function EmployeesPage() {
   const [uploadErrors, setUploadErrors] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isProcessingUpload, setIsProcessingUpload] = useState(false);
 
   const roles: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office'];
   const assignments = ['Head Office', ...(branchesData?.map(b => b.name) || [])];
@@ -85,8 +86,9 @@ export default function EmployeesPage() {
   };
 
   const processUpload = (file: File) => {
+    setIsProcessingUpload(true);
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
@@ -96,34 +98,51 @@ export default function EmployeesPage() {
 
         const errors: string[] = [];
         const validEmployees: any[] = [];
-        const existingLoginIds = new Set(employeesData?.map(e => e.loginId));
+        const existingLoginIds = new Set(employeesData?.map(emp => emp.loginId));
         const validAssignments = new Set(assignments);
 
-        jsonData.forEach((row, index) => {
+        for (const [index, row] of jsonData.entries()) {
           const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Role': role, 'Assignment (Branch Name or \'Head Office\')': assignment, 'Login ID': loginId, 'Password': password } = row;
           if (!name || !code || !role || !assignment || !loginId || !password) {
             errors.push(`Row ${index + 2}: Missing required fields.`);
-            return;
+            continue;
           }
           if (password.length < 6) {
             errors.push(`Row ${index + 2}: Password for ${loginId} must be at least 6 characters.`);
-            return;
+            continue;
           }
           if (existingLoginIds.has(loginId)) {
-            errors.push(`Row ${index + 2}: Login ID "${loginId}" already exists.`);
-            return;
+            errors.push(`Row ${index + 2}: Login ID "${loginId}" already exists in the employee database.`);
+            continue;
           }
           if (!roles.includes(role)) {
              errors.push(`Row ${index + 2}: Invalid role "${role}".`);
-            return;
+            continue;
           }
           if (!validAssignments.has(assignment)) {
              errors.push(`Row ${index + 2}: Invalid assignment "${assignment}".`);
-            return;
+            continue;
+          }
+          
+          if (!auth || !auth.app.options.authDomain) {
+            errors.push(`Row ${index + 2}: Firebase Auth is not configured correctly.`);
+            continue;
+          }
+
+          const email = `${loginId}@${auth.app.options.authDomain}`;
+          try {
+            const methods = await fetchSignInMethodsForEmail(auth, email);
+            if (methods.length > 0) {
+              errors.push(`Row ${index + 2}: Login ID "${loginId}" is already registered in the authentication system.`);
+              continue;
+            }
+          } catch (authError: any) {
+            errors.push(`Row ${index + 2}: Could not verify Login ID "${loginId}" due to a network error. Please try again.`);
+            continue;
           }
 
           validEmployees.push({ name, bengaliName, code, role, assignment, loginId, password });
-        });
+        }
 
         setUploadedEmployees(validEmployees);
         setUploadErrors(errors);
@@ -131,7 +150,13 @@ export default function EmployeesPage() {
 
       } catch (error) {
         toast({ variant: 'destructive', title: 'Error processing file' });
+      } finally {
+        setIsProcessingUpload(false);
       }
+    };
+    reader.onerror = () => {
+        setIsProcessingUpload(false);
+        toast({ variant: 'destructive', title: 'Could not read the file.' });
     };
     reader.readAsArrayBuffer(file);
   };
@@ -162,7 +187,11 @@ export default function EmployeesPage() {
             await setDoc(doc(firestore, "employees", uid), newEmployee);
             successCount++;
         } catch (error: any) {
-            uploadProcessErrors.push(`Failed to create employee ${emp.name} (${emp.loginId}): ${error.message}`);
+            let errorMessage = error.message;
+            if (error.code === 'auth/email-already-in-use') {
+                errorMessage = 'This Login ID is already registered. If you deleted this employee, you must also contact support to have their authentication account removed before re-creating them.';
+            }
+            uploadProcessErrors.push(`Failed to create employee ${emp.name} (${emp.loginId}): ${errorMessage}`);
         }
         setUploadProgress(((i + 1) / uploadedEmployees.length) * 100);
     }
@@ -388,9 +417,13 @@ export default function EmployeesPage() {
                     <FileDown className="h-4 w-4" />
                     Download
                 </Button>
-                <Button size="sm" variant="outline" className="gap-1" onClick={handleUploadClick}>
-                    <FileUp className="h-4 w-4" />
-                    Upload
+                <Button size="sm" variant="outline" className="gap-1" onClick={handleUploadClick} disabled={isProcessingUpload}>
+                  {isProcessingUpload ? 'Processing...' : (
+                    <>
+                      <FileUp className="h-4 w-4" />
+                      Upload
+                    </>
+                  )}
                 </Button>
                 {currentUser?.role === 'Super Admin' && (
                   <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}>
@@ -559,3 +592,5 @@ export default function EmployeesPage() {
     </>
   );
 }
+
+    
