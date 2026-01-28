@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       const loginId = 'superadmin';
-      const password = 'bbb';
+      const password = 'bbbbbb';
       const email = `${loginId}@${auth.app.options.authDomain}`;
 
       try {
@@ -65,7 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Sign out the newly created admin so the user has to login manually.
         await signOut(auth);
 
-        console.log('Super Admin seeded successfully. You can now log in with Login ID: "superadmin" and Password: "bbb"');
+        console.log('Super Admin seeded successfully. You can now log in with Login ID: "superadmin" and Password: "bbbbbb"');
 
       } catch (authError: any) {
         if (authError.code === 'auth/email-already-in-use') {
@@ -110,6 +110,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!password) {
       throw new Error("Password is required.");
     }
+     if (!auth.app.options.authDomain) {
+        throw new Error("Firebase auth domain is not configured. Cannot create email for login.");
+    }
     // This assumes the user's email is formatted as loginId@<auth-domain>
     const email = `${loginId}@${auth.app.options.authDomain}`;
     await signInWithEmailAndPassword(auth, email, password);
@@ -123,6 +126,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updatePassword = async (newPassword: string): Promise<void> => {
     if (!auth.currentUser) {
       throw new Error("No user is logged in.");
+    }
+    if (newPassword.length < 6) {
+        throw new Error("Password must be at least 6 characters long.");
     }
     await fbUpdatePassword(auth.currentUser, newPassword);
   };
