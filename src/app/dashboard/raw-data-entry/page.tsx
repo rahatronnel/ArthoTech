@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/context/AuthContext';
-import { groups } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -13,6 +12,10 @@ import { Download, Upload } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
+import type { Group } from '@/lib/data';
+
 
 type UploadedRow = {
   'Field Worker ID': string;
@@ -47,6 +50,17 @@ export default function RawDataEntryPage() {
     const [file, setFile] = useState<File | null>(null);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
     const [uploadedData, setUploadedData] = useState<UploadedRow[]>([]);
+
+    const firestore = useFirestore();
+    const groupsQuery = useMemoFirebase(() => {
+        if (!firestore || !currentUser) return null;
+        if (currentUser.role === 'Super Admin') {
+            return collection(firestore, 'groups');
+        }
+        return query(collection(firestore, 'groups'), where('responsibleEmployeeId', '==', currentUser.id));
+    }, [firestore, currentUser]);
+    const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
+
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -89,6 +103,9 @@ export default function RawDataEntryPage() {
             { s: { r: 1, c: 13 }, e: { r: 2, c: 13 } },// Advance
             { s: { r: 1, c: 14 }, e: { r: 2, c: 14 } },// Rebate
             { s: { r: 1, c: 15 }, e: { r: 1, c: 17 } },// Total Collection (under loan)
+            { s: { r: 2, c: 15 }, e: { r: 2, c: 15 } }, // Loan Received (principle)
+            { s: { r: 2, c: 16 }, e: { r: 2, c: 16 } }, // Loan Received (Service Charge)
+            { s: { r: 2, c: 17 }, e: { r: 2, c: 17 } }, // Total
             { s: { r: 0, c: 18 }, e: { r: 2, c: 18 } },// Risk fund
             { s: { r: 0, c: 19 }, e: { r: 2, c: 19 } },// Processing Fees / Form fees
             { s: { r: 0, c: 20 }, e: { r: 2, c: 20 } },// Passbook fees
@@ -105,6 +122,10 @@ export default function RawDataEntryPage() {
     const handleProcessUpload = () => {
         if (!file) {
             toast({ variant: "destructive", title: "No file selected", description: "Please select a file to upload." });
+            return;
+        }
+        if (groupsLoading) {
+            toast({ title: "Please wait", description: "Groups are still loading. Try again in a moment." });
             return;
         }
         const reader = new FileReader();
@@ -137,12 +158,7 @@ export default function RawDataEntryPage() {
                     return;
                 }
 
-                const userVisibleGroupCodes = new Set(
-                    (currentUser?.role === 'Super Admin'
-                        ? groups
-                        : groups.filter(g => g.responsibleEmployeeId === currentUser?.id)
-                    ).map(g => g.code)
-                );
+                const userVisibleGroupCodes = new Set(groupsData?.map(g => g.code) || []);
 
                 const allProcessedData: UploadedRow[] = dataRows.map(row => {
                     return {
@@ -242,9 +258,9 @@ export default function RawDataEntryPage() {
                             <Input id="raw-data-upload" type="file" accept=".xlsx, .xls" onChange={handleFileChange} className="file:text-foreground" />
                         </div>
                     </div>
-                     <Button onClick={handleProcessUpload} className="w-full" disabled={!file}>
+                     <Button onClick={handleProcessUpload} className="w-full" disabled={!file || groupsLoading}>
                         <Upload className="mr-2 h-4 w-4" />
-                        Upload and Preview
+                        {groupsLoading ? 'Loading Groups...' : 'Upload and Preview'}
                     </Button>
                 </CardContent>
             </Card>
