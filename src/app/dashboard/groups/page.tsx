@@ -1,12 +1,11 @@
+
 "use client";
 
-import { useState } from 'react';
-import { groups as initialGroups, employees } from '@/lib/data';
-import type { Group } from '@/lib/data';
+import { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -19,19 +18,33 @@ import { useMember } from '@/context/MemberContext';
 import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
 import { useAuth } from '@/context/AuthContext';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, doc, setDoc, deleteDoc, writeBatch, collectionGroup, query, getDocs } from 'firebase/firestore';
+import type { Group, Employee, Branch } from '@/lib/data';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 export default function GroupsPage() {
   const { toast } = useToast();
   const { currentUser } = useAuth();
+  const firestore = useFirestore();
 
-  const userVisibleGroups = currentUser?.role === 'Super Admin'
-    ? initialGroups
-    : initialGroups.filter(g => g.responsibleEmployeeId === currentUser?.id);
+  // Firestore data fetching
+  const employeesQuery = useMemoFirebase(() => collection(firestore, 'employees'), [firestore]);
+  const { data: employees, isLoading: employeesLoading } = useCollection<Employee>(employeesQuery);
 
-  const [groups, setGroups] = useState(userVisibleGroups);
+  const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
+  const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
+  
+  const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
+  const { data: branches, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
+  const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+
+  // These contexts are not yet migrated to Firestore and will return empty/initial values.
   const { memberChanges } = useMember();
   const { savingsTransactions } = useSavings(); 
   const { loanDisbursements, loanCollections } = useLoan();
@@ -41,9 +54,17 @@ export default function GroupsPage() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
+  
+  const userVisibleGroups = useMemo(() => {
+    if (!groupsData) return [];
+    if (currentUser?.role === 'Super Admin') {
+      return groupsData;
+    }
+    return groupsData.filter(g => g.responsibleEmployeeId === currentUser?.id);
+  }, [groupsData, currentUser]);
 
   const getEmployeeName = (employeeId: string) => {
-    return employees.find(e => e.id === employeeId)?.name || 'N/A';
+    return employees?.find(e => e.id === employeeId)?.name || 'N/A';
   };
   
   const calculateCurrentMembers = (groupId: string, initialMembers: number) => {
@@ -90,12 +111,38 @@ export default function GroupsPage() {
     setGroupToDelete(group);
   };
 
-  const confirmDelete = () => {
-    if (groupToDelete) {
-      setGroups(groups.filter(g => g.id !== groupToDelete.id));
-      toast({ title: "Group deleted", description: `"${groupToDelete.name}" has been deleted.` });
-      setGroupToDelete(null);
+  const confirmDelete = async () => {
+    if (groupToDelete && firestore) {
+      try {
+        await deleteDoc(doc(firestore, "branches", groupToDelete.branchId, "groups", groupToDelete.id));
+        toast({ title: "Group deleted", description: `"${groupToDelete.name}" has been deleted.` });
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error deleting group', description: error.message });
+      } finally {
+        setGroupToDelete(null);
+      }
     }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!firestore || !groupsQuery) return;
+    try {
+      const groupsSnapshot = await getDocs(groupsQuery);
+      if (groupsSnapshot.empty) {
+        toast({ title: "No groups to delete." });
+        setIsDeleteAllOpen(false);
+        return;
+      }
+      const batch = writeBatch(firestore);
+      groupsSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+      toast({ title: "All groups deleted." });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error deleting groups', description: error.message });
+    }
+    setIsDeleteAllOpen(false);
   };
 
   const handleDialogClose = () => {
@@ -107,13 +154,14 @@ export default function GroupsPage() {
     const [name, setName] = useState(editingGroup?.name || '');
     const [code, setCode] = useState(editingGroup?.code || '');
     const [day, setDay] = useState(editingGroup?.day || '');
+    const [branchId, setBranchId] = useState(editingGroup?.branchId || '');
     const [responsibleEmployeeId, setResponsibleEmployeeId] = useState(editingGroup?.responsibleEmployeeId || '');
     const [initialMembers, setInitialMembers] = useState(editingGroup?.initialMembers || 0);
     const [initialSavings, setInitialSavings] = useState(editingGroup?.initialSavings || 0);
     const [status, setStatus] = useState<Group['status'] | ''>(editingGroup?.status || '');
 
-    const handleSubmit = () => {
-      if (!name || !code || !day || !responsibleEmployeeId || !status) {
+    const handleSubmit = async () => {
+      if (!name || !code || !day || !branchId || !responsibleEmployeeId || !status || !firestore) {
         toast({
             variant: "destructive",
             title: "Validation Error",
@@ -121,27 +169,33 @@ export default function GroupsPage() {
         });
         return;
       }
-      if (editingGroup) { // Update
-        const updatedGroup: Group = { ...editingGroup, name, code, day, responsibleEmployeeId, status: status as Group['status'], initialMembers, initialSavings };
-
-        setGroups(groups.map(g => (g.id === editingGroup.id ? updatedGroup : g)));
-        toast({ title: "Group updated", description: `"${name}" has been updated.` });
-      } else { // Create
-        const newGroup: Group = {
-          id: `G${String(groups.length + 1).padStart(3, '0')}`,
-          name,
-          code,
-          day,
-          responsibleEmployeeId,
-          initialMembers: initialMembers,
-          initialSavings: initialSavings,
-          status: status as Group['status'],
-          totalLoans: 0,
-        };
-        setGroups([...groups, newGroup]);
-        toast({ title: "Group created", description: `"${name}" has been created.` });
+      try {
+        if (editingGroup) { // Update
+          const groupDocRef = doc(firestore, 'branches', editingGroup.branchId, 'groups', editingGroup.id);
+          const updatedGroup: Partial<Group> = { name, code, day, responsibleEmployeeId, status: status as Group['status'], initialMembers, initialSavings };
+          await setDoc(groupDocRef, updatedGroup, { merge: true });
+          toast({ title: "Group updated", description: `"${name}" has been updated.` });
+        } else { // Create
+          const newDocRef = doc(collection(firestore, 'branches', branchId, 'groups'));
+          const newGroup: Group = {
+            id: newDocRef.id,
+            name,
+            code,
+            day,
+            responsibleEmployeeId,
+            initialMembers,
+            initialSavings,
+            status: status as Group['status'],
+            totalLoans: 0,
+            branchId,
+          };
+          await setDoc(newDocRef, newGroup);
+          toast({ title: "Group created", description: `"${name}" has been created.` });
+        }
+        handleDialogClose();
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Save failed', description: error.message });
       }
-      handleDialogClose();
     };
 
     return (
@@ -154,6 +208,21 @@ export default function GroupsPage() {
                     </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
+                    <div className="grid gap-2">
+                        <Label htmlFor="branch">
+                           Branch
+                        </Label>
+                        <Select onValueChange={setBranchId} value={branchId} disabled={!!editingGroup}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a branch" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {branches?.map(b => (
+                                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <div className="grid gap-2">
                             <Label htmlFor="name">
@@ -193,7 +262,7 @@ export default function GroupsPage() {
                                     <SelectValue placeholder="Select a leader" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {employees.filter(e => e.role === 'Branch User').map(e => (
+                                    {employees?.filter(e => e.role === 'Branch User').map(e => (
                                         <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                                     ))}
                                 </SelectContent>
@@ -237,6 +306,8 @@ export default function GroupsPage() {
         </Dialog>
     );
   };
+  
+  const isLoading = groupsLoading || employeesLoading || branchesLoading;
 
   return (
     <>
@@ -247,6 +318,12 @@ export default function GroupsPage() {
             <CardDescription>Manage client groups and their financial activities.</CardDescription>
           </div>
           <div className="flex items-center gap-2">
+              {currentUser?.role === 'Super Admin' && (
+                <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}>
+                  <Trash2 className="h-4 w-4" />
+                  Delete All
+                </Button>
+              )}
               <Button size="sm" className="gap-1" onClick={handleAddNewClick}>
                   <PlusCircle className="h-4 w-4" />
                   New Group
@@ -254,6 +331,13 @@ export default function GroupsPage() {
           </div>
         </CardHeader>
         <CardContent>
+          {isLoading ? (
+             Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex items-center space-x-4 p-4 border-b">
+                    <Skeleton className="h-10 w-full" />
+                </div>
+            ))
+          ) : (
           <Table>
             <TableHeader>
               <TableRow>
@@ -269,7 +353,7 @@ export default function GroupsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {groups.map((group) => (
+              {userVisibleGroups.map((group) => (
                 <TableRow key={group.id}>
                   <TableCell className="font-medium">{group.name}</TableCell>
                   <TableCell className="hidden md:table-cell">{group.code}</TableCell>
@@ -300,6 +384,7 @@ export default function GroupsPage() {
               ))}
             </TableBody>
           </Table>
+          )}
         </CardContent>
       </Card>
       
@@ -320,6 +405,23 @@ export default function GroupsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <AlertDialog open={isDeleteAllOpen} onOpenChange={setIsDeleteAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete ALL groups.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAll} className="bg-destructive hover:bg-destructive/90">Delete All</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
+
+    
