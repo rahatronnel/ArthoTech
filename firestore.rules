@@ -1,0 +1,274 @@
+rules_version = '2';
+
+/**
+ * @name LendEasy Microfinance Security Rules
+ * @author Firebase Security Rules Architect
+ *
+ * @description
+ * This ruleset is designed for the LendEasy microfinance application. It establishes
+ * a secure-by-default environment where all access requires user authentication.
+ *
+ * Core Philosophy:
+ * The security model assumes all users are internal employees of the organization.
+ * Therefore, the primary security boundary is authentication; users must be signed in
+ * to perform any action. Data is broadly categorized into two types:
+ * 1. Organizational Data: Read-only reference data like regions, zones, and roles.
+ * 2. Operational Data: Active data like employees, groups, and loans, with
+ *    stricter write controls.
+ *
+ * Data Structure:
+ * - Organizational hierarchy is nested: /regions/{regionId}/zones/{zoneId}/...
+ * - Core operational data (groups, members, loans) is nested under /branches/{branchId}/...
+ * - Top-level collections exist for flat hierarchies like /employees and /user_roles.
+ *
+ * Key Security Decisions:
+ * - Default Deny: No access is granted to unauthenticated users.
+ * - Authenticated Reads for Org Data: All signed-in employees can read the
+ *   organizational structure (regions, zones, areas, branches) and user roles.
+ *   Writes to this data are disabled to prevent unauthorized changes.
+ * - Employee Data Ownership: An employee's own record in the /employees
+ *   collection is manageable only by them, following a strict ownership model where
+ *   the document ID must match the user's authentication UID.
+ * - Prototyping Flexibility for Operational Data: For collections like groups, members,
+ *   and loans, any authenticated user can create new documents to facilitate rapid
+ *   development. However, updating and deleting are disabled because the data schema
+ *   lacks ownership fields (`creatorId`, `ownerId`). This is a critical safety
+ *   precaution that should be addressed by adding ownership data to the documents.
+ *
+ * Denormalization for Authorization:
+ * This ruleset is designed with the principle of denormalization in mind. To
+ * implement more granular security (e.g., allowing a Branch Manager to only
+ * modify groups within their own branch), the `Employee` document should contain
+ * their `branchId`, and the `Group` documents should contain a `creatorId` or
+ * `managerId`. The current rules are broad due to the schema's limitations but
+ * are structured to easily incorporate such checks once the data is denormalized.
+ *
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // -------------------------------------------------------------------------
+    // Helper Functions
+    // -------------------------------------------------------------------------
+
+    /**
+     * @description Checks if a user is authenticated.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * @description Checks if the authenticated user's UID matches the provided userId.
+     * This is the core of the ownership model.
+     * @param userId The UID to check against.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Verifies that a document exists before an update or delete operation.
+     * This prevents operations on non-existent documents.
+     */
+    function isExistingDoc() {
+      return resource != null;
+    }
+
+    /**
+     * @description Combines ownership check with an existence check for update/delete operations.
+     * @param userId The UID of the document owner.
+     */
+    function isOwnerOfExistingDoc(userId) {
+      return isOwner(userId) && isExistingDoc();
+    }
+
+    // --- Data Integrity Helpers (Prototyping Mode) ---
+    // These functions only validate IDs critical for authorization and relationships.
+    // They do NOT validate the full data shape.
+
+    /**
+     * @description Validates incoming Employee data on creation.
+     */
+    function hasValidEmployeeData(employeeId) {
+      return request.resource.data.id == employeeId;
+    }
+
+    /**
+     * @description Ensures the Employee ID is immutable on update.
+     */
+    function isEmployeeIdImmutable() {
+      return request.resource.data.id == resource.data.id;
+    }
+
+    /**
+     * @description Validates incoming Group data on creation for path consistency.
+     */
+    function hasValidGroupData(branchId, groupId) {
+      return request.resource.data.id == groupId
+          && request.resource.data.branchId == branchId;
+    }
+
+    /**
+     * @description Validates incoming Member data on creation for path consistency.
+     */
+    function hasValidMemberData(groupId, memberId) {
+      return request.resource.data.id == memberId
+          && request.resource.data.groupId == groupId;
+    }
+
+    /**
+     * @description Validates incoming Loan data on creation for path consistency.
+     */
+    function hasValidLoanData(groupId, loanId) {
+      return request.resource.data.id == loanId
+          && request.resource.data.groupId == groupId;
+    }
+
+    /**
+     * @description Validates incoming Savings data on creation for path consistency.
+     */
+    function hasValidSavingsData(groupId, savingsId) {
+      return request.resource.data.id == savingsId
+          && request.resource.data.groupId == groupId;
+    }
+
+
+    // -------------------------------------------------------------------------
+    // Organizational Structure (Read-Only)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @description Defines rules for the organizational hierarchy (Regions, Zones, Areas, Branches).
+     * This data is considered reference information, readable by any authenticated employee
+     * but not writable through the client SDKs to maintain structural integrity.
+     * @path        /regions/{regionId} and its subcollections
+     * @allow       (get, list) Any authenticated user can read the org structure.
+     * @deny        (create, update, delete) No user can modify the org structure from the app.
+     * @principle   Protects critical reference data by making it read-only for clients.
+     */
+    match /regions/{regionId}/{document=**} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
+    }
+
+
+    // -------------------------------------------------------------------------
+    // Application Roles (Read-Only)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @description Defines security for user role definitions.
+     * Like the organizational structure, roles are considered core configuration data
+     * that should be readable by employees but not modifiable from the client.
+     * @path        /user_roles/{userRoleId}
+     * @allow       (get, list) An authenticated user can read role definitions.
+     * @deny        (create, update, delete) No user can modify roles from the app.
+     * @principle   Protects application configuration data by making it read-only.
+     */
+    match /user_roles/{userRoleId} {
+      allow get, list: if isSignedIn();
+      allow create, update, delete: if false;
+    }
+
+
+    // -------------------------------------------------------------------------
+    // Employee Data
+    // -------------------------------------------------------------------------
+
+    /**
+     * @description Secures employee data, treating it as a user's own profile.
+     * It enforces a strict ownership model where an employee can only create,
+     * update, or delete their own document. Assumes `employeeId` matches `request.auth.uid`.
+     * @path        /employees/{employeeId}
+     * @allow       (create) A new user creating their own employee document (`employeeId` == `auth.uid`).
+     * @allow       (update, delete) An existing user modifying their own employee document.
+     * @deny        (update, delete) A user trying to modify another employee's document.
+     * @principle   Enforces a strict user-ownership model for personal data.
+     */
+    match /employees/{employeeId} {
+      allow get, list: if isSignedIn();
+      allow create: if isOwner(employeeId) && hasValidEmployeeData(employeeId);
+      allow update: if isOwnerOfExistingDoc(employeeId) && isEmployeeIdImmutable();
+      allow delete: if isOwnerOfExistingDoc(employeeId);
+    }
+
+
+    // -------------------------------------------------------------------------
+    // Branch Operational Data (Groups & Subcollections)
+    // -------------------------------------------------------------------------
+
+    /**
+     * @description Secures the groups within a branch. In this prototyping phase, any
+     * authenticated user can create a group to allow for app testing.
+     * CRITICAL: Updates and deletes are disabled because the Group entity is missing
+     * an `ownerId` or `creatorId` field, making ownership verification impossible.
+     * @path        /branches/{branchId}/groups/{groupId}
+     * @allow       (create) Any authenticated user creating a new group.
+     * @deny        (update, delete) Any user trying to modify or delete a group.
+     * @principle   Allows creation for prototyping flexibility but denies modification
+     *              to prevent unauthorized data changes on resources with no owner.
+     */
+    match /branches/{branchId}/groups/{groupId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && hasValidGroupData(branchId, groupId);
+      // CRITICAL: Cannot implement owner-only writes. The 'Group' entity is missing an 'ownerId' or 'creatorId' field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated.
+    }
+
+    /**
+     * @description Secures the members within a group.
+     * Follows the same security pattern as Groups: allows creation by any authenticated user
+     * for prototyping but denies modifications due to a lack of ownership data.
+     * @path        /branches/{branchId}/groups/{groupId}/members/{memberId}
+     * @allow       (create) Any authenticated user creating a new member.
+     * @deny        (update, delete) Any user trying to modify or delete a member.
+     * @principle   Allows creation for prototyping flexibility but denies modification
+     *              to prevent unauthorized data changes on resources with no owner.
+     */
+    match /branches/{branchId}/groups/{groupId}/members/{memberId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && hasValidMemberData(groupId, memberId);
+      // CRITICAL: Cannot implement owner-only writes. The 'Member' entity is missing an 'ownerId' or 'creatorId' field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated.
+    }
+
+    /**
+     * @description Secures the loans within a group.
+     * Follows the same security pattern as Groups: allows creation by any authenticated user
+     * for prototyping but denies modifications due to a lack of ownership data.
+     * @path        /branches/{branchId}/groups/{groupId}/loans/{loanId}
+     * @allow       (create) Any authenticated user creating a new loan record.
+     * @deny        (update, delete) Any user trying to modify or delete a loan record.
+     * @principle   Allows creation for prototyping flexibility but denies modification
+     *              to prevent unauthorized data changes on resources with no owner.
+     */
+    match /branches/{branchId}/groups/{groupId}/loans/{loanId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && hasValidLoanData(groupId, loanId);
+      // CRITICAL: Cannot implement owner-only writes. The 'Loan' entity is missing an 'ownerId' or 'creatorId' field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated.
+    }
+
+    /**
+     * @description Secures the savings records within a group.
+     * Follows the same security pattern as Groups: allows creation by any authenticated user
+     * for prototyping but denies modifications due to a lack of ownership data.
+     * @path        /branches/{branchId}/groups/{groupId}/savings/{savingsId}
+     * @allow       (create) Any authenticated user creating a new savings record.
+     * @deny        (update, delete) Any user trying to modify or delete a savings record.
+     * @principle   Allows creation for prototyping flexibility but denies modification
+     *              to prevent unauthorized data changes on resources with no owner.
+     */
+    match /branches/{branchId}/groups/{groupId}/savings/{savingsId} {
+      allow get, list: if isSignedIn();
+      allow create: if isSignedIn() && hasValidSavingsData(groupId, savingsId);
+      // CRITICAL: Cannot implement owner-only writes. The 'Savings' entity is missing an 'ownerId' or 'creatorId' field.
+      allow update: if false; // TODO: Add owner validation once the schema is updated.
+      allow delete: if false; // TODO: Add owner validation once the schema is updated.
+    }
+  }
+}
