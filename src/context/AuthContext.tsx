@@ -1,3 +1,4 @@
+
 "use client";
 
 import { createContext, useState, useContext, ReactNode, useEffect } from 'react';
@@ -114,7 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         throw new Error("Firebase auth domain is not configured. Cannot create email for login.");
     }
     // This assumes the user's email is formatted as loginId@<auth-domain>
-    const email = `${loginId}@${auth.app.options.authDomain}`;
+    const normalizedLoginId = loginId.toLowerCase().trim();
+    const email = `${normalizedLoginId}@${auth.app.options.authDomain}`;
     await signInWithEmailAndPassword(auth, email, password);
   };
 
@@ -156,3 +158,5 @@ export function useAuth() {
   }
   return context;
 }
+
+    

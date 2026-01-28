@@ -98,7 +98,7 @@ export default function EmployeesPage() {
 
         const errors: string[] = [];
         const validEmployees: any[] = [];
-        const existingLoginIds = new Set(employeesData?.map(emp => emp.loginId));
+        const existingLoginIds = new Set(employeesData?.map(emp => emp.loginId.toLowerCase()));
         const newLoginIdsInFile = new Set<string>();
         const validAssignments = new Set(assignments);
 
@@ -112,11 +112,14 @@ export default function EmployeesPage() {
             errors.push(`Row ${index + 2}: Password for ${loginId} must be at least 6 characters.`);
             continue;
           }
-          if (existingLoginIds.has(loginId)) {
+
+          const normalizedLoginId = String(loginId).toLowerCase().trim();
+
+          if (existingLoginIds.has(normalizedLoginId)) {
             errors.push(`Row ${index + 2}: Login ID "${loginId}" already exists in the employee database.`);
             continue;
           }
-          if (newLoginIdsInFile.has(loginId)) {
+          if (newLoginIdsInFile.has(normalizedLoginId)) {
             errors.push(`Row ${index + 2}: Duplicate Login ID "${loginId}" found in the upload file.`);
             continue;
           }
@@ -134,7 +137,7 @@ export default function EmployeesPage() {
             continue;
           }
 
-          const email = `${loginId}@${auth.app.options.authDomain}`;
+          const email = `${normalizedLoginId}@${auth.app.options.authDomain}`;
           try {
             const methods = await fetchSignInMethodsForEmail(auth, email);
             if (methods.length > 0) {
@@ -147,7 +150,7 @@ export default function EmployeesPage() {
           }
 
           validEmployees.push({ name, bengaliName, code, role, assignment, loginId, password });
-          newLoginIdsInFile.add(loginId);
+          newLoginIdsInFile.add(normalizedLoginId);
         }
 
         setUploadedEmployees(validEmployees);
@@ -178,7 +181,8 @@ export default function EmployeesPage() {
     for (let i = 0; i < uploadedEmployees.length; i++) {
         const emp = uploadedEmployees[i];
         try {
-            const email = `${emp.loginId}@${auth.app.options.authDomain}`;
+            const normalizedLoginId = String(emp.loginId).toLowerCase().trim();
+            const email = `${normalizedLoginId}@${auth.app.options.authDomain}`;
             const userCredential = await createUserWithEmailAndPassword(auth, email, emp.password);
             const uid = userCredential.user.uid;
 
@@ -302,7 +306,8 @@ export default function EmployeesPage() {
           await setDoc(employeeDocRef, updatedData, { merge: true });
           toast({ title: "Employee updated", description: `"${name}" has been updated.` });
         } else { // Create
-          const email = `${loginId}@${auth.app.options.authDomain}`;
+          const normalizedLoginId = loginId.toLowerCase().trim();
+          const email = `${normalizedLoginId}@${auth.app.options.authDomain}`;
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           const uid = userCredential.user.uid;
 
@@ -598,7 +603,5 @@ export default function EmployeesPage() {
     </>
   );
 }
-
-    
 
     
