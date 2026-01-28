@@ -16,12 +16,14 @@ import { useAuth } from '@/context/AuthContext';
 
 
 const columns: string[] = [
-    'Field Worker (ID and Name)',
-    'Samity (ID and name)',
+    'Field Worker ID',
+    'Field Worker Name',
+    'Samity ID',
+    'Samity Name',
     'Component',
     'Savings Collection',
-    'Savings Refund',
     'Interest On Savings',
+    'Savings Refund',
     'Disbursement Amount',
     'Regular Recovarable',
     'Loan Received principle',
@@ -61,10 +63,15 @@ export default function RawDataEntryPage() {
         const templateData = userVisibleGroups.map(group => {
             const fieldWorker = employees.find(e => e.id === group.responsibleEmployeeId);
             const row: any = {};
-            row['Field Worker (ID and Name)'] = fieldWorker ? `${fieldWorker.id} - ${fieldWorker.name}` : 'N/A';
-            row['Samity (ID and name)'] = `${group.id} - ${group.name}`;
+            row['Field Worker ID'] = fieldWorker ? fieldWorker.id : 'N/A';
+            row['Field Worker Name'] = fieldWorker ? fieldWorker.name : 'N/A';
+            row['Samity ID'] = group.id;
+            row['Samity Name'] = group.name;
             row['Component'] = 'General Loan'; // Default value
-            columns.slice(3).forEach(col => row[col] = 0); // Initialize numeric columns to 0
+            
+            // Initialize numeric columns to 0
+            columns.slice(5).forEach(col => row[col] = 0);
+            
             return row;
         });
 
@@ -91,8 +98,8 @@ export default function RawDataEntryPage() {
 
                 if (jsonData.length > 0) {
                     const firstRow = jsonData[0];
-                    if (!firstRow['Samity (ID and name)']) {
-                         toast({ variant: "destructive", title: "Invalid File Format", description: "The file is missing the 'Samity (ID and name)' column." });
+                    if (!firstRow['Samity ID']) {
+                         toast({ variant: "destructive", title: "Invalid File Format", description: "The file is missing the 'Samity ID' column." });
                          return;
                     }
                 }
@@ -102,7 +109,7 @@ export default function RawDataEntryPage() {
                     : groups.filter(g => g.responsibleEmployeeId === currentUser?.id).map(g => g.id);
 
                 const validData = jsonData.filter(row => {
-                    const samityId = String(row['Samity (ID and name)']).split(' - ')[0];
+                    const samityId = String(row['Samity ID']);
                     return userVisibleGroupIds.includes(samityId);
                 });
 
@@ -177,9 +184,29 @@ export default function RawDataEntryPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow className="bg-muted/50">
-                                    {columns.map((colName) => (
-                                        <TableHead key={colName} className="font-bold text-foreground">{colName}</TableHead>
-                                    ))}
+                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Field Worker</TableHead>
+                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Samity (Group)</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Component</TableHead>
+                                    <TableHead colSpan={3} className="text-center font-bold text-foreground border-r">Savings</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Disbursement Amount</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Regular Recovarable</TableHead>
+                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Loan Collection</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Risk fund</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Processing Fees / Form fees</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Passbook fees</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Admission fees</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground">Total Collection</TableHead>
+                                </TableRow>
+                                <TableRow className="bg-muted/50">
+                                    <TableHead className="font-bold text-foreground border-r">ID</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Name</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">ID</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Name</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Savings Collection</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Interest On Savings</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Savings Refund</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Loan Received principle</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">service charge</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
