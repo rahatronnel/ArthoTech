@@ -20,9 +20,9 @@ const columns: string[] = [
     'Samity ID',
     'Samity Name',
     'Component',
-    'Savings Collection RS',
-    'Interest On Savings RS',
-    'Savings Refund RS',
+    'Savings Collection',
+    'Interest On Savings',
+    'Savings Refund',
     'Additional Fees Collection',
     'Disbursement Amount',
     'Regular Recovarable',
@@ -39,6 +39,7 @@ const columns: string[] = [
     'Admission fees',
     'Total Collection',
 ];
+
 
 type UploadedRow = { [key: string]: any };
 
@@ -196,9 +197,9 @@ export default function RawDataEntryPage() {
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Field Worker</TableHead>
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Samity (Group)</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Component</TableHead>
-                                    <TableHead className="text-center font-bold text-foreground border-r">Savings Collection</TableHead>
-                                    <TableHead className="text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
-                                    <TableHead className="text-center font-bold text-foreground border-r">Savings Refund</TableHead>
+                                    <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Savings Collection</TableHead>
+                                    <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
+                                    <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Savings Refund</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Additional Fees Collection</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Disbursement Amount</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Regular Recovarable</TableHead>
@@ -274,5 +275,3 @@ export default function RawDataEntryPage() {
     );
 
 }
-
-    
