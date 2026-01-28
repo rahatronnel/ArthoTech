@@ -55,15 +55,6 @@ export default function RawDataEntryPage() {
     };
     
     const handleDownloadTemplate = () => {
-        const userVisibleGroups = currentUser?.role === 'Super Admin' 
-            ? groups
-            : groups.filter(g => g.responsibleEmployeeId === currentUser?.id);
-
-        if(userVisibleGroups.length === 0){
-             toast({ variant: 'destructive', title: 'No Groups Found', description: 'There are no groups assigned to you to generate a template.' });
-            return;
-        }
-
         const headerRow1 = [
             'Field Worker', null, 'Samity', null, 'Component', 'Savings Collection', 'Interest On Savings', 'Savings Refund', 'Additional Fees Collection', 'Disbursement Amount', 'Regular Recovarable', 'Loan Collection', null, null, null, null, null, null, 'Risk fund', 'Processing Fees / Form fees', 'Passbook fees', 'Admission fees', 'Total Collection'
         ];
@@ -71,37 +62,7 @@ export default function RawDataEntryPage() {
             'ID', 'Name', 'ID', 'Name', null, 'RS', 'RS', 'RS', null, null, null, 'Regular', 'Due', 'Advance', 'Rebate', 'Loan Received (principle)', 'Loan Received (Service Charge)', 'Total', null, null, null, null, null
         ];
 
-        const dataRows = userVisibleGroups.map(group => {
-            const fieldWorker = employees.find(e => e.id === group.responsibleEmployeeId);
-            const row = [
-                fieldWorker ? fieldWorker.id : 'N/A',
-                fieldWorker ? fieldWorker.name : 'N/A',
-                group.id,
-                group.name,
-                'General Loan',
-                0, // Savings Collection
-                0, // Interest On Savings
-                0, // Savings Refund
-                0, // Additional Fees Collection
-                0, // Disbursement Amount
-                0, // Regular Recovarable
-                0, // Loan Collection - Regular
-                0, // Loan Collection - Due
-                0, // Loan Collection - Advance
-                0, // Loan Collection - Rebate
-                0, // Loan Collection - Principle
-                0, // Loan Collection - Service Charge
-                0, // Loan Collection - Total
-                0, // Risk fund
-                0, // Processing Fees
-                0, // Passbook fees
-                0, // Admission fees
-                0, // Total Collection
-            ];
-            return row;
-        });
-
-        const worksheetData = [headerRow1, headerRow2, ...dataRows];
+        const worksheetData = [headerRow1, headerRow2];
         const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
         
         worksheet['!merges'] = [
@@ -126,7 +87,7 @@ export default function RawDataEntryPage() {
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Daily Transactions");
         XLSX.writeFile(workbook, "DailyTransactionTemplate.xlsx");
-        toast({ title: "Template Downloaded", description: "Fill in the template and upload it." });
+        toast({ title: "Template Downloaded", description: "Please fill out the blank template and upload it." });
     };
 
     const handleProcessUpload = () => {
@@ -245,7 +206,7 @@ export default function RawDataEntryPage() {
                 <CardHeader>
                     <CardTitle>Excel Template Format</CardTitle>
                     <CardDescription>
-                        Your Excel file must follow this structure. Use the download button to get a pre-filled template.
+                        Your Excel file must follow this structure. Use the download button to get a blank template.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -256,9 +217,9 @@ export default function RawDataEntryPage() {
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Field Worker</TableHead>
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Samity</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Component</TableHead>
-                                    <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Savings Collection</TableHead>
-                                    <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
-                                    <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Savings Refund</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Savings Collection</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Savings Refund</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Additional Fees Collection</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Disbursement Amount</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Regular Recovarable</TableHead>
@@ -274,9 +235,6 @@ export default function RawDataEntryPage() {
                                     <TableHead className="font-bold text-foreground border-r">Name</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">ID</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Name</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">RS</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">RS</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">RS</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Regular</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Due</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Advance</TableHead>
