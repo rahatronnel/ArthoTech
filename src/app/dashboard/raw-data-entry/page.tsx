@@ -2,8 +2,8 @@
 
 import { useState } from 'react';
 import * as XLSX from 'xlsx';
-import { useToast } from '@/hooks/use-toast';
-import { employees, groups } from '@/lib/data';
+import { useAuth } from '@/context/AuthContext';
+import { groups, employees } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Download, Upload } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useAuth } from '@/context/AuthContext';
+import { useToast } from '@/hooks/use-toast';
 
 type UploadedRow = {
   'Field Worker ID': string;
@@ -104,8 +104,26 @@ export default function RawDataEntryPage() {
                 const worksheet = workbook.Sheets[sheetName];
                 
                 const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
+
+                if (rawData.length < 3) {
+                    toast({
+                        variant: "destructive",
+                        title: "Empty or Invalid File",
+                        description: "The file must contain headers and at least one data row.",
+                    });
+                    return;
+                }
                 
-                const dataRows = rawData.slice(2);
+                const dataRows = rawData.slice(2).filter(row => row && row.length > 0 && row.some(cell => cell !== null && cell !== ''));
+
+                if(dataRows.length === 0) {
+                     toast({
+                        variant: "destructive",
+                        title: "No Data Rows Found",
+                        description: "No data rows were found after the header. Please ensure your data starts on row 3.",
+                    });
+                    return;
+                }
 
                 const userVisibleGroupIds = new Set(
                     (currentUser?.role === 'Super Admin'
@@ -114,7 +132,7 @@ export default function RawDataEntryPage() {
                     ).map(g => g.id)
                 );
 
-                const processedData: UploadedRow[] = dataRows.map(row => {
+                const allProcessedData: UploadedRow[] = dataRows.map(row => {
                     return {
                         'Field Worker ID': String(row[0] || ''),
                         'Field Worker Name': String(row[1] || ''),
@@ -140,20 +158,37 @@ export default function RawDataEntryPage() {
                         'Admission fees': Number(row[21]) || 0,
                         'Total Collection': Number(row[22]) || 0,
                     };
-                }).filter(row => userVisibleGroupIds.has(row['Samity ID']));
+                });
 
+                const validData = allProcessedData.filter(row => userVisibleGroupIds.has(row['Samity ID']));
 
-                if (processedData.length === 0) {
-                    toast({ variant: "destructive", title: "No Valid Data", description: "No data in the file corresponds to your assigned groups, or the file is empty." });
+                if (allProcessedData.length > 0 && validData.length === 0) {
+                    const foundIds = [...new Set(allProcessedData.map(row => row['Samity ID']).filter(id => id))];
+                    const description = `The file contains data, but none of the Samity IDs match your assigned groups. Found IDs: ${foundIds.slice(0, 5).join(', ')}.`;
+                     toast({
+                        variant: "destructive",
+                        title: "No Matching Data",
+                        description: description,
+                        duration: 9000,
+                    });
                     return;
                 }
 
-                setUploadedData(processedData);
+                if (validData.length === 0) {
+                    toast({ 
+                        variant: "destructive", 
+                        title: "No Valid Data", 
+                        description: "No processable data found. This could be because no data corresponds to your assigned groups, or the file is empty after the headers." 
+                    });
+                    return;
+                }
+
+                setUploadedData(validData);
                 setIsConfirmDialogOpen(true);
 
             } catch (error) {
                 console.error("Error parsing Excel file:", error);
-                toast({ variant: "destructive", title: "Error reading file", description: "There was a problem processing the Excel file. Please ensure it matches the template." });
+                toast({ variant: "destructive", title: "Error Reading File", description: "There was a problem processing the file. Please ensure it matches the downloaded template structure." });
             }
         };
         reader.readAsArrayBuffer(file);
