@@ -1,12 +1,11 @@
 "use client";
 
 import { useState } from 'react';
-import { zones as initialZones, regions, employees } from '@/lib/data';
-import type { Zone } from '@/lib/data';
+import type { Zone, Region, Employee } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, MoreHorizontal, FileDown, FileUp } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FileDown, FileUp, Trash2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -14,18 +13,37 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from '@/context/AuthContext';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
 
 export default function ZonesPage() {
   const { toast } = useToast();
-  const [zones, setZones] = useState(initialZones);
+  const { currentUser } = useAuth();
+  const firestore = useFirestore();
+
+  const zonesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'zones')) : null, [firestore]);
+  const { data: zones, isLoading: zonesLoading } = useCollection<Zone>(zonesQuery);
+
+  const regionsQuery = useMemoFirebase(() => collection(firestore, 'regions'), [firestore]);
+  const { data: regions, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
+
+  const employeesQuery = useMemoFirebase(() => collection(firestore, 'employees'), [firestore]);
+  const { data: employees, isLoading: employeesLoading } = useCollection<Employee>(employeesQuery);
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingZone, setEditingZone] = useState<Zone | null>(null);
   const [zoneToDelete, setZoneToDelete] = useState<Zone | null>(null);
+  const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
 
   const getEmployeeName = (employeeId: string) => {
-    return employees.find(e => e.id === employeeId)?.name || 'N/A';
+    return employees?.find(e => e.id === employeeId)?.name || 'N/A';
   };
   
+  const getRegionName = (regionId: string) => {
+    return regions?.find(r => r.id === regionId)?.name || 'N/A';
+  };
+
   const handleAddNewClick = () => {
     setEditingZone(null);
     setIsDialogOpen(true);
@@ -40,12 +58,38 @@ export default function ZonesPage() {
     setZoneToDelete(zone);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (zoneToDelete) {
-      setZones(zones.filter(z => z.id !== zoneToDelete.id));
-      toast({ title: "Zone deleted", description: `"${zoneToDelete.name}" has been deleted.` });
-      setZoneToDelete(null);
+       try {
+        await deleteDoc(doc(firestore, "regions", zoneToDelete.regionId, "zones", zoneToDelete.id));
+        toast({ title: "Zone deleted", description: `"${zoneToDelete.name}" has been deleted.` });
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Error deleting zone', description: error.message });
+      } finally {
+        setZoneToDelete(null);
+      }
     }
+  };
+  
+  const handleDeleteAll = async () => {
+    if (!zonesQuery) return;
+    try {
+      const zonesSnapshot = await getDocs(zonesQuery);
+      if (zonesSnapshot.empty) {
+        toast({ title: "No zones to delete." });
+        setIsDeleteAllOpen(false);
+        return;
+      }
+      const batch = writeBatch(firestore);
+      zonesSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      await batch.commit();
+      toast({ title: 'All zones have been deleted.' });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: 'Error deleting all zones', description: error.message });
+    }
+    setIsDeleteAllOpen(false);
   };
 
   const handleDialogClose = () => {
@@ -57,11 +101,11 @@ export default function ZonesPage() {
     const [name, setName] = useState(editingZone?.name || '');
     const [bengaliName, setBengaliName] = useState(editingZone?.bengaliName || '');
     const [code, setCode] = useState(editingZone?.code || '');
-    const [region, setRegion] = useState(editingZone?.region || '');
+    const [regionId, setRegionId] = useState(editingZone?.regionId || '');
     const [employeeId, setEmployeeId] = useState(editingZone?.responsibleEmployeeId || '');
 
-    const handleSubmit = () => {
-       if (!name || !bengaliName || !code || !region || !employeeId) {
+    const handleSubmit = async () => {
+       if (!name || !bengaliName || !code || !regionId || !employeeId) {
         toast({
             variant: "destructive",
             title: "Validation Error",
@@ -70,23 +114,29 @@ export default function ZonesPage() {
         return;
       }
 
-      if (editingZone) { // Update
-        const updatedZone: Zone = { ...editingZone, name, bengaliName, code, region, responsibleEmployeeId: employeeId };
-        setZones(zones.map(z => z.id === editingZone.id ? updatedZone : z));
-        toast({ title: "Zone updated", description: `"${name}" has been updated.` });
-      } else { // Create
-        const newZone: Zone = {
-          id: `Z${String(zones.length + 1).padStart(3, '0')}`,
-          name,
-          bengaliName,
-          code,
-          region,
-          responsibleEmployeeId: employeeId,
-        };
-        setZones([...zones, newZone]);
-        toast({ title: "Zone created", description: `"${name}" has been created.` });
+      try {
+        if (editingZone) { // Update
+          const zoneDocRef = doc(firestore, 'regions', editingZone.regionId, 'zones', editingZone.id);
+          const updatedData: Partial<Zone> = { name, bengaliName, code, responsibleEmployeeId: employeeId, regionId };
+          await setDoc(zoneDocRef, updatedData, { merge: true });
+          toast({ title: "Zone updated", description: `"${name}" has been updated.` });
+        } else { // Create
+          const newDocRef = doc(collection(firestore, 'regions', regionId, 'zones'));
+          const newZone: Zone = {
+            id: newDocRef.id,
+            name,
+            bengaliName,
+            code,
+            regionId,
+            responsibleEmployeeId: employeeId,
+          };
+          await setDoc(newDocRef, newZone);
+          toast({ title: "Zone created", description: `"${name}" has been created.` });
+        }
+        handleDialogClose();
+      } catch (error: any) {
+        toast({ variant: 'destructive', title: 'Save failed', description: error.message });
       }
-      handleDialogClose();
     };
 
     return (
@@ -121,13 +171,13 @@ export default function ZonesPage() {
               <Label htmlFor="region">
                 Region
               </Label>
-              <Select onValueChange={setRegion} value={region}>
+              <Select onValueChange={setRegionId} value={regionId} disabled={!!editingZone}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a region" />
                 </SelectTrigger>
                 <SelectContent>
-                  {regions.map(r => (
-                    <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+                  {regions?.map(r => (
+                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -141,7 +191,7 @@ export default function ZonesPage() {
                   <SelectValue placeholder="Select an employee" />
                 </SelectTrigger>
                 <SelectContent>
-                  {employees.filter(e => e.role === 'Zonal User').map(employee => (
+                  {employees?.filter(e => e.role === 'Zonal User').map(employee => (
                     <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -157,6 +207,8 @@ export default function ZonesPage() {
     );
   };
   
+  const isLoading = zonesLoading || regionsLoading || employeesLoading;
+
   return (
     <Card>
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -173,6 +225,12 @@ export default function ZonesPage() {
                 <FileUp className="h-4 w-4" />
                 Upload
             </Button>
+             {currentUser?.role === 'Super Admin' && (
+              <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}>
+                <Trash2 className="h-4 w-4" />
+                Delete All
+              </Button>
+            )}
             <Button size="sm" className="gap-1" onClick={handleAddNewClick}>
             <PlusCircle className="h-4 w-4" />
             New Zone
@@ -180,6 +238,7 @@ export default function ZonesPage() {
         </div>
       </CardHeader>
       <CardContent>
+        {isLoading ? <p>Loading...</p> : (
         <Table>
           <TableHeader>
             <TableRow>
@@ -192,12 +251,12 @@ export default function ZonesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {zones.map((zone) => (
+            {zones?.map((zone) => (
               <TableRow key={zone.id}>
                 <TableCell className="font-medium">{zone.name}</TableCell>
                 <TableCell>{zone.bengaliName}</TableCell>
                 <TableCell className="hidden md:table-cell">{zone.code}</TableCell>
-                <TableCell className="hidden md:table-cell">{zone.region}</TableCell>
+                <TableCell className="hidden md:table-cell">{getRegionName(zone.regionId)}</TableCell>
                 <TableCell>{getEmployeeName(zone.responsibleEmployeeId)}</TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
@@ -218,6 +277,7 @@ export default function ZonesPage() {
             ))}
           </TableBody>
         </Table>
+        )}
       </CardContent>
       {isDialogOpen && <FormDialog />}
       <AlertDialog open={!!zoneToDelete} onOpenChange={() => setZoneToDelete(null)}>
@@ -232,6 +292,20 @@ export default function ZonesPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+       <AlertDialog open={isDeleteAllOpen} onOpenChange={setIsDeleteAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete ALL zones.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAll} className="bg-destructive hover:bg-destructive/90">Delete All</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
