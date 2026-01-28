@@ -28,6 +28,7 @@ import {
   Wallet,
   Landmark,
   HandCoins,
+  FileUp,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceHolderImages } from "@/lib/placeholder-images";
@@ -49,6 +50,7 @@ const navItems = [
   { href: "/dashboard/loan-disbursement", icon: Landmark, label: "Loan Disbursement" },
   { href: "/dashboard/loan-collection", icon: HandCoins, label: "Loan Collection" },
   { href: "/dashboard/upload-bulk-data", icon: Archive, label: "Others Data" },
+  { href: "/dashboard/upload-daily-transection", icon: FileUp, label: "Upload Daily Transaction" },
   { href: "/dashboard/roles", icon: ShieldCheck, label: "Roles" },
   { href: "/dashboard/configuration", icon: Settings, label: "Configuration" },
 ];
