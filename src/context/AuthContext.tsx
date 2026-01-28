@@ -4,7 +4,7 @@ import { createContext, useState, useContext, ReactNode, useEffect } from 'react
 import { useRouter } from 'next/navigation';
 import type { Employee } from '@/lib/data';
 import { useAuth as useFirebaseAuth, useFirestore, useUser } from '@/firebase';
-import { doc, getDoc, collection, query, limit, getDocs, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, signOut, updatePassword as fbUpdatePassword, User, createUserWithEmailAndPassword } from 'firebase/auth';
 
 type AuthContextType = {
@@ -27,56 +27,54 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const firestore = useFirestore();
   const router = useRouter();
 
-  // Seed a default Super Admin if no employees exist in the database.
+  // Seed a default Super Admin if one doesn't exist.
   useEffect(() => {
     const seedSuperAdmin = async () => {
-      if (!firestore || !auth) return;
-
-      const employeesQuery = query(collection(firestore, 'employees'), limit(1));
+      if (!firestore || !auth || !auth.app.options.authDomain) {
+          // Firebase services aren't ready, or config is missing.
+          if (!auth?.app.options.authDomain) {
+              console.error("Cannot seed admin: authDomain is not available in Firebase config.");
+          }
+          return;
+      }
       
+      const loginId = 'admin';
+      const password = 'password';
+      const email = `${loginId}@${auth.app.options.authDomain}`;
+
       try {
-        const snapshot = await getDocs(employeesQuery);
+        // This will create the user and sign them in.
+        // It will fail with 'auth/email-already-in-use' if the user exists, which is expected.
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const uid = userCredential.user.uid;
+
+        console.log("No Super Admin found. Seeding new admin account...");
+
+        const adminEmployee: Omit<Employee, 'id'> = {
+          name: 'Super Admin',
+          bengaliName: 'সুপার অ্যাডমিন',
+          code: 'ADMIN-001',
+          role: 'Super Admin',
+          assignment: 'Head Office',
+          loginId: loginId,
+        };
         
-        if (snapshot.empty) {
-          console.log("No employees found. Seeding Super Admin...");
-          const loginId = 'admin';
-          const password = 'password';
-          const authDomain = auth.app.options.authDomain;
-          if (!authDomain) {
-            console.error("Cannot seed admin: authDomain is not available.");
-            return;
-          }
-          const email = `${loginId}@${authDomain}`;
+        // Because createUser... signs the user in, this setDoc is allowed by the `isSignedIn()` rule.
+        await setDoc(doc(firestore, "employees", uid), adminEmployee);
+        
+        // Sign out the newly created admin so the user has to login manually.
+        await signOut(auth);
 
-          try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const uid = userCredential.user.uid;
+        console.log('Super Admin seeded successfully. You can now log in with Login ID: "admin" and Password: "password"');
 
-            const adminEmployee: Omit<Employee, 'id'> = {
-              name: 'Super Admin',
-              bengaliName: 'সুপার অ্যাডমিন',
-              code: 'ADMIN-001',
-              role: 'Super Admin',
-              assignment: 'Head Office',
-              loginId: loginId,
-            };
-            
-            await setDoc(doc(firestore, "employees", uid), adminEmployee);
-            
-            // Sign out the newly created admin so the user has to login manually.
-            await signOut(auth);
-
-            console.log('Super Admin seeded successfully. You can now log in with Login ID: "admin" and Password: "password"');
-          } catch (authError: any) {
-            if (authError.code === 'auth/email-already-in-use') {
-              console.log('Admin user already exists in Firebase Auth. Skipping seeding.');
-            } else {
-              console.error('Error creating admin user in Auth:', authError);
-            }
-          }
+      } catch (authError: any) {
+        if (authError.code === 'auth/email-already-in-use') {
+          // This is the expected "error" on subsequent loads, means admin exists.
+          console.log('Admin user already exists. Skipping seeding.');
+        } else {
+          // Log other, unexpected errors during the seeding process.
+          console.error('Error during admin seeding:', authError);
         }
-      } catch (firestoreError) {
-        console.error('Error checking for existing employees in Firestore:', firestoreError);
       }
     };
 
