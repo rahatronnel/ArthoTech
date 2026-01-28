@@ -99,6 +99,7 @@ export default function EmployeesPage() {
         const errors: string[] = [];
         const validEmployees: any[] = [];
         const existingLoginIds = new Set(employeesData?.map(emp => emp.loginId));
+        const newLoginIdsInFile = new Set<string>();
         const validAssignments = new Set(assignments);
 
         for (const [index, row] of jsonData.entries()) {
@@ -113,6 +114,10 @@ export default function EmployeesPage() {
           }
           if (existingLoginIds.has(loginId)) {
             errors.push(`Row ${index + 2}: Login ID "${loginId}" already exists in the employee database.`);
+            continue;
+          }
+          if (newLoginIdsInFile.has(loginId)) {
+            errors.push(`Row ${index + 2}: Duplicate Login ID "${loginId}" found in the upload file.`);
             continue;
           }
           if (!roles.includes(role)) {
@@ -142,6 +147,7 @@ export default function EmployeesPage() {
           }
 
           validEmployees.push({ name, bengaliName, code, role, assignment, loginId, password });
+          newLoginIdsInFile.add(loginId);
         }
 
         setUploadedEmployees(validEmployees);
@@ -592,5 +598,7 @@ export default function EmployeesPage() {
     </>
   );
 }
+
+    
 
     
