@@ -21,8 +21,11 @@ const columns: string[] = [
     'Samity Name',
     'Component',
     'Savings Collection',
+    'RS_1',
     'Interest On Savings',
+    'RS_2',
     'Savings Refund',
+    'RS_3',
     'Additional Fees Collection',
     'Disbursement Amount',
     'Regular Recovarable',
@@ -69,7 +72,11 @@ export default function RawDataEntryPage() {
             const fieldWorker = employees.find(e => e.id === group.responsibleEmployeeId);
             const row: any = {};
             columns.forEach(col => {
-                 row[col] = 0;
+                 if (col.startsWith('RS_')) {
+                    row[col] = '';
+                 } else {
+                    row[col] = 0;
+                 }
             });
             row['Field Worker ID'] = fieldWorker ? fieldWorker.id : 'N/A';
             row['Field Worker Name'] = fieldWorker ? fieldWorker.name : 'N/A';
@@ -80,7 +87,14 @@ export default function RawDataEntryPage() {
             return row;
         });
 
-        const worksheet = XLSX.utils.json_to_sheet(templateData, { header: columns });
+        const displayColumns = columns.map(c => {
+            if (c.startsWith('RS_')) return 'RS';
+            return c;
+        });
+
+        const worksheet = XLSX.utils.json_to_sheet(templateData, { header: columns, skipHeader: true });
+        XLSX.utils.sheet_add_aoa(worksheet, [displayColumns], { origin: 'A1' });
+
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Daily Transactions");
         XLSX.writeFile(workbook, "DailyTransactionTemplate.xlsx");
@@ -193,8 +207,11 @@ export default function RawDataEntryPage() {
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Samity (Group)</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Component</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Savings Collection</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">RS</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">RS</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Savings Refund</TableHead>
+                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">RS</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Additional Fees Collection</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Disbursement Amount</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Regular Recovarable</TableHead>
