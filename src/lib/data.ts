@@ -30,6 +30,8 @@ export type Branch = {
   code: string;
   bengaliName: string;
   areaId: string;
+  address: string;
+  contactNumber: string;
 };
 
 export type Employee = {
