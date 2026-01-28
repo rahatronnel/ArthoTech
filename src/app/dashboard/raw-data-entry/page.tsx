@@ -14,7 +14,32 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
 
-type UploadedRow = { [key: string]: any };
+type UploadedRow = {
+  'Field Worker ID': string;
+  'Field Worker Name': string;
+  'Samity ID': string;
+  'Samity Name': string;
+  'Component': string;
+  'Savings Collection': number;
+  'Interest On Savings': number;
+  'Savings Refund': number;
+  'Additional Fees Collection': number;
+  'Disbursement Amount': number;
+  'Regular Recovarable': number;
+  'Loan Collection Regular': number;
+  'Loan Collection Due': number;
+  'Loan Collection Advance': number;
+  'Loan Collection Rebate': number;
+  'Loan Received (principle)': number;
+  'Loan Received (Service Charge)': number;
+  'Loan Collection Total': number;
+  'Risk fund': number;
+  'Processing Fees / Form fees': number;
+  'Passbook fees': number;
+  'Admission fees': number;
+  'Total Collection': number;
+};
+
 
 export default function RawDataEntryPage() {
     const { toast } = useToast();
@@ -48,14 +73,32 @@ export default function RawDataEntryPage() {
 
         const dataRows = userVisibleGroups.map(group => {
             const fieldWorker = employees.find(e => e.id === group.responsibleEmployeeId);
-            return [
+            const row = [
                 fieldWorker ? fieldWorker.id : 'N/A',
                 fieldWorker ? fieldWorker.name : 'N/A',
                 group.id,
                 group.name,
                 'General Loan',
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, // Savings Collection
+                0, // Interest On Savings
+                0, // Savings Refund
+                0, // Additional Fees Collection
+                0, // Disbursement Amount
+                0, // Regular Recovarable
+                0, // Loan Collection - Regular
+                0, // Loan Collection - Due
+                0, // Loan Collection - Advance
+                0, // Loan Collection - Rebate
+                0, // Loan Collection - Principle
+                0, // Loan Collection - Service Charge
+                0, // Loan Collection - Total
+                0, // Risk fund
+                0, // Processing Fees
+                0, // Passbook fees
+                0, // Admission fees
+                0, // Total Collection
             ];
+            return row;
         });
 
         const worksheetData = [headerRow1, headerRow2, ...dataRows];
@@ -66,6 +109,9 @@ export default function RawDataEntryPage() {
             { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },  // Field Worker
             { s: { r: 0, c: 2 }, e: { r: 0, c: 3 } },  // Samity (Group)
             { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } },  // Component
+            { s: { r: 0, c: 5 }, e: { r: 1, c: 5 } },  // Savings Collection
+            { s: { r: 0, c: 6 }, e: { r: 1, c: 6 } },  // Interest on Savings
+            { s: { r: 0, c: 7 }, e: { r: 1, c: 7 } },  // Savings Refund
             { s: { r: 0, c: 8 }, e: { r: 1, c: 8 } },  // Additional Fees Collection
             { s: { r: 0, c: 9 }, e: { r: 1, c: 9 } },  // Disbursement Amount
             { s: { r: 0, c: 10 }, e: { r: 1, c: 10 } },// Regular Recovarable
@@ -92,60 +138,61 @@ export default function RawDataEntryPage() {
         reader.onload = (e) => {
             try {
                 const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                const workbook = XLSX.read(data, { type: 'array', sheetRows: 2 }); // Read only first 2 rows for headers
+                const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
                 
-                // We need to read the file again for the full data
-                const fullWorkbook = XLSX.read(data, { type: 'array' });
-                const fullWorksheet = fullWorkbook.Sheets[sheetName];
-                const jsonData: UploadedRow[] = XLSX.utils.sheet_to_json(fullWorksheet, { header: 1, range: 1 }); // Range starts from second header row
-
-                const header1 = (XLSX.utils.sheet_to_json(worksheet, {header: 1})[0] as string[]) || [];
-
-                if (jsonData.length > 0) {
-                     if (!header1.includes('Samity (Group)')) {
-                         toast({ variant: "destructive", title: "Invalid File Format", description: "The file is missing the 'Samity (Group)' column." });
-                         return;
-                    }
-                }
+                const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
                 
-                const userVisibleGroupIds = currentUser?.role === 'Super Admin'
-                    ? groups.map(g => g.id)
-                    : groups.filter(g => g.responsibleEmployeeId === currentUser?.id).map(g => g.id);
+                const dataRows = rawData.slice(2);
 
-                // Map headers from the file to our expected data structure
-                const fileHeaders = jsonData[0] as string[];
-                const samityIdIndex = fileHeaders.findIndex(h => h && h.toLowerCase().includes('id'));
-                
-                if (samityIdIndex === -1) {
-                     toast({ variant: "destructive", title: "Invalid File Format", description: "Could not find 'Samity ID' column." });
-                     return;
-                }
+                const userVisibleGroupIds = new Set(
+                    (currentUser?.role === 'Super Admin'
+                        ? groups
+                        : groups.filter(g => g.responsibleEmployeeId === currentUser?.id)
+                    ).map(g => g.id)
+                );
 
-                // data starts from the 3rd row in the sheet (index 2) but json_to_json with range:1 makes it start at index 1
-                const validData = jsonData.slice(1).filter(row => {
-                    const samityId = String((row as any[])[samityIdIndex]);
-                    return userVisibleGroupIds.includes(samityId);
-                }).map(row => {
-                    const rowData: UploadedRow = {};
-                    fileHeaders.forEach((header, index) => {
-                        rowData[header] = (row as any[])[index];
-                    });
-                    return rowData;
-                });
+                const processedData: UploadedRow[] = dataRows.map(row => {
+                    return {
+                        'Field Worker ID': String(row[0] || ''),
+                        'Field Worker Name': String(row[1] || ''),
+                        'Samity ID': String(row[2] || ''),
+                        'Samity Name': String(row[3] || ''),
+                        'Component': String(row[4] || ''),
+                        'Savings Collection': Number(row[5]) || 0,
+                        'Interest On Savings': Number(row[6]) || 0,
+                        'Savings Refund': Number(row[7]) || 0,
+                        'Additional Fees Collection': Number(row[8]) || 0,
+                        'Disbursement Amount': Number(row[9]) || 0,
+                        'Regular Recovarable': Number(row[10]) || 0,
+                        'Loan Collection Regular': Number(row[11]) || 0,
+                        'Loan Collection Due': Number(row[12]) || 0,
+                        'Loan Collection Advance': Number(row[13]) || 0,
+                        'Loan Collection Rebate': Number(row[14]) || 0,
+                        'Loan Received (principle)': Number(row[15]) || 0,
+                        'Loan Received (Service Charge)': Number(row[16]) || 0,
+                        'Loan Collection Total': Number(row[17]) || 0,
+                        'Risk fund': Number(row[18]) || 0,
+                        'Processing Fees / Form fees': Number(row[19]) || 0,
+                        'Passbook fees': Number(row[20]) || 0,
+                        'Admission fees': Number(row[21]) || 0,
+                        'Total Collection': Number(row[22]) || 0,
+                    };
+                }).filter(row => userVisibleGroupIds.has(row['Samity ID']));
 
-                if (validData.length === 0) {
-                    toast({ variant: "destructive", title: "No Valid Data", description: "No data in the file corresponds to your assigned groups." });
+
+                if (processedData.length === 0) {
+                    toast({ variant: "destructive", title: "No Valid Data", description: "No data in the file corresponds to your assigned groups, or the file is empty." });
                     return;
                 }
 
-                setUploadedData(validData);
+                setUploadedData(processedData);
                 setIsConfirmDialogOpen(true);
 
             } catch (error) {
                 console.error("Error parsing Excel file:", error);
-                toast({ variant: "destructive", title: "Error reading file", description: "There was a problem processing the Excel file." });
+                toast({ variant: "destructive", title: "Error reading file", description: "There was a problem processing the Excel file. Please ensure it matches the template." });
             }
         };
         reader.readAsArrayBuffer(file);
@@ -198,7 +245,7 @@ export default function RawDataEntryPage() {
                 <CardHeader>
                     <CardTitle>Excel Template Format</CardTitle>
                     <CardDescription>
-                        Your Excel file must have the following columns in this exact order.
+                        Your Excel file must follow this structure. Use the download button to get a pre-filled template.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -209,9 +256,9 @@ export default function RawDataEntryPage() {
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Field Worker</TableHead>
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Samity (Group)</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Component</TableHead>
-                                    <TableHead className="text-center font-bold text-foreground border-r">Savings Collection</TableHead>
-                                    <TableHead className="text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
-                                    <TableHead className="text-center font-bold text-foreground border-r">Savings Refund</TableHead>
+                                    <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Savings Collection</TableHead>
+                                    <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
+                                    <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Savings Refund</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Additional Fees Collection</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Disbursement Amount</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Regular Recovarable</TableHead>
@@ -262,7 +309,7 @@ export default function RawDataEntryPage() {
                         <TableHeader>
                             <TableRow>
                                 {uploadedData.length > 0 && Object.keys(uploadedData[0]).map((key) => (
-                                    <TableHead key={key}>{key}</TableHead>
+                                    <TableHead key={key} className="whitespace-nowrap">{key}</TableHead>
                                 ))}
                             </TableRow>
                         </TableHeader>
@@ -270,7 +317,7 @@ export default function RawDataEntryPage() {
                             {uploadedData.map((row, rowIndex) => (
                                 <TableRow key={rowIndex}>
                                     {Object.values(row).map((cell, cellIndex) => (
-                                        <TableCell key={cellIndex}>{String(cell)}</TableCell>
+                                        <TableCell key={cellIndex} className="whitespace-nowrap">{String(cell)}</TableCell>
                                     ))}
                                 </TableRow>
                             ))}
