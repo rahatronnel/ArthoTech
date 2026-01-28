@@ -3,7 +3,7 @@ export type Region = {
   name: string;
   code: string;
   bengaliName: string;
-  responsibleEmployeeId: string;
+  responsibleEmployeeId?: string;
 };
 
 export type Zone = {
@@ -12,7 +12,7 @@ export type Zone = {
   code: string;
   bengaliName: string;
   regionId: string;
-  responsibleEmployeeId: string;
+  responsibleEmployeeId?: string;
 };
 
 export type Area = {
@@ -21,7 +21,7 @@ export type Area = {
   code: string;
   bengaliName: string;
   zoneId: string;
-  responsibleEmployeeId: string;
+  responsibleEmployeeId?: string;
 };
 
 export type Branch = {

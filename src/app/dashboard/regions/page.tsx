@@ -34,7 +34,8 @@ export default function RegionsPage() {
   const [regionToDelete, setRegionToDelete] = useState<Region | null>(null);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
 
-  const getEmployeeName = (employeeId: string) => {
+  const getEmployeeName = (employeeId?: string) => {
+    if (!employeeId) return 'N/A';
     return employees?.find(e => e.id === employeeId)?.name || 'N/A';
   };
 
@@ -109,11 +110,11 @@ export default function RegionsPage() {
     const [employeeId, setEmployeeId] = useState(editingRegion?.responsibleEmployeeId || '');
   
     const handleSubmit = async () => {
-      if (!name || !bengaliName || !code || !employeeId) {
+      if (!name || !bengaliName || !code) {
         toast({
             variant: "destructive",
             title: "Validation Error",
-            description: "Please fill out all fields.",
+            description: "Please fill out Name, Bengali Name, and Code.",
         });
         return;
       }
@@ -176,9 +177,10 @@ export default function RegionsPage() {
               </Label>
               <Select onValueChange={setEmployeeId} value={employeeId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select an employee" />
+                  <SelectValue placeholder="Select an employee (optional)" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">None</SelectItem>
                   {employees?.filter(e => e.role === 'Regional User').map(employee => (
                     <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
                   ))}

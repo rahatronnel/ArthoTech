@@ -37,7 +37,8 @@ export default function ZonesPage() {
   const [zoneToDelete, setZoneToDelete] = useState<Zone | null>(null);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
 
-  const getEmployeeName = (employeeId: string) => {
+  const getEmployeeName = (employeeId?: string) => {
+    if (!employeeId) return 'N/A';
     return employees?.find(e => e.id === employeeId)?.name || 'N/A';
   };
   
@@ -123,11 +124,11 @@ export default function ZonesPage() {
     const [employeeId, setEmployeeId] = useState(editingZone?.responsibleEmployeeId || '');
 
     const handleSubmit = async () => {
-       if (!name || !bengaliName || !code || !regionId || !employeeId) {
+       if (!name || !bengaliName || !code || !regionId) {
         toast({
             variant: "destructive",
             title: "Validation Error",
-            description: "Please fill out all fields.",
+            description: "Please fill out Name, Bengali Name, Code, and Region.",
         });
         return;
       }
@@ -206,9 +207,10 @@ export default function ZonesPage() {
               </Label>
               <Select onValueChange={setEmployeeId} value={employeeId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select an employee" />
+                  <SelectValue placeholder="Select an employee (optional)" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="">None</SelectItem>
                   {employees?.filter(e => e.role === 'Zonal User').map(employee => (
                     <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
                   ))}

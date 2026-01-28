@@ -43,7 +43,8 @@ export default function AreasPage() {
   const [areaToDelete, setAreaToDelete] = useState<FullArea | null>(null);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
 
-  const getEmployeeName = (employeeId: string) => {
+  const getEmployeeName = (employeeId?: string) => {
+    if (!employeeId) return 'N/A';
     const employee = employees?.find(e => e.id === employeeId);
     return employee?.name || 'N/A';
   };
@@ -140,11 +141,11 @@ export default function AreasPage() {
     }, [regionId, zones]);
 
     const handleSubmit = async () => {
-      if (!name || !bengaliName || !code || !regionId || !zoneId || !employeeId) {
+      if (!name || !bengaliName || !code || !regionId || !zoneId) {
         toast({
             variant: "destructive",
             title: "Validation Error",
-            description: "Please fill out all fields.",
+            description: "Please fill out Name, Bengali Name, Code, Region and Zone.",
         });
         return;
       }
@@ -239,9 +240,10 @@ export default function AreasPage() {
                         </Label>
                         <Select onValueChange={setEmployeeId} value={employeeId}>
                             <SelectTrigger>
-                                <SelectValue placeholder="Select an employee" />
+                                <SelectValue placeholder="Select an employee (optional)" />
                             </SelectTrigger>
                             <SelectContent>
+                                <SelectItem value="">None</SelectItem>
                                 {employees?.filter(e => e.role === 'Area User').map(employee => (
                                     <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
                                 ))}
