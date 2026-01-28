@@ -55,7 +55,7 @@ export default function RawDataEntryPage() {
     };
     
     const handleDownloadTemplate = () => {
-        const headerRow1 = [
+       const headerRow1 = [
             'Field Worker', null, 'Samity', null, 'Component', 'Savings Collection', 'Interest On Savings', 'Savings Refund', 'Additional Fees Collection', 'Disbursement Amount', 'Regular Recovarable', 'Loan Collection', null, null, null, null, null, null, 'Risk fund', 'Processing Fees / Form fees', 'Passbook fees', 'Admission fees', 'Total Collection'
         ];
         const headerRow2 = [
@@ -125,11 +125,11 @@ export default function RawDataEntryPage() {
                     return;
                 }
 
-                const userVisibleGroupIds = new Set(
+                const userVisibleGroupCodes = new Set(
                     (currentUser?.role === 'Super Admin'
                         ? groups
                         : groups.filter(g => g.responsibleEmployeeId === currentUser?.id)
-                    ).map(g => g.id)
+                    ).map(g => g.code)
                 );
 
                 const allProcessedData: UploadedRow[] = dataRows.map(row => {
@@ -160,11 +160,11 @@ export default function RawDataEntryPage() {
                     };
                 });
 
-                const validData = allProcessedData.filter(row => userVisibleGroupIds.has(row['Samity ID']));
+                const validData = allProcessedData.filter(row => userVisibleGroupCodes.has(row['Samity ID']));
 
                 if (allProcessedData.length > 0 && validData.length === 0) {
                     const foundIds = [...new Set(allProcessedData.map(row => row['Samity ID']).filter(id => id))];
-                    const description = `The file contains data, but none of the Samity IDs match your assigned groups. Found IDs: ${foundIds.slice(0, 5).join(', ')}.`;
+                    const description = `The file contains data, but none of the Samity IDs match the Group Codes of your assigned groups. Found IDs: ${foundIds.slice(0, 5).join(', ')}.`;
                      toast({
                         variant: "destructive",
                         title: "No Matching Data",
@@ -252,9 +252,9 @@ export default function RawDataEntryPage() {
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Field Worker</TableHead>
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Samity</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Component</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Savings Collection</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
-                                    <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Savings Refund</TableHead>
+                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Savings Collection</TableHead>
+                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
+                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Savings Refund</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Additional Fees Collection</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Disbursement Amount</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Regular Recovarable</TableHead>
@@ -270,6 +270,12 @@ export default function RawDataEntryPage() {
                                     <TableHead className="font-bold text-foreground border-r">Name</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">ID</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Name</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">RS</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">RS</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">RS</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Regular</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Due</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Advance</TableHead>
