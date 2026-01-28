@@ -28,74 +28,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const firestore = useFirestore();
   const router = useRouter();
 
-  // Seed a default Super Admin if one doesn't exist.
-  useEffect(() => {
-    const seedSuperAdmin = async () => {
-      if (!firestore || !auth || !auth.app.options.authDomain) {
-          // Firebase services aren't ready, or config is missing.
-          if (!auth?.app.options.authDomain) {
-              console.error("Cannot seed admin: authDomain is not available in Firebase config.");
-          }
-          return;
-      }
-      
-      const loginId = 'superadmin';
-      const password = 'bbbbbb';
-      const email = `${loginId}@${auth.app.options.authDomain}`;
-
-      try {
-        // This will create the user and sign them in.
-        // It will fail with 'auth/email-already-in-use' if the user exists, which is expected.
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        const uid = userCredential.user.uid;
-
-        console.log("No Super Admin found. Seeding new admin account...");
-
-        const adminEmployee: Omit<Employee, 'id'> = {
-          name: 'Super Admin',
-          bengaliName: 'সুপার অ্যাডমিন',
-          code: 'SADMIN-001',
-          role: 'Super Admin',
-          assignment: 'Head Office',
-          loginId: loginId,
-        };
-        
-        // Because createUser... signs the user in, this setDoc is allowed by the `isSignedIn()` rule.
-        await setDoc(doc(firestore, "employees", uid), adminEmployee);
-        
-        // Sign out the newly created admin so the user has to login manually.
-        await signOut(auth);
-
-        console.log('Super Admin seeded successfully. You can now log in with Login ID: "superadmin" and Password: "bbbbbb"');
-
-      } catch (authError: any) {
-        if (authError.code === 'auth/email-already-in-use') {
-          // This is the expected "error" on subsequent loads, means admin exists.
-          console.log('Admin user already exists. Skipping seeding.');
-        } else {
-          // Log other, unexpected errors during the seeding process.
-          console.error('Error during admin seeding:', authError);
-        }
-      }
-    };
-
-    // Run the check only once after the initial auth state has been determined and if no user is logged in.
-    if (isFirebaseUserLoading === false && !firebaseUser) {
-      seedSuperAdmin();
-    }
-  }, [isFirebaseUserLoading, firebaseUser, firestore, auth, router]);
-
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (firebaseUser) {
         setAuthLoading(true);
         const userDocRef = doc(firestore, 'employees', firebaseUser.uid);
-        const userDoc = await getDoc(userDocRef);
+        
+        // Attempt to get the user document.
+        let userDoc = await getDoc(userDocRef);
+
+        // If the document doesn't exist, it might be a race condition during bulk upload.
+        // Wait a short period and try one more time.
+        if (!userDoc.exists()) {
+            await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5 seconds
+            userDoc = await getDoc(userDocRef); // Retry fetching
+        }
+
         if (userDoc.exists()) {
           setCurrentUser({ id: userDoc.id, ...userDoc.data() } as Employee);
         } else {
+          // If the profile still doesn't exist after the retry, it's a genuine issue.
+          // The user might have been deleted from the DB but not from Auth.
+          // Set to null, which will trigger a logout for security.
+          console.warn(`No employee profile found for user ${firebaseUser.uid}, even after retry. Logging out.`);
           setCurrentUser(null);
-          console.warn(`No employee profile found for user ${firebaseUser.uid}`);
         }
         setAuthLoading(false);
       } else if (!isFirebaseUserLoading) {

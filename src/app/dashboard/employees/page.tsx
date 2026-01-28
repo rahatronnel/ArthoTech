@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
-import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'firebase/auth';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
@@ -108,7 +108,7 @@ export default function EmployeesPage() {
             errors.push(`Row ${index + 2}: Missing required fields.`);
             continue;
           }
-          if (password.length < 6) {
+          if (String(password).length < 6) {
             errors.push(`Row ${index + 2}: Password for ${loginId} must be at least 6 characters.`);
             continue;
           }
@@ -123,6 +123,8 @@ export default function EmployeesPage() {
             errors.push(`Row ${index + 2}: Duplicate Login ID "${loginId}" found in the upload file.`);
             continue;
           }
+          newLoginIdsInFile.add(normalizedLoginId);
+
           if (!roles.includes(role)) {
              errors.push(`Row ${index + 2}: Invalid role "${role}".`);
             continue;
@@ -132,25 +134,7 @@ export default function EmployeesPage() {
             continue;
           }
           
-          if (!auth || !auth.app.options.authDomain) {
-            errors.push(`Row ${index + 2}: Firebase Auth is not configured correctly.`);
-            continue;
-          }
-
-          const email = `${normalizedLoginId}@${auth.app.options.authDomain}`;
-          try {
-            const methods = await fetchSignInMethodsForEmail(auth, email);
-            if (methods.length > 0) {
-              errors.push(`Row ${index + 2}: Login ID "${loginId}" is already registered in the authentication system.`);
-              continue;
-            }
-          } catch (authError: any) {
-            errors.push(`Row ${index + 2}: Could not verify Login ID "${loginId}" due to a network error. Please try again.`);
-            continue;
-          }
-
           validEmployees.push({ name, bengaliName, code, role, assignment, loginId, password });
-          newLoginIdsInFile.add(normalizedLoginId);
         }
 
         setUploadedEmployees(validEmployees);
@@ -235,7 +219,7 @@ export default function EmployeesPage() {
     if (employeeToDelete) {
       try {
         await deleteDoc(doc(firestore, "employees", employeeToDelete.id));
-        toast({ title: "Employee deleted", description: `"${employeeToDelete.name}" has been deleted.` });
+        toast({ title: "Employee deleted", description: `"${employeeToDelete.name}" has been deleted from the app.` });
       } catch (error: any) {
         toast({ variant: "destructive", title: "Error deleting employee", description: error.message });
       } finally {
@@ -317,7 +301,7 @@ export default function EmployeesPage() {
             code,
             role: role as Employee['role'],
             assignment,
-            loginId,
+            loginId: normalizedLoginId,
           };
           
           await setDoc(doc(firestore, "employees", uid), newEmployee);
@@ -575,8 +559,8 @@ export default function EmployeesPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the employee
-              "{employeeToDelete?.name}". The associated login will remain, but will not have access.
+              This action cannot be undone. This will permanently delete the employee record for
+              "{employeeToDelete?.name}" from the application. The associated login account will NOT be deleted. To permanently remove the user's login access, please contact support.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

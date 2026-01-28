@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -22,6 +23,7 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     try {
+      // The login function in AuthContext will handle lower-casing.
       await login(loginId, password);
       toast({ title: "Login Successful", description: "Welcome back!" });
       router.push('/dashboard');
@@ -51,7 +53,6 @@ export default function LoginPage() {
             </div>
           <CardTitle className="text-2xl font-bold text-white">Login</CardTitle>
           <CardDescription className="text-white/80">Enter your credentials to access your account</CardDescription>
-          <p className="text-xs text-center text-white/60 pt-2">First time setup? Use login: <strong>superadmin</strong> &amp; password: <strong>bbbbbb</strong></p>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
@@ -91,3 +92,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
+    
