@@ -14,33 +14,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
 
-const columns: string[] = [
-    'Field Worker ID',
-    'Field Worker Name',
-    'Samity ID',
-    'Samity Name',
-    'Component',
-    'Savings Collection',
-    'Interest On Savings',
-    'Savings Refund',
-    'Additional Fees Collection',
-    'Disbursement Amount',
-    'Regular Recovarable',
-    'Regular',
-    'Due',
-    'Advance',
-    'Rebate',
-    'Loan Received (principle)',
-    'Loan Received (Service Charge)',
-    'Total',
-    'Risk fund',
-    'Processing Fees / Form fees',
-    'Passbook fees',
-    'Admission fees',
-    'Total Collection',
-];
-
-
 type UploadedRow = { [key: string]: any };
 
 export default function RawDataEntryPage() {
@@ -66,26 +39,44 @@ export default function RawDataEntryPage() {
             return;
         }
 
-        const templateData = userVisibleGroups.map(group => {
+        const headerRow1 = [
+            'Field Worker', null, 'Samity (Group)', null, 'Component', 'Savings Collection', 'Interest On Savings', 'Savings Refund', 'Additional Fees Collection', 'Disbursement Amount', 'Regular Recovarable', 'Loan Collection', null, null, null, null, null, null, 'Risk fund', 'Processing Fees / Form fees', 'Passbook fees', 'Admission fees', 'Total Collection'
+        ];
+        const headerRow2 = [
+            'ID', 'Name', 'ID', 'Name', null, 'RS', 'RS', 'RS', null, null, null, 'Regular', 'Due', 'Advance', 'Rebate', 'Loan Received (principle)', 'Loan Received (Service Charge)', 'Total', null, null, null, null, null
+        ];
+
+        const dataRows = userVisibleGroups.map(group => {
             const fieldWorker = employees.find(e => e.id === group.responsibleEmployeeId);
-            const row: any = {};
-            columns.forEach(col => {
-                 if (col.endsWith(' Name') || col.endsWith(' ID') || col === 'Component' ) {
-                    row[col] = '';
-                 } else {
-                    row[col] = 0;
-                 }
-            });
-            row['Field Worker ID'] = fieldWorker ? fieldWorker.id : 'N/A';
-            row['Field Worker Name'] = fieldWorker ? fieldWorker.name : 'N/A';
-            row['Samity ID'] = group.id;
-            row['Samity Name'] = group.name;
-            row['Component'] = 'General Loan'; // Default value
-            
-            return row;
+            return [
+                fieldWorker ? fieldWorker.id : 'N/A',
+                fieldWorker ? fieldWorker.name : 'N/A',
+                group.id,
+                group.name,
+                'General Loan',
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            ];
         });
 
-        const worksheet = XLSX.utils.json_to_sheet(templateData, { header: columns });
+        const worksheetData = [headerRow1, headerRow2, ...dataRows];
+        const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+        
+        worksheet['!merges'] = [
+            // s = start, e = end, r = row, c = col
+            { s: { r: 0, c: 0 }, e: { r: 0, c: 1 } },  // Field Worker
+            { s: { r: 0, c: 2 }, e: { r: 0, c: 3 } },  // Samity (Group)
+            { s: { r: 0, c: 4 }, e: { r: 1, c: 4 } },  // Component
+            { s: { r: 0, c: 8 }, e: { r: 1, c: 8 } },  // Additional Fees Collection
+            { s: { r: 0, c: 9 }, e: { r: 1, c: 9 } },  // Disbursement Amount
+            { s: { r: 0, c: 10 }, e: { r: 1, c: 10 } },// Regular Recovarable
+            { s: { r: 0, c: 11 }, e: { r: 0, c: 17 } },// Loan Collection
+            { s: { r: 0, c: 18 }, e: { r: 1, c: 18 } },// Risk fund
+            { s: { r: 0, c: 19 }, e: { r: 1, c: 19 } },// Processing Fees / Form fees
+            { s: { r: 0, c: 20 }, e: { r: 1, c: 20 } },// Passbook fees
+            { s: { r: 0, c: 21 }, e: { r: 1, c: 21 } },// Admission fees
+            { s: { r: 0, c: 22 }, e: { r: 1, c: 22 } },// Total Collection
+        ];
+        
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Daily Transactions");
         XLSX.writeFile(workbook, "DailyTransactionTemplate.xlsx");
@@ -101,15 +92,20 @@ export default function RawDataEntryPage() {
         reader.onload = (e) => {
             try {
                 const data = new Uint8Array(e.target?.result as ArrayBuffer);
-                const workbook = XLSX.read(data, { type: 'array' });
+                const workbook = XLSX.read(data, { type: 'array', sheetRows: 2 }); // Read only first 2 rows for headers
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                const jsonData: UploadedRow[] = XLSX.utils.sheet_to_json(worksheet);
+                
+                // We need to read the file again for the full data
+                const fullWorkbook = XLSX.read(data, { type: 'array' });
+                const fullWorksheet = fullWorkbook.Sheets[sheetName];
+                const jsonData: UploadedRow[] = XLSX.utils.sheet_to_json(fullWorksheet, { header: 1, range: 1 }); // Range starts from second header row
+
+                const header1 = (XLSX.utils.sheet_to_json(worksheet, {header: 1})[0] as string[]) || [];
 
                 if (jsonData.length > 0) {
-                    const firstRow = jsonData[0];
-                    if (!firstRow['Samity ID']) {
-                         toast({ variant: "destructive", title: "Invalid File Format", description: "The file is missing the 'Samity ID' column." });
+                     if (!header1.includes('Samity (Group)')) {
+                         toast({ variant: "destructive", title: "Invalid File Format", description: "The file is missing the 'Samity (Group)' column." });
                          return;
                     }
                 }
@@ -118,9 +114,25 @@ export default function RawDataEntryPage() {
                     ? groups.map(g => g.id)
                     : groups.filter(g => g.responsibleEmployeeId === currentUser?.id).map(g => g.id);
 
-                const validData = jsonData.filter(row => {
-                    const samityId = String(row['Samity ID']);
+                // Map headers from the file to our expected data structure
+                const fileHeaders = jsonData[0] as string[];
+                const samityIdIndex = fileHeaders.findIndex(h => h && h.toLowerCase().includes('id'));
+                
+                if (samityIdIndex === -1) {
+                     toast({ variant: "destructive", title: "Invalid File Format", description: "Could not find 'Samity ID' column." });
+                     return;
+                }
+
+                // data starts from the 3rd row in the sheet (index 2) but json_to_json with range:1 makes it start at index 1
+                const validData = jsonData.slice(1).filter(row => {
+                    const samityId = String((row as any[])[samityIdIndex]);
                     return userVisibleGroupIds.includes(samityId);
+                }).map(row => {
+                    const rowData: UploadedRow = {};
+                    fileHeaders.forEach((header, index) => {
+                        rowData[header] = (row as any[])[index];
+                    });
+                    return rowData;
                 });
 
                 if (validData.length === 0) {
@@ -197,9 +209,9 @@ export default function RawDataEntryPage() {
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Field Worker</TableHead>
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Samity (Group)</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Component</TableHead>
-                                    <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Savings Collection</TableHead>
-                                    <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
-                                    <TableHead colSpan={1} className="text-center font-bold text-foreground border-r">Savings Refund</TableHead>
+                                    <TableHead className="text-center font-bold text-foreground border-r">Savings Collection</TableHead>
+                                    <TableHead className="text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
+                                    <TableHead className="text-center font-bold text-foreground border-r">Savings Refund</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Additional Fees Collection</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Disbursement Amount</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Regular Recovarable</TableHead>
@@ -229,7 +241,7 @@ export default function RawDataEntryPage() {
                             </TableHeader>
                             <TableBody>
                                  <TableRow>
-                                    <TableCell colSpan={columns.length} className="h-24 text-center text-muted-foreground">
+                                    <TableCell colSpan={23} className="h-24 text-center text-muted-foreground">
                                         Fill your daily transaction data here...
                                     </TableCell>
                                 </TableRow>
