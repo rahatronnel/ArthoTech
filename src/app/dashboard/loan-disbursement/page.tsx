@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -11,11 +11,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLoan } from '@/context/LoanContext';
-import { groups, LoanDisbursement } from '@/lib/data';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, Download } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collectionGroup, query } from 'firebase/firestore';
+import type { Group, LoanDisbursement } from '@/lib/data';
 
 type ReportRow = LoanDisbursement & { groupName: string };
 
@@ -30,10 +32,18 @@ export default function LoanDisbursementPage() {
   const { toast } = useToast();
   const { loanDisbursements, addLoanDisbursement } = useLoan();
   const { currentUser } = useAuth();
-  
-  const userVisibleGroups = currentUser?.role === 'Super Admin'
-    ? groups
-    : groups.filter(g => g.responsibleEmployeeId === currentUser?.id);
+  const firestore = useFirestore();
+
+  const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
+  const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
+
+  const userVisibleGroups = useMemo(() => {
+    if (!groupsData) return [];
+    if (currentUser?.role === 'Super Admin') {
+      return groupsData;
+    }
+    return groupsData.filter(g => g.responsibleEmployeeId === currentUser?.id);
+  }, [groupsData, currentUser]);
   
   // State for the entry form
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -67,7 +77,7 @@ export default function LoanDisbursementPage() {
     addLoanDisbursement({ date, groupId, amount, notes });
     toast({
       title: "Disbursement Recorded",
-      description: `Loan disbursement for ${groups.find(g => g.id === groupId)?.name} on ${date} has been saved.`
+      description: `Loan disbursement for ${groupsData?.find(g => g.id === groupId)?.name} on ${date} has been saved.`
     });
     // Reset form
     setGroupId('');
@@ -175,7 +185,7 @@ export default function LoanDisbursementPage() {
         .filter(d => d.date === searchDate && userVisibleGroups.some(g => g.id === d.groupId))
         .map(d => ({
             ...d,
-            groupName: groups.find(g => g.id === d.groupId)?.name || 'Unknown Group'
+            groupName: groupsData?.find(g => g.id === d.groupId)?.name || 'Unknown Group'
         }));
 
     setReportData(dailyReport);
@@ -201,9 +211,9 @@ export default function LoanDisbursementPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="group">Group</Label>
-              <Select onValueChange={setGroupId} value={groupId}>
+              <Select onValueChange={setGroupId} value={groupId} disabled={groupsLoading}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a group" />
+                  <SelectValue placeholder={groupsLoading ? "Loading..." : "Select a group"} />
                 </SelectTrigger>
                 <SelectContent>
                   {userVisibleGroups.map(g => (
@@ -220,7 +230,7 @@ export default function LoanDisbursementPage() {
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes..."/>
             </div>
-            <Button onClick={handleAddDisbursement} className="w-full">Save Disbursement</Button>
+            <Button onClick={handleAddDisbursement} className="w-full" disabled={groupsLoading}>Save Disbursement</Button>
           </CardContent>
         </Card>
 
@@ -230,9 +240,9 @@ export default function LoanDisbursementPage() {
             <CardDescription>Download the template, fill it out, and upload it here.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Button onClick={handleDownloadTemplate} variant="outline" className="w-full">
+            <Button onClick={handleDownloadTemplate} variant="outline" className="w-full" disabled={groupsLoading}>
                 <Download className="mr-2 h-4 w-4" />
-                Download Template
+                {groupsLoading ? "Loading..." : "Download Template"}
             </Button>
             <div className="space-y-2">
               <Label htmlFor="bulk-upload-disbursement">Upload Filled Template</Label>
@@ -241,9 +251,9 @@ export default function LoanDisbursementPage() {
                 File must be the downloaded template with your data filled in.
               </p>
             </div>
-            <Button onClick={handleProcessUpload} className="w-full" disabled={!file}>
+            <Button onClick={handleProcessUpload} className="w-full" disabled={!file || groupsLoading}>
               <Upload className="mr-2 h-4 w-4" />
-              Upload and Preview
+              {groupsLoading ? "Loading..." : "Upload and Preview"}
             </Button>
           </CardContent>
         </Card>
