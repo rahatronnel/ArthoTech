@@ -51,6 +51,7 @@ export default function LoginPage() {
             </div>
           <CardTitle className="text-2xl font-bold text-white">Login</CardTitle>
           <CardDescription className="text-white/80">Enter your credentials to access your account</CardDescription>
+          <p className="text-xs text-center text-white/60 pt-2">First time setup? Use login: <strong>admin</strong> &amp; password: <strong>password</strong></p>
         </CardHeader>
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
