@@ -14,7 +14,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
 
-
 const columns: string[] = [
     'Field Worker ID',
     'Field Worker Name',
@@ -24,10 +23,16 @@ const columns: string[] = [
     'Savings Collection',
     'Interest On Savings',
     'Savings Refund',
+    'Additional Fees Collection',
     'Disbursement Amount',
     'Regular Recovarable',
+    'Regular',
+    'Due',
+    'Advance',
+    'Rebate',
     'Loan Received principle',
     'service charge',
+    'Total',
     'Risk fund',
     'Processing Fees / Form fees',
     'Passbook fees',
@@ -187,10 +192,10 @@ export default function RawDataEntryPage() {
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Field Worker</TableHead>
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Samity (Group)</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Component</TableHead>
-                                    <TableHead colSpan={3} className="text-center font-bold text-foreground border-r">Savings</TableHead>
+                                    <TableHead colSpan={4} className="text-center font-bold text-foreground border-r">Savings</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Disbursement Amount</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Regular Recovarable</TableHead>
-                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Loan Collection</TableHead>
+                                    <TableHead colSpan={7} className="text-center font-bold text-foreground border-r">Loan Collection</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Risk fund</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Processing Fees / Form fees</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Passbook fees</TableHead>
@@ -205,8 +210,14 @@ export default function RawDataEntryPage() {
                                     <TableHead className="font-bold text-foreground border-r">Savings Collection</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Interest On Savings</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Savings Refund</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Additional Fees Collection</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Regular</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Due</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Advance</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Rebate</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Loan Received principle</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">service charge</TableHead>
+                                    <TableHead className="font-bold text-foreground border-r">Total</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -255,4 +266,5 @@ export default function RawDataEntryPage() {
             </Dialog>
         </div>
     );
-}
+
+    
