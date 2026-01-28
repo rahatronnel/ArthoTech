@@ -20,11 +20,8 @@ const columns: string[] = [
     'Samity ID',
     'Samity Name',
     'Component',
-    'Savings Collection',
     'Savings Collection RS',
-    'Interest On Savings',
     'Interest On Savings RS',
-    'Savings Refund',
     'Savings Refund RS',
     'Additional Fees Collection',
     'Disbursement Amount',
@@ -72,7 +69,7 @@ export default function RawDataEntryPage() {
             const fieldWorker = employees.find(e => e.id === group.responsibleEmployeeId);
             const row: any = {};
             columns.forEach(col => {
-                 if (col.endsWith(' RS') || col.endsWith(' Name') || col.endsWith(' ID') || col === 'Component' ) {
+                 if (col.endsWith(' Name') || col.endsWith(' ID') || col === 'Component' ) {
                     row[col] = '';
                  } else {
                     row[col] = 0;
@@ -199,9 +196,9 @@ export default function RawDataEntryPage() {
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Field Worker</TableHead>
                                     <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Samity (Group)</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Component</TableHead>
-                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Savings Collection</TableHead>
-                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
-                                    <TableHead colSpan={2} className="text-center font-bold text-foreground border-r">Savings Refund</TableHead>
+                                    <TableHead className="text-center font-bold text-foreground border-r">Savings Collection</TableHead>
+                                    <TableHead className="text-center font-bold text-foreground border-r">Interest On Savings</TableHead>
+                                    <TableHead className="text-center font-bold text-foreground border-r">Savings Refund</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Additional Fees Collection</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Disbursement Amount</TableHead>
                                     <TableHead rowSpan={2} className="align-middle text-center font-bold text-foreground border-r">Regular Recovarable</TableHead>
@@ -217,11 +214,8 @@ export default function RawDataEntryPage() {
                                     <TableHead className="font-bold text-foreground border-r">Name</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">ID</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Name</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">RS</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">RS</TableHead>
-                                    <TableHead className="font-bold text-foreground border-r">Amount</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">RS</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Regular</TableHead>
                                     <TableHead className="font-bold text-foreground border-r">Due</TableHead>
