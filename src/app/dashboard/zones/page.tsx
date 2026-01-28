@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -133,10 +134,12 @@ export default function ZonesPage() {
         return;
       }
 
+      const finalEmployeeId = employeeId === 'none' ? undefined : employeeId;
+
       try {
         if (editingZone) { // Update
           const zoneDocRef = doc(firestore, 'regions', editingZone.regionId, 'zones', editingZone.id);
-          const updatedData: Partial<Zone> = { name, bengaliName, code, responsibleEmployeeId: employeeId, regionId };
+          const updatedData: Partial<Zone> = { name, bengaliName, code, responsibleEmployeeId: finalEmployeeId, regionId };
           await setDoc(zoneDocRef, updatedData, { merge: true });
           toast({ title: "Zone updated", description: `"${name}" has been updated.` });
         } else { // Create
@@ -147,7 +150,7 @@ export default function ZonesPage() {
             bengaliName,
             code,
             regionId,
-            responsibleEmployeeId: employeeId,
+            responsibleEmployeeId: finalEmployeeId,
           };
           await setDoc(newDocRef, newZone);
           toast({ title: "Zone created", description: `"${name}" has been created.` });
@@ -210,7 +213,7 @@ export default function ZonesPage() {
                   <SelectValue placeholder="Select an employee (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {employees?.filter(e => e.role === 'Zonal User').map(employee => (
                     <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
                   ))}
@@ -332,3 +335,5 @@ export default function ZonesPage() {
     </Card>
   );
 }
+
+    

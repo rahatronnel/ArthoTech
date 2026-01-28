@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -150,10 +151,12 @@ export default function AreasPage() {
         return;
       }
 
+      const finalEmployeeId = employeeId === 'none' ? undefined : employeeId;
+
       try {
         if (editingArea) { // Update
           const areaDocRef = doc(firestore, 'regions', editingArea.regionId, 'zones', editingArea.zoneId, 'areas', editingArea.id);
-          const updatedData: Partial<FullArea> = { name, bengaliName, code, responsibleEmployeeId: employeeId, zoneId, regionId };
+          const updatedData: Partial<FullArea> = { name, bengaliName, code, responsibleEmployeeId: finalEmployeeId, zoneId, regionId };
           await setDoc(areaDocRef, updatedData, { merge: true });
           toast({ title: "Area updated", description: `"${name}" has been updated.` });
         } else { // Create
@@ -165,7 +168,7 @@ export default function AreasPage() {
             code,
             zoneId,
             regionId,
-            responsibleEmployeeId: employeeId,
+            responsibleEmployeeId: finalEmployeeId,
           };
           await setDoc(newDocRef, newArea);
           toast({ title: "Area created", description: `"${name}" has been created.` });
@@ -243,7 +246,7 @@ export default function AreasPage() {
                                 <SelectValue placeholder="Select an employee (optional)" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="">None</SelectItem>
+                                <SelectItem value="none">None</SelectItem>
                                 {employees?.filter(e => e.role === 'Area User').map(employee => (
                                     <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
                                 ))}
@@ -367,3 +370,5 @@ export default function AreasPage() {
     </Card>
   );
 }
+
+    

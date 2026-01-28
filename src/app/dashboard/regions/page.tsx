@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -119,10 +120,12 @@ export default function RegionsPage() {
         return;
       }
       
+      const finalEmployeeId = employeeId === 'none' ? undefined : employeeId;
+
       try {
         if (editingRegion) { // Update
           const regionDocRef = doc(firestore, 'regions', editingRegion.id);
-          const updatedData: Partial<Region> = { name, bengaliName, code, responsibleEmployeeId: employeeId };
+          const updatedData: Partial<Region> = { name, bengaliName, code, responsibleEmployeeId: finalEmployeeId };
           await setDoc(regionDocRef, updatedData, { merge: true });
           toast({ title: "Region updated", description: `"${name}" has been updated.` });
         } else { // Create
@@ -132,7 +135,7 @@ export default function RegionsPage() {
               name,
               bengaliName,
               code,
-              responsibleEmployeeId: employeeId,
+              responsibleEmployeeId: finalEmployeeId,
           };
           await setDoc(newDocRef, newRegion);
           toast({ title: "Region created", description: `"${name}" has been added.` });
@@ -180,7 +183,7 @@ export default function RegionsPage() {
                   <SelectValue placeholder="Select an employee (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="none">None</SelectItem>
                   {employees?.filter(e => e.role === 'Regional User').map(employee => (
                     <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
                   ))}
@@ -298,3 +301,6 @@ export default function RegionsPage() {
     </Card>
   );
 }
+
+
+    
