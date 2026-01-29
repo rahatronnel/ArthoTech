@@ -6,7 +6,7 @@ import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/context/AuthContext';
 import { useOthersData } from '@/context/OthersDataContext';
-import { type Branch, type OtherDataEntry, otherDataTypes as allDataTypes } from '@/lib/data';
+import { type Branch, type OtherDataEntry, otherDataTypes as allDataTypes, type Group, type Employee } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
 import { useMember } from '@/context/MemberContext';
 import { collection, query, where, collectionGroup } from 'firebase/firestore';
-import type { Group, LoanDisbursement, LoanCollection } from '@/lib/data';
+import type { LoanDisbursement, LoanCollection } from '@/lib/data';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
@@ -73,6 +73,9 @@ export default function RawDataEntryPage() {
     const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
     const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
     
+    const employeesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'employees'): null, [firestore]);
+    const { data: employeesData, isLoading: employeesLoading } = useCollection<Employee>(employeesQuery);
+
     const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
     const { data: branchesData, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
 
@@ -221,7 +224,7 @@ export default function RawDataEntryPage() {
                 });
 
                 if (allProcessedData.length > 0 && validData.length === 0) {
-                    const foundIds = [...new Set(allProcessedData.map(row => row['Samity ID']).filter(id => id))];
+                    const foundIds = [...new Set(allProcessedData.map(row => String(row['Samity ID']).trim().toLowerCase()).filter(id => id))];
                     const description = `The file contains data, but none of the Samity IDs match the Group Codes of your assigned groups. Found Samity IDs in file: ${foundIds.slice(0, 5).join(', ')}.`;
                      toast({
                         variant: "destructive",
@@ -359,7 +362,7 @@ export default function RawDataEntryPage() {
         if (fileInput) fileInput.value = '';
     };
 
-    const isLoading = groupsLoading || branchesLoading;
+    const isLoading = groupsLoading || branchesLoading || employeesLoading;
 
     return (
         <div className="flex flex-col gap-6">
@@ -402,6 +405,8 @@ export default function RawDataEntryPage() {
                 uploadDate={uploadDate}
                 setUploadDate={setUploadDate}
                 handleConfirmUpload={handleConfirmUpload}
+                groupsData={groupsData}
+                employeesData={employeesData}
             />
 
             <Card>
@@ -694,20 +699,32 @@ const Step3Others = ({ data }: { data: UploadedRow[] }) => {
 
 
 // Step 4: Summary
-const Step4Summary = ({ data }: { data: UploadedRow[] }) => {
+const Step4Summary = ({ data, groupsData, employeesData }: { data: UploadedRow[], groupsData: Group[] | null, employeesData: Employee[] | null }) => {
     const summaryData = useMemo(() => {
+        if (!groupsData || !employeesData) return [];
+
+        const groupMap = new Map(groupsData.map(g => [g.code.toLowerCase(), g]));
+        const employeeMap = new Map(employeesData.map(e => [e.id, e]));
         const officerMap = new Map<string, { name: string, total: number }>();
+
         data.forEach(row => {
-            const officerId = row['Field Worker ID'];
-            if (!officerMap.has(officerId)) {
-                officerMap.set(officerId, { name: row['Field Worker Name'], total: 0 });
+            const samityCode = row['Samity ID'].toLowerCase();
+            const group = groupMap.get(samityCode);
+
+            if (group && group.responsibleEmployeeId) {
+                const employee = employeeMap.get(group.responsibleEmployeeId);
+                if (employee) {
+                    if (!officerMap.has(employee.id)) {
+                        officerMap.set(employee.id, { name: employee.name, total: 0 });
+                    }
+                    const current = officerMap.get(employee.id)!;
+                    current.total += row['Total Collection'];
+                    officerMap.set(employee.id, current);
+                }
             }
-            const current = officerMap.get(officerId)!;
-            current.total += row['Total Collection'];
-            officerMap.set(officerId, current);
         });
         return Array.from(officerMap.values());
-    }, [data]);
+    }, [data, groupsData, employeesData]);
     
     const grandTotal = useMemo(() => summaryData.reduce((acc, officer) => acc + officer.total, 0), [summaryData]);
 
@@ -715,7 +732,7 @@ const Step4Summary = ({ data }: { data: UploadedRow[] }) => {
         <Card>
             <CardHeader>
                 <CardTitle>Step 4: Field Officer Summary</CardTitle>
-                <CardDescription>Final review of total collections per field officer.</CardDescription>
+                <CardDescription>Final review of total collections per field officer, based on group assignments.</CardDescription>
             </CardHeader>
             <CardContent>
                  <ScrollArea className="h-[45vh] relative">
@@ -747,7 +764,7 @@ const Step4Summary = ({ data }: { data: UploadedRow[] }) => {
     );
 };
 
-const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, uploadedData, uploadDate, setUploadDate, handleConfirmUpload }: any) => {
+const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, uploadedData, uploadDate, setUploadDate, handleConfirmUpload, groupsData, employeesData }: any) => {
     
      const handleClose = (open: boolean) => {
         if (!open) {
@@ -777,7 +794,7 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
                     {wizardStep === 1 && <Step1Savings data={uploadedData} />}
                     {wizardStep === 2 && <Step2Loans data={uploadedData} />}
                     {wizardStep === 3 && <Step3Others data={uploadedData} />}
-                    {wizardStep === 4 && <Step4Summary data={uploadedData} />}
+                    {wizardStep === 4 && <Step4Summary data={uploadedData} groupsData={groupsData} employeesData={employeesData} />}
                 </div>
 
                 <DialogFooter className="mt-auto pt-4 border-t !justify-between">
