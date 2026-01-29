@@ -21,6 +21,7 @@ export type Area = {
   code: string;
   bengaliName: string;
   zoneId: string;
+  regionId: string;
   responsibleEmployeeId?: string;
 };
 
@@ -30,6 +31,8 @@ export type Branch = {
   code: string;
   bengaliName: string;
   areaId: string;
+  zoneId: string;
+  regionId: string;
   address: string;
   contactNumber: string;
 };
@@ -99,9 +102,9 @@ export type Group = {
   code: string;
   day: string;
   branchId: string;
-  areaId?: string;
-  zoneId?: string;
-  regionId?: string;
+  areaId: string;
+  zoneId: string;
+  regionId: string;
 };
 
 export type Role = {

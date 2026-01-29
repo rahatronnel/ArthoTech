@@ -19,27 +19,25 @@ import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGrou
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-type FullArea = Area & { regionId: string };
-
 export default function AreasPage() {
   const { toast } = useToast();
   const firestore = useFirestore();
 
   const areasQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'areas')) : null, [firestore]);
-  const { data: areas, isLoading: areasLoading } = useCollection<FullArea>(areasQuery);
+  const { data: areas, isLoading: areasLoading } = useCollection<Area>(areasQuery);
 
   const zonesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'zones')) : null, [firestore]);
   const { data: zones, isLoading: zonesLoading } = useCollection<Zone>(zonesQuery);
 
-  const regionsQuery = useMemoFirebase(() => collection(firestore, 'regions'), [firestore]);
+  const regionsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'regions') : null, [firestore]);
   const { data: regions, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
 
   const employeesQuery = useMemoFirebase(() => collection(firestore, 'employees'), [firestore]);
   const { data: employees, isLoading: employeesLoading } = useCollection<Employee>(employeesQuery);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingArea, setEditingArea] = useState<FullArea | null>(null);
-  const [areaToDelete, setAreaToDelete] = useState<FullArea | null>(null);
+  const [editingArea, setEditingArea] = useState<Area | null>(null);
+  const [areaToDelete, setAreaToDelete] = useState<Area | null>(null);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -153,6 +151,7 @@ export default function AreasPage() {
         bengaliName: areaData.bengaliName,
         code: areaData.code,
         zoneId: areaData.zoneId,
+        regionId: areaData.regionId,
         responsibleEmployeeId: areaData.responsibleEmployeeId,
       };
       batch.set(newDocRef, { ...newArea, id: newDocRef.id });
@@ -173,12 +172,12 @@ export default function AreasPage() {
     setIsDialogOpen(true);
   };
 
-  const handleEditClick = (area: FullArea) => {
+  const handleEditClick = (area: Area) => {
     setEditingArea(area);
     setIsDialogOpen(true);
   };
 
-  const handleDeleteClick = (area: FullArea) => {
+  const handleDeleteClick = (area: Area) => {
     setAreaToDelete(area);
   };
 
@@ -249,7 +248,7 @@ export default function AreasPage() {
       try {
         if (editingArea) { // Update
           const areaDocRef = doc(firestore, 'regions', editingArea.regionId, 'zones', editingArea.zoneId, 'areas', editingArea.id);
-          const updatedData: Partial<FullArea> = { name, bengaliName, code, responsibleEmployeeId: finalEmployeeId, zoneId, regionId };
+          const updatedData: Partial<Area> = { name, bengaliName, code, responsibleEmployeeId: finalEmployeeId, zoneId, regionId };
           await setDoc(areaDocRef, updatedData, { merge: true });
           toast({ title: "Area updated", description: `"${name}" has been updated.` });
         } else { // Create
@@ -260,6 +259,7 @@ export default function AreasPage() {
             bengaliName,
             code,
             zoneId,
+            regionId,
             responsibleEmployeeId: finalEmployeeId,
           };
           await setDoc(newDocRef, newArea);
@@ -512,5 +512,3 @@ export default function AreasPage() {
     </Card>
   );
 }
-
-    

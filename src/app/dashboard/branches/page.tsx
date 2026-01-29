@@ -19,18 +19,15 @@ import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGrou
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-type FullBranch = Branch & { regionId: string; zoneId: string };
-type FullArea = Area & { regionId: string };
-
 export default function BranchesPage() {
   const { toast } = useToast();
   const firestore = useFirestore();
 
   const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
-  const { data: branches, isLoading: branchesLoading } = useCollection<FullBranch>(branchesQuery);
+  const { data: branches, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
 
   const areasQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'areas')) : null, [firestore]);
-  const { data: areas, isLoading: areasLoading } = useCollection<FullArea>(areasQuery);
+  const { data: areas, isLoading: areasLoading } = useCollection<Area>(areasQuery);
 
   const zonesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'zones')) : null, [firestore]);
   const { data: zones, isLoading: zonesLoading } = useCollection<Zone>(zonesQuery);
@@ -39,8 +36,8 @@ export default function BranchesPage() {
   const { data: regions, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingBranch, setEditingBranch] = useState<FullBranch | null>(null);
-  const [branchToDelete, setBranchToDelete] = useState<FullBranch | null>(null);
+  const [editingBranch, setEditingBranch] = useState<Branch | null>(null);
+  const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -136,6 +133,8 @@ export default function BranchesPage() {
         address: branchData.address,
         contactNumber: branchData.contactNumber,
         areaId: branchData.areaId,
+        zoneId: branchData.zoneId,
+        regionId: branchData.regionId,
       };
       batch.set(newDocRef, { ...newBranch, id: newDocRef.id });
     });
@@ -155,12 +154,12 @@ export default function BranchesPage() {
     setIsDialogOpen(true);
   };
 
-  const handleEditClick = (branch: FullBranch) => {
+  const handleEditClick = (branch: Branch) => {
     setEditingBranch(branch);
     setIsDialogOpen(true);
   };
 
-  const handleDeleteClick = (branch: FullBranch) => {
+  const handleDeleteClick = (branch: Branch) => {
     setBranchToDelete(branch);
   };
 
@@ -218,26 +217,19 @@ export default function BranchesPage() {
     const filteredAreas = useMemo(() => areas?.filter(a => a.zoneId === selectedZoneId) || [], [selectedZoneId, areas]);
 
     const handleSubmit = async () => {
-      if (!name || !code || !selectedAreaId || !address || !contactNumber) {
+      if (!name || !code || !selectedAreaId || !address || !contactNumber || !selectedRegionId || !selectedZoneId) {
         toast({ variant: "destructive", title: "Validation Error", description: "Please fill out all required fields." });
         return;
       }
-      
-      const selectedArea = areas?.find(a => a.id === selectedAreaId);
-      if (!selectedArea) {
-          toast({ variant: "destructive", title: "Invalid Selection", description: "Selected area could not be found." });
-          return;
-      }
-      const { zoneId, regionId } = selectedArea;
 
       try {
         if (editingBranch) { // Update
           const branchDocRef = doc(firestore, 'regions', editingBranch.regionId, 'zones', editingBranch.zoneId, 'areas', editingBranch.areaId, 'branches', editingBranch.id);
-          const updatedData: Partial<FullBranch> = { name, bengaliName, code, address, contactNumber };
+          const updatedData: Partial<Branch> = { name, bengaliName, code, address, contactNumber };
           await setDoc(branchDocRef, updatedData, { merge: true });
           toast({ title: "Branch updated", description: `"${name}" has been updated.` });
         } else { // Create
-          const newDocRef = doc(collection(firestore, 'regions', regionId, 'zones', zoneId, 'areas', selectedAreaId, 'branches'));
+          const newDocRef = doc(collection(firestore, 'regions', selectedRegionId, 'zones', selectedZoneId, 'areas', selectedAreaId, 'branches'));
           const newBranch: Branch = {
             id: newDocRef.id,
             name,
@@ -246,6 +238,8 @@ export default function BranchesPage() {
             address,
             contactNumber,
             areaId: selectedAreaId,
+            zoneId: selectedZoneId,
+            regionId: selectedRegionId,
           };
           await setDoc(newDocRef, newBranch);
           toast({ title: "Branch created", description: `"${name}" has been created.` });
@@ -451,5 +445,3 @@ export default function BranchesPage() {
     </Card>
   );
 }
-
-    
