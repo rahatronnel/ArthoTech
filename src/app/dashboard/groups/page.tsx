@@ -17,7 +17,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useMember } from '@/context/MemberContext';
 import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
-import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, collectionGroup, query, getDocs } from 'firebase/firestore';
 import type { Group, Employee, Branch } from '@/lib/data';
@@ -27,10 +26,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function GroupsPage() {
   const { toast } = useToast();
-  const { currentUser } = useAuth();
   const firestore = useFirestore();
 
-  const employeesQuery = useMemoFirebase(() => collection(firestore, 'employees'), [firestore]);
+  const employeesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'employees'): null, [firestore]);
   const { data: employees, isLoading: employeesLoading } = useCollection<Employee>(employeesQuery);
 
   const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
@@ -61,11 +59,14 @@ export default function GroupsPage() {
   
   const userVisibleGroups = useMemo(() => {
     if (!groupsData) return [];
-    if (currentUser?.role === 'Super Admin') {
-      return groupsData;
+    // Super Admin sees all, others see only groups they are responsible for.
+    if (employees?.find(e => e.id === 'superadmin-001')?.role === 'Super Admin') {
+        return groupsData;
     }
+    const currentUser = employees?.find(e => e.id === 'superadmin-001');
     return groupsData.filter(g => g.responsibleEmployeeId === currentUser?.id);
-  }, [groupsData, currentUser]);
+  }, [groupsData, employees]);
+
 
   const getEmployeeName = (employeeId: string) => {
     return employees?.find(e => e.id === employeeId)?.name || 'N/A';
@@ -149,7 +150,7 @@ export default function GroupsPage() {
 
         const errors: string[] = [];
         const validGroups: any[] = [];
-        const employeeMap = new Map(employees?.filter(e => e.role === 'Branch User').map(e => [e.code, e.id]));
+        const employeeMap = new Map(employees?.map(e => [e.code, e.id]));
         const branchMap = new Map(branches?.map(b => [b.code, b.id]));
 
         jsonData.forEach((row, index) => {
@@ -163,7 +164,7 @@ export default function GroupsPage() {
             return;
           }
           if (!employeeMap.has(leaderCode)) {
-            errors.push(`Row ${index + 2}: Leader with code "${leaderCode}" not found or is not a 'Branch User'.`);
+            errors.push(`Row ${index + 2}: Leader with code "${leaderCode}" not found.`);
             return;
           }
           const branchId = branchMap.get(branchCode)!;
@@ -377,7 +378,7 @@ export default function GroupsPage() {
                                     <SelectValue placeholder="Select a leader" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {employees?.filter(e => e.role === 'Branch User').map(e => (
+                                    {employees?.map(e => (
                                         <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>
                                     ))}
                                 </SelectContent>
@@ -442,12 +443,12 @@ export default function GroupsPage() {
                   <FileUp className="h-4 w-4" />
                   Upload
               </Button>
-              {currentUser?.role === 'Super Admin' && (
+              
                 <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}>
                   <Trash2 className="h-4 w-4" />
                   Delete All
                 </Button>
-              )}
+              
               <Button size="sm" className="gap-1" onClick={handleAddNewClick}>
                   <PlusCircle className="h-4 w-4" />
                   New Group
@@ -597,3 +598,5 @@ export default function GroupsPage() {
     </>
   );
 }
+
+    
