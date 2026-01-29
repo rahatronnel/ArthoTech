@@ -1,3 +1,4 @@
+
 "use client";
 
 import { createContext, useState, useContext, ReactNode } from 'react';
@@ -25,7 +26,7 @@ export function LoanProvider({ children }: { children: ReactNode }) {
 
   const addLoanDisbursement = (disbursement: Omit<LoanDisbursement, 'id'>) => {
     const newDisbursement: LoanDisbursement = {
-        id: `LD${loanDisbursements.length + 1}`,
+        id: `LD-${Date.now()}-${Math.random()}`,
         ...disbursement
     };
     setLoanDisbursements(prev => [...prev, newDisbursement]);
@@ -33,7 +34,7 @@ export function LoanProvider({ children }: { children: ReactNode }) {
 
   const addLoanCollection = (collection: Omit<LoanCollection, 'id'>) => {
     const newCollection: LoanCollection = {
-        id: `LC${loanCollections.length + 1}`,
+        id: `LC-${Date.now()}-${Math.random()}`,
         ...collection
     };
     setLoanCollections(prev => [...prev, newCollection]);

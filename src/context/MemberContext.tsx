@@ -1,3 +1,4 @@
+
 "use client";
 
 import { createContext, useState, useContext, ReactNode } from 'react';
@@ -17,7 +18,7 @@ export function MemberProvider({ children }: { children: ReactNode }) {
 
   const addMemberChange = (change: Omit<GroupMemberChange, 'id'>) => {
     const newChange: GroupMemberChange = {
-        id: `MC${memberChanges.length + 1}`,
+        id: `MC-${Date.now()}-${Math.random()}`,
         ...change
     };
     setMemberChanges(prev => [...prev, newChange]);

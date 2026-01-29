@@ -1,3 +1,4 @@
+
 "use client";
 
 import { createContext, useState, useContext, ReactNode } from 'react';
@@ -17,7 +18,7 @@ export function SavingsProvider({ children }: { children: ReactNode }) {
 
   const addSavingsTransaction = (transaction: Omit<SavingsTransaction, 'id'>) => {
     const newTransaction: SavingsTransaction = {
-        id: `ST${savingsTransactions.length + 1}`,
+        id: `ST-${Date.now()}-${Math.random()}`,
         ...transaction
     };
     setSavingsTransactions(prev => [...prev, newTransaction]);
