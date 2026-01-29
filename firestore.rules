@@ -1,39 +1,29 @@
 rules_version = '2';
 
-/**
- * @name LendEasy Microfinance Security Rules
- * @description This ruleset provides granular access control. It includes a temporary
- *              public read rule on the 'employees' collection to allow an initial
- *              Super Admin setup if no admin account exists.
- */
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * @description Checks if a user is authenticated.
-     */
+    // Helper Functions
     function isSignedIn() {
       return request.auth != null;
     }
 
-    /**
-     * @description More specific rule for the employees collection.
-     *              Allows public reads to check for a Super Admin during initial setup.
-     *              Writes are still protected and require authentication.
-     */
-    match /employees/{employeeId} {
-      allow read: if true;
-      allow write: if isSignedIn();
+    // Function to get the role of the currently signed-in user
+    function getUserRole() {
+      // Access the user's profile document using their UID
+      return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.role;
     }
 
-    /**
-     * @description Default rule for all other documents.
-     *              This rule does not apply to the employees collection because the
-     *              rule above is more specific. It requires authentication for all
-     *              reads and writes.
-     */
+    // Function to check if the user is a Super Admin
+    function isSuperAdmin() {
+      // Only allow if signed in, and their role is 'Super Admin'
+      return isSignedIn() && getUserRole() == 'Super Admin';
+    }
+
+    // By default, only a Super Admin can read or write any document.
+    // This provides a secure default while ensuring the admin has full control.
     match /{document=**} {
-      allow read, write: if isSignedIn();
+      allow read, write: if isSuperAdmin();
     }
   }
 }
