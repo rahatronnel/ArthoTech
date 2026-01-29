@@ -153,22 +153,22 @@ export default function RawDataEntryPage() {
                 
                 const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
 
-                if (rawData.length < 4) { // 3 header rows + at least 1 data row
+                if (rawData.length < 10) { // 9 header rows + at least 1 data row
                     toast({
                         variant: "destructive",
                         title: "Empty or Invalid File",
-                        description: "The file must contain headers and at least one data row.",
+                        description: "The file must contain at least 10 rows (9 for headers, 1 for data).",
                     });
                     return;
                 }
                 
-                const dataRows = rawData.slice(3).filter(row => row && row.length > 0 && row.some(cell => cell !== null && cell !== ''));
+                const dataRows = rawData.slice(9).filter(row => row && row.length > 0 && row.some(cell => cell !== null && cell !== ''));
 
                 if(dataRows.length === 0) {
                      toast({
                         variant: "destructive",
                         title: "No Data Rows Found",
-                        description: "No data rows were found after the header. Please ensure your data starts on row 4.",
+                        description: "No data rows were found after the first 9 header rows.",
                     });
                     return;
                 }
@@ -462,5 +462,3 @@ export default function RawDataEntryPage() {
     );
 
 }
-
-    
