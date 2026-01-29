@@ -1,6 +1,7 @@
 
 "use client";
 
+import * as React from 'react';
 import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/context/AuthContext';
