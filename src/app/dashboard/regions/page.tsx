@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
@@ -22,7 +21,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function RegionsPage() {
   const { toast } = useToast();
-  const { currentUser } = useAuth();
   const firestore = useFirestore();
 
   const regionsQuery = useMemoFirebase(() => collection(firestore, 'regions'), [firestore]);
@@ -90,8 +88,8 @@ export default function RegionsPage() {
 
         jsonData.forEach((row, index) => {
           const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Responsible Employee Code': employeeCode } = row;
-          if (!name || !bengaliName || !code) {
-            errors.push(`Row ${index + 2}: Missing required fields (Name, Bengali Name, Code).`);
+          if (!name || !code) {
+            errors.push(`Row ${index + 2}: Missing required fields (Name, Code).`);
             return;
           }
           let responsibleEmployeeId: string | undefined = undefined;
@@ -103,7 +101,7 @@ export default function RegionsPage() {
                 return;
             }
           }
-          validRegions.push({ name, bengaliName, code, responsibleEmployeeId });
+          validRegions.push({ name, bengaliName: bengaliName || '', code, responsibleEmployeeId });
         });
 
         setUploadedRegions(validRegions);
@@ -172,6 +170,11 @@ export default function RegionsPage() {
     if(!regionsQuery) return;
     try {
       const regionsSnapshot = await getDocs(regionsQuery);
+      if (regionsSnapshot.empty) {
+        toast({ title: "No regions to delete." });
+        setIsDeleteAllOpen(false);
+        return;
+      }
       const batch = writeBatch(firestore);
       regionsSnapshot.forEach(doc => {
         batch.delete(doc.ref);
@@ -196,11 +199,11 @@ export default function RegionsPage() {
     const [employeeId, setEmployeeId] = useState(editingRegion?.responsibleEmployeeId || 'none');
   
     const handleSubmit = async () => {
-      if (!name || !bengaliName || !code) {
+      if (!name || !code) {
         toast({
             variant: "destructive",
             title: "Validation Error",
-            description: "Please fill out Name, Bengali Name, and Code.",
+            description: "Please fill out Name and Code.",
         });
         return;
       }
@@ -302,12 +305,12 @@ export default function RegionsPage() {
                 <FileUp className="h-4 w-4" />
                 Upload
             </Button>
-            {currentUser?.role === 'Super Admin' && (
-              <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}>
-                <Trash2 className="h-4 w-4" />
-                Delete All
-              </Button>
-            )}
+            
+            <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}>
+            <Trash2 className="h-4 w-4" />
+            Delete All
+            </Button>
+            
             <Button size="sm" className="gap-1" onClick={handleAddNewClick}>
                 <PlusCircle className="h-4 w-4" />
                 New Region
@@ -434,3 +437,5 @@ export default function RegionsPage() {
     </Card>
   );
 }
+
+    

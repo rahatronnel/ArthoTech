@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
@@ -25,7 +24,6 @@ type FullArea = Area & { regionId: string };
 
 export default function BranchesPage() {
   const { toast } = useToast();
-  const { currentUser } = useAuth();
   const firestore = useFirestore();
 
   const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
@@ -100,7 +98,7 @@ export default function BranchesPage() {
 
         jsonData.forEach((row, index) => {
           const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Address': address, 'Contact Number': contactNumber, 'Area Code': areaCode } = row;
-          if (!name || !bengaliName || !code || !address || !contactNumber || !areaCode) {
+          if (!name || !code || !address || !contactNumber || !areaCode) {
             errors.push(`Row ${index + 2}: Missing required fields.`);
             return;
           }
@@ -109,7 +107,7 @@ export default function BranchesPage() {
             return;
           }
           const { id: areaId, zoneId, regionId } = areaMap.get(areaCode)!;
-          validBranches.push({ name, bengaliName, code, address, contactNumber, areaId, zoneId, regionId });
+          validBranches.push({ name, bengaliName: bengaliName || '', code, address, contactNumber, areaId, zoneId, regionId });
         });
 
         setUploadedBranches(validBranches);
@@ -334,9 +332,9 @@ export default function BranchesPage() {
         <div className="flex items-center gap-2">
             <Button size="sm" variant="outline" className="gap-1" onClick={handleDownloadTemplate}><FileDown className="h-4 w-4" />Download</Button>
             <Button size="sm" variant="outline" className="gap-1" onClick={handleUploadClick}><FileUp className="h-4 w-4" />Upload</Button>
-            {currentUser?.role === 'Super Admin' && (
+            
               <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}><Trash2 className="h-4 w-4" />Delete All</Button>
-            )}
+            
             <Button size="sm" className="gap-1" onClick={handleAddNewClick}><PlusCircle className="h-4 w-4" />New Branch</Button>
         </div>
       </CardHeader>
@@ -453,3 +451,5 @@ export default function BranchesPage() {
     </Card>
   );
 }
+
+    

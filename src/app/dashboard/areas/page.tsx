@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
@@ -24,7 +23,6 @@ type FullArea = Area & { regionId: string };
 
 export default function AreasPage() {
   const { toast } = useToast();
-  const { currentUser } = useAuth();
   const firestore = useFirestore();
 
   const areasQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'areas')) : null, [firestore]);
@@ -109,8 +107,8 @@ export default function AreasPage() {
 
         jsonData.forEach((row, index) => {
           const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Zone Code': zoneCode, 'Responsible Employee Code': employeeCode } = row;
-          if (!name || !bengaliName || !code || !zoneCode) {
-            errors.push(`Row ${index + 2}: Missing required fields (Name, Bengali Name, Code, Zone Code).`);
+          if (!name || !code || !zoneCode) {
+            errors.push(`Row ${index + 2}: Missing required fields (Name, Code, Zone Code).`);
             return;
           }
           if (!zoneMap.has(zoneCode)) {
@@ -128,7 +126,7 @@ export default function AreasPage() {
                 return;
             }
           }
-          validAreas.push({ name, bengaliName, code, zoneId, regionId, responsibleEmployeeId });
+          validAreas.push({ name, bengaliName: bengaliName || '', code, zoneId, regionId, responsibleEmployeeId });
         });
 
         setUploadedAreas(validAreas);
@@ -237,11 +235,11 @@ export default function AreasPage() {
     }, [regionId, zones]);
 
     const handleSubmit = async () => {
-      if (!name || !bengaliName || !code || !regionId || !zoneId) {
+      if (!name || !code || !regionId || !zoneId) {
         toast({
             variant: "destructive",
             title: "Validation Error",
-            description: "Please fill out Name, Bengali Name, Code, Region and Zone.",
+            description: "Please fill out Name, Code, Region and Zone.",
         });
         return;
       }
@@ -376,12 +374,12 @@ export default function AreasPage() {
                 <FileUp className="h-4 w-4" />
                 Upload
             </Button>
-             {currentUser?.role === 'Super Admin' && (
+             
               <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}>
                 <Trash2 className="h-4 w-4" />
                 Delete All
               </Button>
-            )}
+            
             <Button size="sm" className="gap-1" onClick={handleAddNewClick}>
             <PlusCircle className="h-4 w-4" />
             New Area
@@ -514,3 +512,5 @@ export default function AreasPage() {
     </Card>
   );
 }
+
+    

@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
@@ -28,7 +27,6 @@ const ROLES: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Re
 export default function EmployeesPage() {
     // --- Hooks ---
     const { toast } = useToast();
-    const { currentUser } = useAuth();
     const firestore = useFirestore();
     const fileInputRef = useRef<HTMLInputElement>(null);
     
@@ -86,7 +84,7 @@ export default function EmployeesPage() {
     };
     
     const confirmDeleteAll = async () => {
-        if (currentUser?.role !== 'Super Admin' || !employeesData) return;
+        if (!employeesData) return;
         try {
             const employeesToDelete = employeesData.filter(e => e.role !== 'Super Admin');
             if(employeesToDelete.length === 0) {
@@ -180,7 +178,7 @@ export default function EmployeesPage() {
             }
             
             fileCodes.add(normalizedCode);
-            validEmployees.push({ name, bengaliName, code: String(code).trim(), role, assignment });
+            validEmployees.push({ name, bengaliName: bengaliName || '', code: String(code).trim(), role, assignment });
         });
 
         return { validEmployees, errors };
@@ -233,7 +231,7 @@ export default function EmployeesPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                         <Button size="sm" variant="outline" onClick={handleDownloadTemplate}><FileDown />Download</Button>
                         <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadState.status === 'validating'}><FileUp />{uploadState.status === 'validating' ? 'Processing...' : 'Upload'}</Button>
-                        {currentUser?.role === 'Super Admin' && (<Button size="sm" variant="destructive" onClick={() => setIsDeleteAllOpen(true)}><Trash2 />Delete All</Button>)}
+                        <Button size="sm" variant="destructive" onClick={() => setIsDeleteAllOpen(true)}><Trash2 />Delete All</Button>
                         <Button size="sm" onClick={handleAddNew}><PlusCircle />New Employee</Button>
                     </div>
                 </CardHeader>
@@ -445,3 +443,5 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
         </Dialog>
     );
 }
+
+    
