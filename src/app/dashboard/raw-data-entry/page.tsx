@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Download, Upload } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { useSavings } from '@/context/SavingsContext';
@@ -216,7 +216,7 @@ export default function RawDataEntryPage() {
                     }
 
                     const firstCellContent = String(row[0] || '').trim();
-                    if (firstCellContent.includes('Officer Total')) {
+                    if (firstCellContent.toLowerCase().includes('officer total')) {
                         continue;
                     }
 
@@ -493,8 +493,8 @@ export default function RawDataEntryPage() {
                         </div>
                         <ScrollArea className="h-[60vh] border rounded-md">
                             <Table>
-                                <TableHeader className="sticky top-0 bg-popover z-10">
-                                    <TableRow>
+                                <TableHeader>
+                                    <TableRow className="sticky top-0 z-10 bg-popover hover:bg-popover">
                                         {uploadedData.length > 0 && Object.keys(uploadedData[0]).map((key) => (
                                             <TableHead key={key} className="whitespace-nowrap">{key}</TableHead>
                                         ))}
@@ -512,8 +512,8 @@ export default function RawDataEntryPage() {
                                     ))}
                                 </TableBody>
                                 {totals && uploadedData.length > 0 && (
-                                    <TableFooter className="sticky bottom-0 bg-popover font-bold">
-                                        <TableRow>
+                                    <TableFooter className="font-bold">
+                                        <TableRow className="sticky bottom-0 z-10 bg-popover hover:bg-popover">
                                             <TableCell colSpan={5}>Totals</TableCell>
                                             {numericColumnKeys.map(key => (
                                                 <TableCell key={`total-${key}`} className="whitespace-nowrap text-right">
@@ -524,6 +524,7 @@ export default function RawDataEntryPage() {
                                     </TableFooter>
                                 )}
                             </Table>
+                            <ScrollBar orientation="horizontal" />
                         </ScrollArea>
                     </div>
                     <DialogFooter>
@@ -536,3 +537,5 @@ export default function RawDataEntryPage() {
     );
 
 }
+
+    
