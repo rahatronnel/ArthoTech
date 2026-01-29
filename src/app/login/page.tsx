@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -10,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { PiggyBank } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, query, collection, where, getDocs, writeBatch, setDoc } from 'firebase/firestore';
 import { getAuth as getFirebaseAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { initializeApp as initializeTempApp, deleteApp } from 'firebase/app';
 import { firebaseConfig } from '@/firebase/config';
@@ -106,9 +107,12 @@ function CreateSuperAdminForm({ onAdminCreated }: { onAdminCreated: () => void }
     const [loginId, setLoginId] = useState('');
     const [password, setPassword] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [formError, setFormError] = useState('');
 
     const handleCreateAdmin = async (e: React.FormEvent) => {
         e.preventDefault();
+        setFormError('');
+
         if (!name || !loginId || !password) {
             toast({ variant: 'destructive', title: 'Missing fields', description: 'Please fill out all fields.' });
             return;
@@ -128,6 +132,15 @@ function CreateSuperAdminForm({ onAdminCreated }: { onAdminCreated: () => void }
             if (!authDomain) {
                 throw new Error("Firebase Auth Domain is not configured.");
             }
+
+            // Before creating the new user, find and delete any existing 'Super Admin'
+            const q = query(collection(firestore, "employees"), where("role", "==", "Super Admin"));
+            const querySnapshot = await getDocs(q);
+            const batch = writeBatch(firestore);
+            querySnapshot.forEach((doc) => {
+                batch.delete(doc.ref);
+            });
+            await batch.commit();
 
             const email = `${loginId.toLowerCase().trim()}@${authDomain}`;
             
@@ -149,18 +162,18 @@ function CreateSuperAdminForm({ onAdminCreated }: { onAdminCreated: () => void }
             toast({ title: 'Admin Account Created', description: 'You can now log in with your new credentials.' });
             onAdminCreated();
         } catch (error: any) {
-            console.error(error);
-            let message = error.message;
+            let message = 'An unexpected error occurred during account creation.';
             if (error.code === 'auth/email-already-in-use') {
-                message = 'This Login ID is already registered. Please choose a different Login ID or clear the user from the Firebase Console.';
+                message = 'This Login ID is already registered in Firebase Authentication. This can happen if a previous attempt failed. Please use a different Login ID, or go to the Firebase Console to manually delete the old account.';
+                setFormError(message);
             }
-            toast({ variant: 'destructive', title: 'Creation Failed', description: message });
+             toast({ variant: 'destructive', title: 'Creation Failed', description: message, duration: 9000 });
         } finally {
             await deleteApp(tempApp);
             setIsLoading(false);
         }
     };
-
+    
     return (
         <Card className="w-full max-w-sm">
             <CardHeader>
@@ -181,10 +194,14 @@ function CreateSuperAdminForm({ onAdminCreated }: { onAdminCreated: () => void }
                         <Label htmlFor="password">Password</Label>
                         <Input id="password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
                     </div>
+                    {formError && <p className="text-sm font-medium text-destructive">{formError}</p>}
                 </CardContent>
-                <CardFooter>
-                    <Button type="submit" className="w-full" disabled={isLoading}>
+                <CardFooter className="flex flex-col gap-2">
+                     <Button type="submit" className="w-full" disabled={isLoading}>
                         {isLoading ? 'Creating Account...' : 'Create Admin Account'}
+                    </Button>
+                    <Button type="button" variant="link" size="sm" className="text-muted-foreground" onClick={onAdminCreated}>
+                        Cancel
                     </Button>
                 </CardFooter>
             </form>
@@ -194,6 +211,15 @@ function CreateSuperAdminForm({ onAdminCreated }: { onAdminCreated: () => void }
 
 export default function LoginPage() {
     const [showAdminReset, setShowAdminReset] = useState(false);
+
+    const handleCheckAdmin = async (firestore: any) => {
+        // On initial load, check if a super admin exists. If not, force the creation form.
+        const q = query(collection(firestore, "employees"), where("role", "==", "Super Admin"));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) {
+            setShowAdminReset(true);
+        }
+    };
 
     return (
         <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-slate-900 to-purple-900">
