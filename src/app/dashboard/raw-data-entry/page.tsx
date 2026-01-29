@@ -173,7 +173,7 @@ export default function RawDataEntryPage() {
                     return;
                 }
 
-                const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => g.code) || []);
+                const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => String(g.code).trim().toLowerCase()) || []);
 
                 const allProcessedData: UploadedRow[] = dataRows.map(row => {
                     return {
@@ -203,7 +203,10 @@ export default function RawDataEntryPage() {
                     };
                 });
                 
-                const validData = allProcessedData.filter(row => userVisibleGroupCodes.has(row['Samity ID']));
+                const validData = allProcessedData.filter(row => {
+                    const normalizedSamityId = String(row['Samity ID']).trim().toLowerCase();
+                    return userVisibleGroupCodes.has(normalizedSamityId);
+                });
 
                 if (allProcessedData.length > 0 && validData.length === 0) {
                     const foundIds = [...new Set(allProcessedData.map(row => row['Samity ID']).filter(id => id))];
@@ -247,12 +250,13 @@ export default function RawDataEntryPage() {
             return;
         }
 
-        const groupMap = new Map(groupsData.map(g => [g.code, g]));
+        const groupMap = new Map(groupsData.map(g => [String(g.code).trim().toLowerCase(), g]));
         const branchMap = new Map(branchesData.map(b => [b.id, b]));
         const othersEntriesToAdd: Omit<OtherDataEntry, 'id'>[] = [];
 
         uploadedData.forEach(row => {
-            const group = groupMap.get(row['Samity ID']);
+            const normalizedSamityId = String(row['Samity ID']).trim().toLowerCase();
+            const group = groupMap.get(normalizedSamityId);
             if (!group) return;
 
             const branch = branchMap.get(group.branchId);
@@ -462,3 +466,5 @@ export default function RawDataEntryPage() {
     );
 
 }
+
+    

@@ -92,8 +92,8 @@ export default function ZonesPage() {
 
         const errors: string[] = [];
         const validZones: any[] = [];
-        const employeeMap = new Map(employees?.filter(e => e.role === 'Zonal User').map(e => [e.code, e.id]));
-        const regionMap = new Map(regions?.map(r => [r.code, r.id]));
+        const employeeMap = new Map(employees?.filter(e => e.role === 'Zonal User').map(e => [String(e.code).trim().toLowerCase(), e.id]));
+        const regionMap = new Map(regions?.map(r => [String(r.code).trim().toLowerCase(), r.id]));
 
         jsonData.forEach((row, index) => {
           const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Region Code': regionCode, 'Responsible Employee Code': employeeCode } = row;
@@ -101,16 +101,18 @@ export default function ZonesPage() {
             errors.push(`Row ${index + 2}: Missing required fields (Name, Code, Region Code).`);
             return;
           }
-          if (!regionMap.has(regionCode)) {
+          const normalizedRegionCode = String(regionCode).trim().toLowerCase();
+          if (!regionMap.has(normalizedRegionCode)) {
             errors.push(`Row ${index + 2}: Region with code "${regionCode}" not found.`);
             return;
           }
-          const regionId = regionMap.get(regionCode)!;
+          const regionId = regionMap.get(normalizedRegionCode)!;
 
           let responsibleEmployeeId: string | undefined = undefined;
           if (employeeCode) {
-            if(employeeMap.has(employeeCode)) {
-                responsibleEmployeeId = employeeMap.get(employeeCode);
+            const normalizedEmployeeCode = String(employeeCode).trim().toLowerCase();
+            if(employeeMap.has(normalizedEmployeeCode)) {
+                responsibleEmployeeId = employeeMap.get(normalizedEmployeeCode);
             } else {
                 errors.push(`Row ${index + 2}: Employee with code "${employeeCode}" not found or they do not have the 'Zonal User' role.`);
                 return;
@@ -479,5 +481,7 @@ export default function ZonesPage() {
     </Card>
   );
 }
+
+    
 
     

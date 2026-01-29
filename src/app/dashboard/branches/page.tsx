@@ -91,7 +91,7 @@ export default function BranchesPage() {
 
         const errors: string[] = [];
         const validBranches: any[] = [];
-        const areaMap = new Map(areas?.map(a => [a.code, { id: a.id, zoneId: a.zoneId, regionId: a.regionId }]));
+        const areaMap = new Map(areas?.map(a => [String(a.code).trim().toLowerCase(), { id: a.id, zoneId: a.zoneId, regionId: a.regionId }]));
 
         jsonData.forEach((row, index) => {
           const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Address': address, 'Contact Number': contactNumber, 'Area Code': areaCode } = row;
@@ -99,11 +99,12 @@ export default function BranchesPage() {
             errors.push(`Row ${index + 2}: Missing required fields.`);
             return;
           }
-          if (!areaMap.has(areaCode)) {
+          const normalizedAreaCode = String(areaCode).trim().toLowerCase();
+          if (!areaMap.has(normalizedAreaCode)) {
             errors.push(`Row ${index + 2}: Area with code "${areaCode}" not found.`);
             return;
           }
-          const { id: areaId, zoneId, regionId } = areaMap.get(areaCode)!;
+          const { id: areaId, zoneId, regionId } = areaMap.get(normalizedAreaCode)!;
           validBranches.push({ name, bengaliName: bengaliName || '', code, address, contactNumber, areaId, zoneId, regionId });
         });
 
@@ -445,3 +446,5 @@ export default function BranchesPage() {
     </Card>
   );
 }
+
+    

@@ -84,7 +84,7 @@ export default function RegionsPage() {
 
         const errors: string[] = [];
         const validRegions: any[] = [];
-        const employeeMap = new Map(employees?.filter(e => e.role === 'Regional User').map(e => [e.code, e.id]));
+        const employeeMap = new Map(employees?.filter(e => e.role === 'Regional User').map(e => [String(e.code).trim().toLowerCase(), e.id]));
 
         jsonData.forEach((row, index) => {
           const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Responsible Employee Code': employeeCode } = row;
@@ -94,8 +94,9 @@ export default function RegionsPage() {
           }
           let responsibleEmployeeId: string | undefined = undefined;
           if (employeeCode) {
-            if(employeeMap.has(employeeCode)) {
-                responsibleEmployeeId = employeeMap.get(employeeCode);
+            const normalizedEmployeeCode = String(employeeCode).trim().toLowerCase();
+            if(employeeMap.has(normalizedEmployeeCode)) {
+                responsibleEmployeeId = employeeMap.get(normalizedEmployeeCode);
             } else {
                 errors.push(`Row ${index + 2}: Employee with code "${employeeCode}" not found or they do not have the 'Regional User' role.`);
                 return;
@@ -437,5 +438,7 @@ export default function RegionsPage() {
     </Card>
   );
 }
+
+    
 
     

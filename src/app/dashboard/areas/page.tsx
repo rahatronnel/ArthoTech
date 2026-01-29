@@ -100,8 +100,8 @@ export default function AreasPage() {
 
         const errors: string[] = [];
         const validAreas: any[] = [];
-        const employeeMap = new Map(employees?.filter(e => e.role === 'Area User').map(e => [e.code, e.id]));
-        const zoneMap = new Map(zones?.map(z => [z.code, { id: z.id, regionId: z.regionId }]));
+        const employeeMap = new Map(employees?.filter(e => e.role === 'Area User').map(e => [String(e.code).trim().toLowerCase(), e.id]));
+        const zoneMap = new Map(zones?.map(z => [String(z.code).trim().toLowerCase(), { id: z.id, regionId: z.regionId }]));
 
         jsonData.forEach((row, index) => {
           const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Zone Code': zoneCode, 'Responsible Employee Code': employeeCode } = row;
@@ -109,16 +109,18 @@ export default function AreasPage() {
             errors.push(`Row ${index + 2}: Missing required fields (Name, Code, Zone Code).`);
             return;
           }
-          if (!zoneMap.has(zoneCode)) {
+          const normalizedZoneCode = String(zoneCode).trim().toLowerCase();
+          if (!zoneMap.has(normalizedZoneCode)) {
             errors.push(`Row ${index + 2}: Zone with code "${zoneCode}" not found.`);
             return;
           }
-          const { id: zoneId, regionId } = zoneMap.get(zoneCode)!;
+          const { id: zoneId, regionId } = zoneMap.get(normalizedZoneCode)!;
 
           let responsibleEmployeeId: string | undefined = undefined;
           if (employeeCode) {
-            if(employeeMap.has(employeeCode)) {
-                responsibleEmployeeId = employeeMap.get(employeeCode);
+            const normalizedEmployeeCode = String(employeeCode).trim().toLowerCase();
+            if(employeeMap.has(normalizedEmployeeCode)) {
+                responsibleEmployeeId = employeeMap.get(normalizedEmployeeCode);
             } else {
                 errors.push(`Row ${index + 2}: Employee with code "${employeeCode}" not found or they do not have the 'Area User' role.`);
                 return;
@@ -512,3 +514,5 @@ export default function AreasPage() {
     </Card>
   );
 }
+
+    

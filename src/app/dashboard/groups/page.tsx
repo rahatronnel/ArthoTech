@@ -149,7 +149,7 @@ export default function GroupsPage() {
         const errors: string[] = [];
         const validGroups: any[] = [];
         const employeeMap = new Map(employees?.map(e => [String(e.code).trim().toLowerCase(), e.id]));
-        const branchMap = new Map(branches?.map(b => [b.code, b]));
+        const branchMap = new Map(branches?.map(b => [String(b.code).trim().toLowerCase(), b]));
         const areaMap = new Map(areas?.map(a => [a.id, a]));
 
         jsonData.forEach((row, index) => {
@@ -158,7 +158,8 @@ export default function GroupsPage() {
             errors.push(`Row ${index + 2}: Missing required fields.`);
             return;
           }
-          if (!branchMap.has(branchCode)) {
+          const normalizedBranchCode = String(branchCode).trim().toLowerCase();
+          if (!branchMap.has(normalizedBranchCode)) {
             errors.push(`Row ${index + 2}: Branch with code "${branchCode}" not found.`);
             return;
           }
@@ -168,7 +169,7 @@ export default function GroupsPage() {
             return;
           }
 
-          const branchForGroup = branchMap.get(branchCode)!;
+          const branchForGroup = branchMap.get(normalizedBranchCode)!;
           const responsibleEmployeeId = employeeMap.get(leaderCodeValue)!;
           
           let regionId = branchForGroup.regionId;
@@ -642,3 +643,5 @@ export default function GroupsPage() {
     </>
   );
 }
+
+    
