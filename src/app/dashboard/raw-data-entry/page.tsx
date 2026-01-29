@@ -711,7 +711,7 @@ const Step4Summary = ({ data, groupsData, employeesData }: { data: UploadedRow[]
     const summaryData = useMemo(() => {
         if (!groupsData || !employeesData) return [];
 
-        const groupMap = new Map(groupsData.filter(g => g.code).map(g => [g.code.toLowerCase(), g]));
+        const groupMap = new Map(groupsData.filter(g => g.code).map(g => [String(g.code).toLowerCase(), g]));
         const employeeMap = new Map(employeesData.map(e => [e.id, e]));
         const officerMap = new Map<string, { name: string, total: number }>();
 
