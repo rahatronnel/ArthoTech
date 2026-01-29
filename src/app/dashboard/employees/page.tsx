@@ -241,7 +241,10 @@ export default function EmployeesPage() {
                 await createIsolatedUser(empData, firestore, auth.app.options.authDomain);
                 successCount++;
             } catch (error: any) {
-                const message = error.code === 'auth/email-already-in-use' ? 'This Login ID is already registered in Firebase Auth.' : error.message;
+                let message = error.message;
+                if (error.code === 'auth/email-already-in-use') {
+                    message = `This Login ID is already registered in Firebase Auth. Please use a new, unique Login ID.`;
+                }
                 creationErrors.push(`Failed for ${empData.loginId}: ${message}`);
             }
             setUploadState(s => ({ ...s, progress: ((i + 1) / s.data.length) * 100 }));
@@ -418,7 +421,10 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
             }
             setIsOpen(false);
         } catch (error: any) {
-            const message = error.code === 'auth/email-already-in-use' ? 'This Login ID is already registered in Firebase Auth.' : error.message;
+            let message = error.message;
+            if (error.code === 'auth/email-already-in-use') {
+                message = 'This Login ID is already registered in Firebase Auth. Please choose a different one.';
+            }
             toast({ variant: "destructive", title: "An error occurred", description: message });
         }
     };
@@ -500,3 +506,4 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
 }
 
     
+
