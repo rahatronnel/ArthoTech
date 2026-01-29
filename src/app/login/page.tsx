@@ -17,7 +17,7 @@ import { firebaseConfig } from '@/firebase/config';
 import { Skeleton } from '@/components/ui/skeleton';
 
 // The regular login form
-function LoginForm() {
+function LoginForm({ onResetAdmin }: { onResetAdmin: () => void }) {
   const router = useRouter();
   const { login, loading } = useAuth();
   const { toast } = useToast();
@@ -83,10 +83,16 @@ function LoginForm() {
             />
           </div>
         </CardContent>
-        <CardFooter>
+        <CardFooter className="flex flex-col gap-4">
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </Button>
+          <p className="text-center text-xs text-white/60">
+            Admin account issues?{' '}
+            <button type="button" onClick={onResetAdmin} className="font-semibold underline hover:text-white">
+                Reset Super Admin
+            </button>
+          </p>
         </CardFooter>
       </form>
     </Card>
@@ -139,6 +145,7 @@ function CreateSuperAdminForm({ onAdminCreated }: { onAdminCreated: () => void }
                 loginId: loginId.toLowerCase().trim(),
             };
 
+            // This will create or overwrite the document, fixing the orphaned record issue.
             await setDoc(doc(firestore, "employees", uid), newEmployee);
 
             toast({ title: 'Admin Account Created', description: 'You can now log in with your new credentials.' });
@@ -160,7 +167,7 @@ function CreateSuperAdminForm({ onAdminCreated }: { onAdminCreated: () => void }
         <Card className="w-full max-w-sm">
             <CardHeader>
                 <CardTitle>Create Super Admin</CardTitle>
-                <CardDescription>No Super Admin account was found. Please create one to get started.</CardDescription>
+                <CardDescription>Create a new Super Admin account. This will overwrite any existing orphaned admin records.</CardDescription>
             </CardHeader>
             <form onSubmit={handleCreateAdmin}>
                 <CardContent className="space-y-4">
@@ -215,12 +222,15 @@ function LoadingState() {
 export default function LoginPage() {
     const [needsSetup, setNeedsSetup] = useState(false);
     const [isChecking, setIsChecking] = useState(true);
+    const [showAdminReset, setShowAdminReset] = useState(false);
     const firestore = useFirestore();
 
     useEffect(() => {
         const checkSuperAdmin = async () => {
             if (!firestore) return;
 
+            // This check is primarily for the very first run.
+            // The reset button handles the orphaned account case.
             try {
                 const q = query(collection(firestore, 'employees'), where('role', '==', 'Super Admin'));
                 const querySnapshot = await getDocs(q);
@@ -245,13 +255,13 @@ export default function LoginPage() {
         <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-slate-900 to-purple-900">
             {isChecking ? (
                 <LoadingState />
-            ) : needsSetup ? (
+            ) : (needsSetup || showAdminReset) ? (
                 <CreateSuperAdminForm onAdminCreated={() => {
                     setNeedsSetup(false);
-                    setIsChecking(false);
+                    setShowAdminReset(false);
                 }} />
             ) : (
-                <LoginForm />
+                <LoginForm onResetAdmin={() => setShowAdminReset(true)} />
             )}
         </div>
     );
