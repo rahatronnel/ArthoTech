@@ -1,27 +1,38 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
+    // --- Helper Functions ---
     function isSignedIn() {
       return request.auth != null;
     }
 
-    // Function to get the role of the currently signed-in user
     function getUserRole() {
-      // Access the user's profile document using their UID
+      // This `get` is safe because of the specific `allow read` rule on /employees/{userId}
       return get(/databases/$(database)/documents/employees/$(request.auth.uid)).data.role;
     }
 
-    // Function to check if the user is a Super Admin
     function isSuperAdmin() {
-      // Only allow if signed in, and their role is 'Super Admin'
-      return isSignedIn() && getUserRole() == 'Super Admin';
+      // Check for document existence before getting data to prevent errors
+      return isSignedIn() &&
+             exists(/databases/$(database)/documents/employees/$(request.auth.uid)) &&
+             getUserRole() == 'Super Admin';
     }
 
-    // By default, only a Super Admin can read or write any document.
-    // This provides a secure default while ensuring the admin has full control.
+    // --- Rules ---
+
+    // Employees Collection: This specific rule is evaluated before the general one below.
+    // It breaks the recursive permission dependency for role checks.
+    match /employees/{userId} {
+      // A user can read their own profile, OR if the requester is a Super Admin.
+      allow read: if (isSignedIn() && request.auth.uid == userId) || isSuperAdmin();
+      // Only a Super Admin can write to employee profiles.
+      allow write: if isSuperAdmin();
+    }
+
+    // General Rule for All Other Documents.
+    // This will be OR'd with the rule above for the employees collection, which is fine.
+    // For all other collections, this is the only rule that applies.
     match /{document=**} {
       allow read, write: if isSuperAdmin();
     }
