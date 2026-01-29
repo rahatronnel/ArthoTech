@@ -33,35 +33,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (firebaseUser) {
         setAuthLoading(true);
         const userDocRef = doc(firestore, 'employees', firebaseUser.uid);
-        
-        // Attempt to get the user document.
-        let userDoc = await getDoc(userDocRef);
 
-        // If the document doesn't exist, it might be a race condition during bulk upload.
-        // Wait a short period and try one more time.
-        if (!userDoc.exists()) {
-            await new Promise(resolve => setTimeout(resolve, 1500)); // Wait 1.5 seconds
-            userDoc = await getDoc(userDocRef); // Retry fetching
-        }
+        // This polling mechanism is crucial for handling the race condition during bulk user creation.
+        // When a new user is created via createUserWithEmailAndPassword, onAuthStateChanged fires immediately,
+        // but the Firestore document for the user's profile might not be created yet.
+        // Instead of failing immediately, we poll for the document for a few seconds.
+        const pollForDocument = async (retries: number, delay: number): Promise<boolean> => {
+          for (let i = 0; i < retries; i++) {
+            const docSnap = await getDoc(userDocRef);
+            if (docSnap.exists()) {
+              setCurrentUser({ id: docSnap.id, ...docSnap.data() } as Employee);
+              return true;
+            }
+            // Wait before the next retry
+            await new Promise(resolve => setTimeout(resolve, delay));
+          }
+          return false;
+        };
 
-        if (userDoc.exists()) {
-          setCurrentUser({ id: userDoc.id, ...userDoc.data() } as Employee);
-        } else {
-          // If the profile still doesn't exist after the retry, it's a genuine issue.
-          // The user might have been deleted from the DB but not from Auth.
-          // Set to null, which will trigger a logout for security.
-          console.warn(`No employee profile found for user ${firebaseUser.uid}, even after retry. Logging out.`);
-          setCurrentUser(null);
-        }
-        setAuthLoading(false);
+        pollForDocument(5, 1000) // Poll 5 times, every 1 second (total 5 seconds)
+          .then(found => {
+            if (!found) {
+              console.warn(`No employee profile found for user ${firebaseUser.uid} after multiple retries. This can happen if the user was deleted or during a failed bulk upload. Logging out.`);
+              // If the profile is not found after polling, the user is invalid.
+              setCurrentUser(null);
+              // Also sign out from Firebase to clear the invalid auth state.
+              signOut(auth);
+            }
+          })
+          .finally(() => {
+            setAuthLoading(false);
+          });
+
       } else if (!isFirebaseUserLoading) {
+        // If there's no firebaseUser and we are not in a loading state, there is no one logged in.
         setCurrentUser(null);
         setAuthLoading(false);
       }
     };
 
     fetchUserProfile();
-  }, [firebaseUser, isFirebaseUserLoading, firestore]);
+  }, [firebaseUser, isFirebaseUserLoading, firestore, auth]);
 
   const login = async (loginId: string, password?: string): Promise<void> => {
     if (!password) {
@@ -70,7 +82,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      if (!auth.app.options.authDomain) {
         throw new Error("Firebase auth domain is not configured. Cannot create email for login.");
     }
-    // This assumes the user's email is formatted as loginId@<auth-domain>
+    // Emails are case-insensitive, so we normalize the loginId to lowercase.
     const normalizedLoginId = loginId.toLowerCase().trim();
     const email = `${normalizedLoginId}@${auth.app.options.authDomain}`;
     await signInWithEmailAndPassword(auth, email, password);
@@ -114,5 +126,3 @@ export function useAuth() {
   }
   return context;
 }
-
-    

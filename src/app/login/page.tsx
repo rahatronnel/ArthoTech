@@ -64,7 +64,7 @@ export default function LoginPage() {
                 placeholder="e.g., johndoe"
                 required
                 value={loginId}
-                onChange={(e) => setLoginId(e.target.value)}
+                onChange={(e) => setLoginId(e.target.value.toLowerCase())}
                 disabled={loading}
                 className="bg-transparent border-white/30 text-white placeholder:text-white/60 focus:ring-white"
               />
@@ -92,5 +92,3 @@ export default function LoginPage() {
     </div>
   );
 }
-
-    

@@ -98,12 +98,14 @@ export default function EmployeesPage() {
 
         const errors: string[] = [];
         const validEmployees: any[] = [];
+        // Use sets for efficient, case-insensitive lookups
         const existingLoginIds = new Set(employeesData?.map(emp => emp.loginId.toLowerCase()));
         const newLoginIdsInFile = new Set<string>();
         const validAssignments = new Set(assignments);
 
         for (const [index, row] of jsonData.entries()) {
           const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Role': role, 'Assignment (Branch Name or \'Head Office\')': assignment, 'Login ID': loginId, 'Password': password } = row;
+          
           if (!name || !code || !role || !assignment || !loginId || !password) {
             errors.push(`Row ${index + 2}: Missing required fields.`);
             continue;
@@ -134,7 +136,7 @@ export default function EmployeesPage() {
             continue;
           }
           
-          validEmployees.push({ name, bengaliName, code, role, assignment, loginId, password });
+          validEmployees.push({ name, bengaliName, code, role, assignment, loginId: normalizedLoginId, password });
         }
 
         setUploadedEmployees(validEmployees);
@@ -165,8 +167,7 @@ export default function EmployeesPage() {
     for (let i = 0; i < uploadedEmployees.length; i++) {
         const emp = uploadedEmployees[i];
         try {
-            const normalizedLoginId = String(emp.loginId).toLowerCase().trim();
-            const email = `${normalizedLoginId}@${auth.app.options.authDomain}`;
+            const email = `${emp.loginId}@${auth.app.options.authDomain}`;
             const userCredential = await createUserWithEmailAndPassword(auth, email, emp.password);
             const uid = userCredential.user.uid;
 
@@ -183,7 +184,7 @@ export default function EmployeesPage() {
         } catch (error: any) {
             let errorMessage = error.message;
             if (error.code === 'auth/email-already-in-use') {
-                errorMessage = 'This Login ID is already registered. If you deleted this employee, you must also contact support to have their authentication account removed before re-creating them.';
+                errorMessage = `This Login ID is already registered as a user. If you deleted this employee, you must also contact support to have their authentication account removed before re-creating them.`;
             }
             uploadProcessErrors.push(`Failed to create employee ${emp.name} (${emp.loginId}): ${errorMessage}`);
         }
@@ -194,7 +195,7 @@ export default function EmployeesPage() {
     
     if(uploadProcessErrors.length > 0) {
         setUploadErrors(uploadProcessErrors);
-        toast({ variant: 'destructive', title: `Upload partially failed.`, description: `${successCount} employees created. ${uploadProcessErrors.length} failed.` });
+        toast({ variant: 'destructive', title: `Upload partially failed.`, description: `${successCount} employees created. ${uploadProcessErrors.length} failed.`, duration: 9000 });
     } else {
         toast({ title: 'Upload Successful', description: `${successCount} employees created successfully.`});
         setIsUploadDialogOpen(false);
@@ -219,7 +220,7 @@ export default function EmployeesPage() {
     if (employeeToDelete) {
       try {
         await deleteDoc(doc(firestore, "employees", employeeToDelete.id));
-        toast({ title: "Employee deleted", description: `"${employeeToDelete.name}" has been deleted from the app.` });
+        toast({ title: "Employee record deleted", description: `"${employeeToDelete.name}" has been deleted from the app.` });
       } catch (error: any) {
         toast({ variant: "destructive", title: "Error deleting employee", description: error.message });
       } finally {
@@ -501,7 +502,7 @@ export default function EmployeesPage() {
                 <DialogTitle>Confirm Upload</DialogTitle>
                 <DialogDescription>
                     {isUploading ? "Uploading employees... Please do not close this window." :
-                     uploadErrors.length > 0 ? 'Please fix the errors and re-upload.' : 'Review the data below. Click "Confirm" to create new employee accounts.'
+                     uploadErrors.length > 0 ? 'Please fix the errors in your file and re-upload.' : 'Review the data below. Click "Confirm" to create new employee accounts.'
                     }
                 </DialogDescription>
             </DialogHeader>
@@ -560,7 +561,7 @@ export default function EmployeesPage() {
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
               This action cannot be undone. This will permanently delete the employee record for
-              "{employeeToDelete?.name}" from the application. The associated login account will NOT be deleted. To permanently remove the user's login access, please contact support.
+              "{employeeToDelete?.name}" from the application. The associated login account will NOT be deleted. For security, login accounts must be removed manually by a system administrator.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -587,5 +588,3 @@ export default function EmployeesPage() {
     </>
   );
 }
-
-    
