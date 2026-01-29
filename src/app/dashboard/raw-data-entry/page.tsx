@@ -188,7 +188,7 @@ export default function RawDataEntryPage() {
                     const processedRow: UploadedRow = {
                         'Field Worker ID': lastFieldWorkerId,
                         'Field Worker Name': lastFieldWorkerName,
-                        'Samity ID': String(row[2] || ''),
+                        'Samity ID': String(row[2] || '').trim().toLowerCase(),
                         'Samity Name': String(row[3] || ''),
                         'Component': String(row[4] || ''),
                         'Savings Collection': Number(row[5]) || 0,
@@ -528,40 +528,28 @@ const Step1Savings = ({ data }: { data: UploadedRow[] }) => {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Step 1: Savings Review</CardTitle>
-                <CardDescription>Confirm the savings collections and refunds for each group.</CardDescription>
+                <CardTitle>Step 1: Savings Summary</CardTitle>
+                <CardDescription>Confirm the total savings collections and refunds from the uploaded file.</CardDescription>
             </CardHeader>
-            <CardContent>
-                <ScrollArea className="h-[45vh] relative">
-                    <Table>
-                        <TableHeader className="sticky top-0 bg-background z-10">
-                            <TableRow>
-                                <TableHead>Samity Name</TableHead>
-                                <TableHead className="text-right">Savings Collection</TableHead>
-                                <TableHead className="text-right">Interest On Savings</TableHead>
-                                <TableHead className="text-right">Savings Refund</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {data.map((row, i) => (
-                                <TableRow key={i}>
-                                    <TableCell className="font-medium">{row['Samity Name']}</TableCell>
-                                    <TableCell className="text-right text-green-600">{formatCurrency(row['Savings Collection'])}</TableCell>
-                                    <TableCell className="text-right text-blue-600">{formatCurrency(row['Interest On Savings'])}</TableCell>
-                                    <TableCell className="text-right text-red-600">{formatCurrency(row['Savings Refund'])}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                         <TableFooter className="sticky bottom-0 bg-background z-10">
-                            <TableRow className="font-bold">
-                                <TableCell>Totals</TableCell>
-                                <TableCell className="text-right">{formatCurrency(totals.collection)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(totals.interest)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(totals.refund)}</TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
-                </ScrollArea>
+            <CardContent className="grid gap-4 md:grid-cols-3">
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardDescription>Total Savings Collection</CardDescription>
+                        <CardTitle className="text-3xl text-green-600">{formatCurrency(totals.collection)}</CardTitle>
+                    </CardHeader>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardDescription>Total Interest On Savings</CardDescription>
+                        <CardTitle className="text-3xl">{formatCurrency(totals.interest)}</CardTitle>
+                    </CardHeader>
+                </Card>
+                 <Card>
+                    <CardHeader className="pb-2">
+                        <CardDescription>Total Savings Refund</CardDescription>
+                        <CardTitle className="text-3xl text-red-600">{formatCurrency(totals.refund)}</CardTitle>
+                    </CardHeader>
+                </Card>
             </CardContent>
         </Card>
     );
@@ -570,16 +558,6 @@ const Step1Savings = ({ data }: { data: UploadedRow[] }) => {
 
 // Step 2: Loans & OTR
 const Step2Loans = ({ data }: { data: UploadedRow[] }) => {
-    const loanData = useMemo(() => {
-        return data.map(row => {
-            const totalLoanReceived = row['Loan Received (principle)'] + row['Loan Received (Service Charge)'];
-            const recoverable = row['Regular Recovarable'];
-            const advance = row['Loan Collection Advance'];
-            const otr = recoverable > 0 ? ((totalLoanReceived - advance) / recoverable) * 100 : 0;
-            return { ...row, otr: Math.max(0, otr) }; // Ensure OTR is not negative
-        });
-    }, [data]);
-
     const totals = useMemo(() => {
         const initial = {
             recoverable: 0,
@@ -588,7 +566,7 @@ const Step2Loans = ({ data }: { data: UploadedRow[] }) => {
             principle: 0,
             serviceCharge: 0
         };
-        const aggregated = loanData.reduce((acc, row) => {
+        const aggregated = data.reduce((acc, row) => {
             acc.recoverable += row['Regular Recovarable'];
             acc.totalCollection += row['Loan Collection Total'];
             acc.advance += row['Loan Collection Advance'];
@@ -601,60 +579,62 @@ const Step2Loans = ({ data }: { data: UploadedRow[] }) => {
         const overallOtr = aggregated.recoverable > 0 ? ((totalReceived - aggregated.advance) / aggregated.recoverable) * 100 : 0;
         
         return { ...aggregated, overallOtr: Math.max(0, overallOtr) };
-    }, [loanData]);
+    }, [data]);
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Step 2: Loan Recovery & OTR Review</CardTitle>
-                <CardDescription>Confirm loan collections and review On-Time Recovery (OTR) percentages.</CardDescription>
+                <CardTitle>Step 2: Loan Recovery Summary</CardTitle>
+                <CardDescription>Confirm the total loan collections and overall On-Time Recovery (OTR) percentage.</CardDescription>
             </CardHeader>
-            <CardContent>
-                <ScrollArea className="h-[45vh] relative">
-                    <Table>
-                         <TableHeader className="sticky top-0 bg-background z-10">
-                            <TableRow>
-                                <TableHead>Samity</TableHead>
-                                <TableHead className="text-right">Recoverable</TableHead>
-                                <TableHead className="text-right">Total Collected</TableHead>
-                                <TableHead className="text-right">Advance</TableHead>
-                                <TableHead className="text-right">OTR (%)</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {loanData.map((row, i) => (
-                                <TableRow key={i}>
-                                    <TableCell className="font-medium">{row['Samity Name']}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(row['Regular Recovarable'])}</TableCell>
-                                    <TableCell className="text-right text-green-600">{formatCurrency(row['Loan Collection Total'])}</TableCell>
-                                    <TableCell className="text-right text-blue-600">{formatCurrency(row['Loan Collection Advance'])}</TableCell>
-                                    <TableCell className="text-right">
-                                        <div className="flex items-center justify-end gap-2">
-                                            <span className={cn("font-bold", row.otr >= 95 ? "text-green-600" : row.otr >= 85 ? "text-orange-500" : "text-red-600")}>{row.otr.toFixed(2)}%</span>
-                                            <Progress value={row.otr} className="w-20 h-2" />
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                         <TableFooter className="sticky bottom-0 bg-background z-10">
-                             <TableRow className="font-bold">
-                                <TableCell>Totals</TableCell>
-                                <TableCell className="text-right">{formatCurrency(totals.recoverable)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(totals.totalCollection)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(totals.advance)}</TableCell>
-                                <TableCell className="text-right">
-                                     <div className="flex items-center justify-end gap-2">
-                                        <span className={cn("font-bold", totals.overallOtr >= 95 ? "text-green-600" : totals.overallOtr >= 85 ? "text-orange-500" : "text-red-600")}>
-                                            {totals.overallOtr.toFixed(2)}%
-                                        </span>
-                                        <Progress value={totals.overallOtr} className="w-20 h-2" />
-                                    </div>
-                                </TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
-                </ScrollArea>
+            <CardContent className="space-y-4">
+                 <Card>
+                    <CardHeader>
+                         <div className="flex justify-between items-center">
+                            <div>
+                                <CardDescription>Overall On-Time Recovery (OTR)</CardDescription>
+                                <CardTitle className={cn("text-4xl", totals.overallOtr >= 95 ? "text-green-600" : totals.overallOtr >= 85 ? "text-orange-500" : "text-red-600")}>
+                                    {totals.overallOtr.toFixed(2)}%
+                                </CardTitle>
+                            </div>
+                            <Progress value={totals.overallOtr} className="w-1/3 h-4" />
+                        </div>
+                    </CardHeader>
+                 </Card>
+                 <div className="grid gap-4 md:grid-cols-2">
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription>Total Regular Recoverable</CardDescription>
+                            <CardTitle className="text-2xl">{formatCurrency(totals.recoverable)}</CardTitle>
+                        </CardHeader>
+                    </Card>
+                     <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription>Total Loan Collected</CardDescription>
+                            <CardTitle className="text-2xl text-green-600">{formatCurrency(totals.totalCollection)}</CardTitle>
+                        </CardHeader>
+                    </Card>
+                 </div>
+                 <div className="grid gap-4 md:grid-cols-3">
+                     <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription>Principle Received</CardDescription>
+                            <CardTitle className="text-xl">{formatCurrency(totals.principle)}</CardTitle>
+                        </CardHeader>
+                    </Card>
+                     <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription>Service Charge Received</CardDescription>
+                            <CardTitle className="text-xl">{formatCurrency(totals.serviceCharge)}</CardTitle>
+                        </CardHeader>
+                    </Card>
+                     <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription>Advance Collection</CardDescription>
+                            <CardTitle className="text-xl text-blue-600">{formatCurrency(totals.advance)}</CardTitle>
+                        </CardHeader>
+                    </Card>
+                 </div>
             </CardContent>
         </Card>
     );
@@ -662,67 +642,51 @@ const Step2Loans = ({ data }: { data: UploadedRow[] }) => {
 
 // Step 3: Other Collections & Admissions
 const Step3Others = ({ data }: { data: UploadedRow[] }) => {
-    const processedData = useMemo(() => {
-        return data.map(row => ({
-            ...row,
-            membersAdmitted: Math.floor(row['Admission fees'] / 10),
-        }));
-    }, [data]);
-
     const totals = useMemo(() => {
-        return processedData.reduce((acc, row) => {
+        return data.reduce((acc, row) => {
             acc.admission += row['Admission fees'];
-            acc.members += row.membersAdmitted;
+            acc.members += Math.floor(row['Admission fees'] / 10);
             acc.passbook += row['Passbook fees'];
             acc.processing += row['Processing Fees / Form fees'];
             acc.risk += row['Risk fund'];
             return acc;
         }, { admission: 0, members: 0, passbook: 0, processing: 0, risk: 0 });
-    }, [processedData]);
+    }, [data]);
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Step 3: Fees & Member Admissions Review</CardTitle>
-                <CardDescription>Confirm other fee collections and the number of new members to be admitted.</CardDescription>
+                <CardTitle>Step 3: Fees & Member Admissions Summary</CardTitle>
+                <CardDescription>Confirm total other fee collections and the total number of new members to be admitted.</CardDescription>
             </CardHeader>
-            <CardContent>
-                <ScrollArea className="h-[45vh] relative">
-                    <Table>
-                         <TableHeader className="sticky top-0 bg-background z-10">
-                            <TableRow>
-                                <TableHead>Samity Name</TableHead>
-                                <TableHead className="text-right">Admission Fees</TableHead>
-                                <TableHead className="text-right">Members Admitted</TableHead>
-                                <TableHead className="text-right">Passbook Fees</TableHead>
-                                <TableHead className="text-right">Processing Fees</TableHead>
-                                <TableHead className="text-right">Risk Fund</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {processedData.map((row, i) => (
-                                <TableRow key={i}>
-                                    <TableCell className="font-medium">{row['Samity Name']}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(row['Admission fees'])}</TableCell>
-                                    <TableCell className="text-right font-bold text-green-600">{row.membersAdmitted}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(row['Passbook fees'])}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(row['Processing Fees / Form fees'])}</TableCell>
-                                    <TableCell className="text-right">{formatCurrency(row['Risk fund'])}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                        <TableFooter className="sticky bottom-0 bg-background z-10">
-                            <TableRow className="font-bold">
-                                <TableCell>Totals</TableCell>
-                                <TableCell className="text-right">{formatCurrency(totals.admission)}</TableCell>
-                                <TableCell className="text-right">{totals.members}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(totals.passbook)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(totals.processing)}</TableCell>
-                                <TableCell className="text-right">{formatCurrency(totals.risk)}</TableCell>
-                            </TableRow>
-                        </TableFooter>
-                    </Table>
-                </ScrollArea>
+            <CardContent className="grid gap-4 md:grid-cols-3">
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardDescription>Total Members Admitted</CardDescription>
+                        <CardTitle className="text-3xl text-green-600">{totals.members}</CardTitle>
+                    </CardHeader>
+                     <CardContent>
+                        <p className="text-sm text-muted-foreground">From {formatCurrency(totals.admission)} in Admission Fees</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardDescription>Total Passbook Fees</CardDescription>
+                        <CardTitle className="text-3xl">{formatCurrency(totals.passbook)}</CardTitle>
+                    </CardHeader>
+                </Card>
+                <Card>
+                     <CardHeader className="pb-2">
+                        <CardDescription>Total Processing Fees</CardDescription>
+                        <CardTitle className="text-3xl">{formatCurrency(totals.processing)}</CardTitle>
+                    </CardHeader>
+                </Card>
+                 <Card>
+                     <CardHeader className="pb-2">
+                        <CardDescription>Total Risk Fund</CardDescription>
+                        <CardTitle className="text-3xl">{formatCurrency(totals.risk)}</CardTitle>
+                    </CardHeader>
+                </Card>
             </CardContent>
         </Card>
     );
