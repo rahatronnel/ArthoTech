@@ -8,7 +8,6 @@ import {
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
-  SidebarFooter,
   SidebarContent,
   useSidebar,
 } from "@/components/ui/sidebar";
@@ -30,11 +29,7 @@ import {
   HandCoins,
   Database,
 } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { PlaceHolderImages } from "@/lib/placeholder-images";
 import { useOrganization } from '@/context/OrganizationContext';
-import { useAuth } from "@/context/AuthContext";
-
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
@@ -58,9 +53,7 @@ const navItems = [
 export function SidebarNav() {
   const pathname = usePathname();
   const { state } = useSidebar();
-  const userAvatar = PlaceHolderImages.find(p => p.id === 'user-avatar');
   const { orgInfo } = useOrganization();
-  const { currentUser } = useAuth();
 
   return (
     <>
@@ -98,20 +91,6 @@ export function SidebarNav() {
           ))}
         </SidebarMenu>
       </SidebarContent>
-      <SidebarFooter className="border-t border-sidebar-border p-2">
-         <div className="flex items-center gap-3">
-            <Avatar>
-              <AvatarImage src={userAvatar?.imageUrl} alt={currentUser?.name || 'User'} data-ai-hint="person face" />
-              <AvatarFallback>{currentUser?.name?.substring(0, 2).toUpperCase() || 'U'}</AvatarFallback>
-            </Avatar>
-            {state === 'expanded' && currentUser && (
-                <div className="flex flex-col overflow-hidden">
-                    <span className="truncate font-semibold text-sm">{currentUser.name}</span>
-                    <span className="truncate text-xs text-muted-foreground">{currentUser.loginId}</span>
-                </div>
-            )}
-         </div>
-      </SidebarFooter>
     </>
   );
 }

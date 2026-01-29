@@ -2,10 +2,10 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /employees/{userId} {
-      // Allow any authenticated user to read their own employee document.
-      // This is the minimum required rule for the login process to succeed.
-      allow read: if request.auth != null && request.auth.uid == userId;
+    // Allow all reads and writes to all documents.
+    // This is insecure and should not be used in production.
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
