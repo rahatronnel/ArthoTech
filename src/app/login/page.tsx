@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,10 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { PiggyBank } from 'lucide-react';
 import { useFirestore } from '@/firebase';
-import { collection, query, where, getDocs, setDoc, doc } from 'firebase/firestore';
+import { doc, setDoc } from 'firebase/firestore';
 import { getAuth as getFirebaseAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 import { initializeApp as initializeTempApp, deleteApp } from 'firebase/app';
 import { firebaseConfig } from '@/firebase/config';
-import { Skeleton } from '@/components/ui/skeleton';
 
 // The regular login form
 function LoginForm({ onResetAdmin }: { onResetAdmin: () => void }) {
@@ -87,7 +86,7 @@ function LoginForm({ onResetAdmin }: { onResetAdmin: () => void }) {
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Signing in...' : 'Sign In'}
           </Button>
-          <p className="text-center text-xs text-white/60">
+           <p className="text-center text-xs text-white/60">
             Admin account issues?{' '}
             <button type="button" onClick={onResetAdmin} className="font-semibold underline hover:text-white">
                 Reset Super Admin
@@ -145,7 +144,6 @@ function CreateSuperAdminForm({ onAdminCreated }: { onAdminCreated: () => void }
                 loginId: loginId.toLowerCase().trim(),
             };
 
-            // This will create or overwrite the document, fixing the orphaned record issue.
             await setDoc(doc(firestore, "employees", uid), newEmployee);
 
             toast({ title: 'Admin Account Created', description: 'You can now log in with your new credentials.' });
@@ -194,72 +192,13 @@ function CreateSuperAdminForm({ onAdminCreated }: { onAdminCreated: () => void }
     );
 }
 
-// Loading component for the check
-function LoadingState() {
-    return (
-        <Card className="w-full max-w-sm">
-            <CardHeader>
-                <Skeleton className="h-6 w-3/4" />
-                <Skeleton className="h-4 w-full" />
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="space-y-2">
-                    <Skeleton className="h-4 w-1/4" />
-                    <Skeleton className="h-10 w-full" />
-                </div>
-                 <div className="space-y-2">
-                    <Skeleton className="h-4 w-1/4" />
-                    <Skeleton className="h-10 w-full" />
-                </div>
-            </CardContent>
-            <CardFooter>
-                <Skeleton className="h-10 w-full" />
-            </CardFooter>
-        </Card>
-    )
-}
-
 export default function LoginPage() {
-    const [needsSetup, setNeedsSetup] = useState(false);
-    const [isChecking, setIsChecking] = useState(true);
     const [showAdminReset, setShowAdminReset] = useState(false);
-    const firestore = useFirestore();
-
-    useEffect(() => {
-        const checkSuperAdmin = async () => {
-            if (!firestore) return;
-
-            // This check is primarily for the very first run.
-            // The reset button handles the orphaned account case.
-            try {
-                const q = query(collection(firestore, 'employees'), where('role', '==', 'Super Admin'));
-                const querySnapshot = await getDocs(q);
-                if (querySnapshot.empty) {
-                    setNeedsSetup(true);
-                } else {
-                    setNeedsSetup(false);
-                }
-            } catch (error) {
-                console.error("Error checking for Super Admin:", error);
-                setNeedsSetup(false);
-            } finally {
-                setIsChecking(false);
-            }
-        };
-
-        checkSuperAdmin();
-    }, [firestore]);
-
 
     return (
         <div className="flex min-h-screen items-center justify-center p-4 bg-gradient-to-br from-slate-900 to-purple-900">
-            {isChecking ? (
-                <LoadingState />
-            ) : (needsSetup || showAdminReset) ? (
-                <CreateSuperAdminForm onAdminCreated={() => {
-                    setNeedsSetup(false);
-                    setShowAdminReset(false);
-                }} />
+            {showAdminReset ? (
+                <CreateSuperAdminForm onAdminCreated={() => setShowAdminReset(false)} />
             ) : (
                 <LoginForm onResetAdmin={() => setShowAdminReset(true)} />
             )}
