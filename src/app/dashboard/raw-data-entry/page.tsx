@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Download, Upload } from 'lucide-react';
+import { Download, Upload, CheckCircle, Wallet, Landmark, Users, UserCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +21,9 @@ import { useLoan } from '@/context/LoanContext';
 import { useMember } from '@/context/MemberContext';
 import { collection, query, where, collectionGroup } from 'firebase/firestore';
 import type { Group, LoanDisbursement, LoanCollection } from '@/lib/data';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { cn } from '@/lib/utils';
 
 
 type UploadedRow = {
@@ -62,6 +65,7 @@ export default function RawDataEntryPage() {
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
     const [uploadedData, setUploadedData] = useState<UploadedRow[]>([]);
     const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
+    const [wizardStep, setWizardStep] = useState(1);
 
     const firestore = useFirestore();
 
@@ -79,57 +83,6 @@ export default function RawDataEntryPage() {
         return groupsData.filter(g => g.responsibleEmployeeId === currentUser.id);
     }, [groupsData, currentUser]);
     
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency: 'INR',
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        }).format(amount);
-    };
-
-    const totals = useMemo(() => {
-        if (!uploadedData || uploadedData.length === 0) return null;
-
-        const initialTotals = {
-            'Savings Collection': 0,
-            'Interest On Savings': 0,
-            'Savings Refund': 0,
-            'Additional Fees Collection': 0,
-            'Disbursement Amount': 0,
-            'Regular Recovarable': 0,
-            'Loan Collection Regular': 0,
-            'Loan Collection Due': 0,
-            'Loan Collection Advance': 0,
-            'Loan Collection Rebate': 0,
-            'Loan Received (principle)': 0,
-            'Loan Received (Service Charge)': 0,
-            'Loan Collection Total': 0,
-            'Risk fund': 0,
-            'Processing Fees / Form fees': 0,
-            'Passbook fees': 0,
-            'Admission fees': 0,
-            'Total Collection': 0,
-        };
-
-        const numericKeys = Object.keys(initialTotals);
-
-        return uploadedData.reduce((acc, row) => {
-            numericKeys.forEach(key => {
-                 if (typeof row[key as keyof UploadedRow] === 'number') {
-                    acc[key as keyof typeof initialTotals] += row[key as keyof UploadedRow];
-                }
-            });
-            return acc;
-        }, initialTotals);
-    }, [uploadedData]);
-
-    const numericColumnKeys = useMemo(() => {
-        if (!uploadedData || uploadedData.length === 0) return [];
-        return Object.keys(uploadedData[0]).slice(5);
-    }, [uploadedData]);
-
-
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             setFile(e.target.files[0]);
@@ -286,8 +239,9 @@ export default function RawDataEntryPage() {
                     });
                     return;
                 }
-
+                
                 setUploadedData(validData);
+                setWizardStep(1);
                 setIsConfirmDialogOpen(true);
 
             } catch (error) {
@@ -399,6 +353,7 @@ export default function RawDataEntryPage() {
         setIsConfirmDialogOpen(false);
         setUploadedData([]);
         setFile(null);
+        setWizardStep(1);
         const fileInput = document.getElementById('raw-data-upload') as HTMLInputElement;
         if (fileInput) fileInput.value = '';
     };
@@ -436,6 +391,17 @@ export default function RawDataEntryPage() {
                     </Button>
                 </CardContent>
             </Card>
+            
+            <ConfirmationWizard
+                isOpen={isConfirmDialogOpen}
+                onOpenChange={setIsConfirmDialogOpen}
+                wizardStep={wizardStep}
+                setWizardStep={setWizardStep}
+                uploadedData={uploadedData}
+                uploadDate={uploadDate}
+                setUploadDate={setUploadDate}
+                handleConfirmUpload={handleConfirmUpload}
+            />
 
             <Card>
                 <CardHeader>
@@ -497,60 +463,378 @@ export default function RawDataEntryPage() {
                 </CardContent>
             </Card>
 
-            <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-                <DialogContent className="max-w-7xl">
-                    <DialogHeader>
-                        <DialogTitle>Confirm Upload</DialogTitle>
-                        <DialogDescription>Review the data below. Select a date and click "Confirm" to save all transactions.</DialogDescription>
-                    </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="space-y-2 max-w-sm">
-                          <Label htmlFor="upload-date">Date for Transactions</Label>
-                          <Input id="upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
-                        </div>
-                        <ScrollArea className="h-[60vh] border rounded-md">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="sticky top-0 z-10 bg-popover hover:bg-popover">
-                                        {uploadedData.length > 0 && Object.keys(uploadedData[0]).map((key) => (
-                                            <TableHead key={key} className="whitespace-nowrap">{key}</TableHead>
-                                        ))}
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {uploadedData.map((row, rowIndex) => (
-                                        <TableRow key={rowIndex}>
-                                            {Object.entries(row).map(([key, cell], cellIndex) => (
-                                                <TableCell key={cellIndex} className="whitespace-nowrap">
-                                                    {typeof cell === 'number' && cell > 0 ? formatCurrency(cell) : String(cell)}
-                                                </TableCell>
-                                            ))}
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                                {totals && uploadedData.length > 0 && (
-                                    <TableFooter className="font-bold">
-                                        <TableRow className="sticky bottom-0 z-10 bg-popover hover:bg-popover">
-                                            <TableCell colSpan={5}>Totals</TableCell>
-                                            {numericColumnKeys.map(key => (
-                                                <TableCell key={`total-${key}`} className="whitespace-nowrap text-right">
-                                                    {formatCurrency(totals[key as keyof typeof totals])}
-                                                </TableCell>
-                                            ))}
-                                        </TableRow>
-                                    </TableFooter>
-                                )}
-                            </Table>
-                            <ScrollBar orientation="horizontal" />
-                        </ScrollArea>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleConfirmUpload}>Confirm Upload</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     );
-
 }
+
+const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+    }).format(amount);
+};
+
+const WizardStepper = ({ currentStep }: { currentStep: number }) => {
+    const steps = [
+        { name: 'Savings', icon: Wallet },
+        { name: 'Loans & OTR', icon: Landmark },
+        { name: 'Fees & Admissions', icon: Users },
+        { name: 'Officer Summary', icon: UserCheck },
+    ];
+    return (
+        <div className="flex items-center justify-between w-full my-4 px-4 md:px-8">
+            {steps.map((step, index) => {
+                const stepNumber = index + 1;
+                const isCompleted = currentStep > stepNumber;
+                const isCurrent = currentStep === stepNumber;
+
+                return (
+                    <React.Fragment key={step.name}>
+                        <div className="flex flex-col items-center text-center">
+                            <div className={cn("flex items-center justify-center w-10 h-10 rounded-full border-2",
+                                isCompleted ? "bg-primary border-primary text-primary-foreground" :
+                                isCurrent ? "border-primary text-primary" :
+                                "border-border text-muted-foreground"
+                            )}>
+                                {isCompleted ? <CheckCircle className="w-6 h-6" /> : <step.icon className="w-5 h-5" />}
+                            </div>
+                            <p className={cn("mt-2 text-xs font-semibold", isCurrent || isCompleted ? "text-foreground" : "text-muted-foreground")}>{step.name}</p>
+                        </div>
+                        {index < steps.length - 1 && (
+                             <div className={cn("flex-1 h-0.5 mx-2", isCompleted ? 'bg-primary' : 'bg-border')} />
+                        )}
+                    </React.Fragment>
+                );
+            })}
+        </div>
+    );
+};
+
+
+// Step 1: Savings
+const Step1Savings = ({ data }: { data: UploadedRow[] }) => {
+    const totals = useMemo(() => {
+        return data.reduce((acc, row) => {
+            acc.collection += row['Savings Collection'];
+            acc.interest += row['Interest On Savings'];
+            acc.refund += row['Savings Refund'];
+            return acc;
+        }, { collection: 0, interest: 0, refund: 0 });
+    }, [data]);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Step 1: Savings Review</CardTitle>
+                <CardDescription>Confirm the savings collections and refunds for each group.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ScrollArea className="h-[45vh] relative">
+                    <Table>
+                        <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                                <TableHead>Samity Name</TableHead>
+                                <TableHead className="text-right">Savings Collection</TableHead>
+                                <TableHead className="text-right">Interest On Savings</TableHead>
+                                <TableHead className="text-right">Savings Refund</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {data.map((row, i) => (
+                                <TableRow key={i}>
+                                    <TableCell className="font-medium">{row['Samity Name']}</TableCell>
+                                    <TableCell className="text-right text-green-600">{formatCurrency(row['Savings Collection'])}</TableCell>
+                                    <TableCell className="text-right text-blue-600">{formatCurrency(row['Interest On Savings'])}</TableCell>
+                                    <TableCell className="text-right text-red-600">{formatCurrency(row['Savings Refund'])}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                         <TableFooter className="sticky bottom-0 bg-background z-10">
+                            <TableRow className="font-bold">
+                                <TableCell>Totals</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totals.collection)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totals.interest)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totals.refund)}</TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                </ScrollArea>
+            </CardContent>
+        </Card>
+    );
+};
+
+
+// Step 2: Loans & OTR
+const Step2Loans = ({ data }: { data: UploadedRow[] }) => {
+    const loanData = useMemo(() => {
+        return data.map(row => {
+            const totalLoanReceived = row['Loan Received (principle)'] + row['Loan Received (Service Charge)'];
+            const recoverable = row['Regular Recovarable'];
+            const advance = row['Loan Collection Advance'];
+            const otr = recoverable > 0 ? ((totalLoanReceived - advance) / recoverable) * 100 : 0;
+            return { ...row, otr: Math.max(0, otr) }; // Ensure OTR is not negative
+        });
+    }, [data]);
+
+    const totals = useMemo(() => {
+        const initial = {
+            recoverable: 0,
+            totalCollection: 0,
+            advance: 0,
+            principle: 0,
+            serviceCharge: 0
+        };
+        const aggregated = loanData.reduce((acc, row) => {
+            acc.recoverable += row['Regular Recovarable'];
+            acc.totalCollection += row['Loan Collection Total'];
+            acc.advance += row['Loan Collection Advance'];
+            acc.principle += row['Loan Received (principle)'];
+            acc.serviceCharge += row['Loan Received (Service Charge)'];
+            return acc;
+        }, initial);
+        
+        const totalReceived = aggregated.principle + aggregated.serviceCharge;
+        const overallOtr = aggregated.recoverable > 0 ? ((totalReceived - aggregated.advance) / aggregated.recoverable) * 100 : 0;
+        
+        return { ...aggregated, overallOtr: Math.max(0, overallOtr) };
+    }, [loanData]);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Step 2: Loan Recovery & OTR Review</CardTitle>
+                <CardDescription>Confirm loan collections and review On-Time Recovery (OTR) percentages.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ScrollArea className="h-[45vh] relative">
+                    <Table>
+                         <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                                <TableHead>Samity</TableHead>
+                                <TableHead className="text-right">Recoverable</TableHead>
+                                <TableHead className="text-right">Total Collected</TableHead>
+                                <TableHead className="text-right">Advance</TableHead>
+                                <TableHead className="text-right">OTR (%)</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {loanData.map((row, i) => (
+                                <TableRow key={i}>
+                                    <TableCell className="font-medium">{row['Samity Name']}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(row['Regular Recovarable'])}</TableCell>
+                                    <TableCell className="text-right text-green-600">{formatCurrency(row['Loan Collection Total'])}</TableCell>
+                                    <TableCell className="text-right text-blue-600">{formatCurrency(row['Loan Collection Advance'])}</TableCell>
+                                    <TableCell className="text-right">
+                                        <div className="flex items-center justify-end gap-2">
+                                            <span className={cn("font-bold", row.otr >= 95 ? "text-green-600" : row.otr >= 85 ? "text-orange-500" : "text-red-600")}>{row.otr.toFixed(2)}%</span>
+                                            <Progress value={row.otr} className="w-20 h-2" />
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                         <TableFooter className="sticky bottom-0 bg-background z-10">
+                             <TableRow className="font-bold">
+                                <TableCell>Totals</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totals.recoverable)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totals.totalCollection)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totals.advance)}</TableCell>
+                                <TableCell className="text-right">
+                                     <div className="flex items-center justify-end gap-2">
+                                        <span className={cn("font-bold", totals.overallOtr >= 95 ? "text-green-600" : totals.overallOtr >= 85 ? "text-orange-500" : "text-red-600")}>
+                                            {totals.overallOtr.toFixed(2)}%
+                                        </span>
+                                        <Progress value={totals.overallOtr} className="w-20 h-2" />
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                </ScrollArea>
+            </CardContent>
+        </Card>
+    );
+};
+
+// Step 3: Other Collections & Admissions
+const Step3Others = ({ data }: { data: UploadedRow[] }) => {
+    const processedData = useMemo(() => {
+        return data.map(row => ({
+            ...row,
+            membersAdmitted: Math.floor(row['Admission fees'] / 10),
+        }));
+    }, [data]);
+
+    const totals = useMemo(() => {
+        return processedData.reduce((acc, row) => {
+            acc.admission += row['Admission fees'];
+            acc.members += row.membersAdmitted;
+            acc.passbook += row['Passbook fees'];
+            acc.processing += row['Processing Fees / Form fees'];
+            acc.risk += row['Risk fund'];
+            return acc;
+        }, { admission: 0, members: 0, passbook: 0, processing: 0, risk: 0 });
+    }, [processedData]);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Step 3: Fees & Member Admissions Review</CardTitle>
+                <CardDescription>Confirm other fee collections and the number of new members to be admitted.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ScrollArea className="h-[45vh] relative">
+                    <Table>
+                         <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                                <TableHead>Samity Name</TableHead>
+                                <TableHead className="text-right">Admission Fees</TableHead>
+                                <TableHead className="text-right">Members Admitted</TableHead>
+                                <TableHead className="text-right">Passbook Fees</TableHead>
+                                <TableHead className="text-right">Processing Fees</TableHead>
+                                <TableHead className="text-right">Risk Fund</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {processedData.map((row, i) => (
+                                <TableRow key={i}>
+                                    <TableCell className="font-medium">{row['Samity Name']}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(row['Admission fees'])}</TableCell>
+                                    <TableCell className="text-right font-bold text-green-600">{row.membersAdmitted}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(row['Passbook fees'])}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(row['Processing Fees / Form fees'])}</TableCell>
+                                    <TableCell className="text-right">{formatCurrency(row['Risk fund'])}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                        <TableFooter className="sticky bottom-0 bg-background z-10">
+                            <TableRow className="font-bold">
+                                <TableCell>Totals</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totals.admission)}</TableCell>
+                                <TableCell className="text-right">{totals.members}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totals.passbook)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totals.processing)}</TableCell>
+                                <TableCell className="text-right">{formatCurrency(totals.risk)}</TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                </ScrollArea>
+            </CardContent>
+        </Card>
+    );
+};
+
+
+// Step 4: Summary
+const Step4Summary = ({ data }: { data: UploadedRow[] }) => {
+    const summaryData = useMemo(() => {
+        const officerMap = new Map<string, { name: string, total: number }>();
+        data.forEach(row => {
+            const officerId = row['Field Worker ID'];
+            if (!officerMap.has(officerId)) {
+                officerMap.set(officerId, { name: row['Field Worker Name'], total: 0 });
+            }
+            const current = officerMap.get(officerId)!;
+            current.total += row['Total Collection'];
+            officerMap.set(officerId, current);
+        });
+        return Array.from(officerMap.values());
+    }, [data]);
+    
+    const grandTotal = useMemo(() => summaryData.reduce((acc, officer) => acc + officer.total, 0), [summaryData]);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Step 4: Field Officer Summary</CardTitle>
+                <CardDescription>Final review of total collections per field officer.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                 <ScrollArea className="h-[45vh] relative">
+                    <Table>
+                        <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                                <TableHead>Field Officer Name</TableHead>
+                                <TableHead className="text-right">Total Collection</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {summaryData.map((officer, i) => (
+                                <TableRow key={i}>
+                                    <TableCell className="font-medium">{officer.name}</TableCell>
+                                    <TableCell className="text-right font-bold">{formatCurrency(officer.total)}</TableCell>
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                         <TableFooter className="sticky bottom-0 bg-background z-10">
+                            <TableRow className="font-bold text-lg">
+                                <TableCell>Grand Total</TableCell>
+                                <TableCell className="text-right">{formatCurrency(grandTotal)}</TableCell>
+                            </TableRow>
+                        </TableFooter>
+                    </Table>
+                </ScrollArea>
+            </CardContent>
+        </Card>
+    );
+};
+
+const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, uploadedData, uploadDate, setUploadDate, handleConfirmUpload }: any) => {
+    
+     const handleClose = (open: boolean) => {
+        if (!open) {
+            onOpenChange(false);
+            setTimeout(() => setWizardStep(1), 300); // Reset step after dialog closes
+        } else {
+            onOpenChange(true);
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={handleClose}>
+            <DialogContent className="max-w-7xl h-[90vh] flex flex-col">
+                <DialogHeader>
+                    <DialogTitle>Confirm Raw Data Upload</DialogTitle>
+                    <DialogDescription>Review the transactions in a step-by-step process before saving.</DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-2 max-w-sm">
+                    <Label htmlFor="upload-date">Date for All Transactions</Label>
+                    <Input id="upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
+                </div>
+                
+                <WizardStepper currentStep={wizardStep} />
+
+                <div className="flex-grow overflow-hidden relative">
+                    {wizardStep === 1 && <Step1Savings data={uploadedData} />}
+                    {wizardStep === 2 && <Step2Loans data={uploadedData} />}
+                    {wizardStep === 3 && <Step3Others data={uploadedData} />}
+                    {wizardStep === 4 && <Step4Summary data={uploadedData} />}
+                </div>
+
+                <DialogFooter className="mt-auto pt-4 border-t !justify-between">
+                     <Button variant="outline" onClick={() => handleClose(false)}>Cancel</Button>
+                    <div className="flex gap-2">
+                        {wizardStep > 1 && (
+                            <Button variant="secondary" onClick={() => setWizardStep((s: number) => s - 1)}>
+                                Previous
+                            </Button>
+                        )}
+                        {wizardStep < 4 ? (
+                            <Button onClick={() => setWizardStep((s: number) => s + 1)}>
+                                Next
+                            </Button>
+                        ) : (
+                            <Button onClick={handleConfirmUpload} className="bg-green-600 hover:bg-green-700">
+                                Confirm & Save All
+                            </Button>
+                        )}
+                    </div>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
