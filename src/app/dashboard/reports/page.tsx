@@ -8,6 +8,11 @@ const reports = [
     description: 'A basic report showing details for each branch.',
     href: '/dashboard/reports/branch-wise',
   },
+  {
+    title: 'Cross Check Report',
+    description: 'A daily summary of all financial and member activities.',
+    href: '/dashboard/reports/cross-check',
+  },
 ];
 
 export default function ReportsPage() {
