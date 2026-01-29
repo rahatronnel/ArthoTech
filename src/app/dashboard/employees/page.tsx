@@ -19,7 +19,7 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { firebaseConfig } from '@/firebase/config';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
 import { getAuth as getFirebaseAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, deleteApp } from 'firebase/app';
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
@@ -34,22 +34,28 @@ const ROLES: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Re
  * Uses a secondary Firebase app instance for isolation.
  */
 async function createIsolatedUser(employeeData: any, firestore: any, authDomain: string) {
-    const tempApp = initializeApp(firebaseConfig, `employee-creator-${Date.now()}`);
-    const tempAuth = getFirebaseAuth(tempApp);
-    const email = `${employeeData.loginId}@${authDomain}`;
-    
-    const userCredential = await createUserWithEmailAndPassword(tempAuth, email, employeeData.password);
-    const uid = userCredential.user.uid;
+    const tempApp = initializeApp(firebaseConfig, `employee-creator-${Date.now()}-${Math.random()}`);
+    try {
+        const tempAuth = getFirebaseAuth(tempApp);
+        const email = `${employeeData.loginId}@${authDomain}`;
+        
+        const userCredential = await createUserWithEmailAndPassword(tempAuth, email, employeeData.password);
+        const uid = userCredential.user.uid;
 
-    const newEmployee: Omit<Employee, 'id' | 'password'> = {
-        name: employeeData.name,
-        bengaliName: employeeData.bengaliName,
-        code: employeeData.code,
-        role: employeeData.role,
-        assignment: employeeData.assignment,
-        loginId: employeeData.loginId,
-    };
-    await setDoc(doc(firestore, "employees", uid), newEmployee);
+        const newEmployee: Omit<Employee, 'id' | 'password'> = {
+            name: employeeData.name,
+            bengaliName: employeeData.bengaliName,
+            code: employeeData.code,
+            role: employeeData.role,
+            assignment: employeeData.assignment,
+            loginId: employeeData.loginId,
+        };
+        // The employee ID in Firestore MUST match the auth UID
+        await setDoc(doc(firestore, "employees", uid), newEmployee);
+    } finally {
+        // Ensure the temporary app is cleaned up
+        await deleteApp(tempApp);
+    }
 }
 
 
@@ -117,9 +123,9 @@ export default function EmployeesPage() {
     const confirmDeleteAll = async () => {
         if (currentUser?.role !== 'Super Admin' || !employeesData) return;
         try {
-            const employeesToDelete = employees.filter(e => e.role !== 'Super Admin');
+            const employeesToDelete = employeesData.filter(e => e.role !== 'Super Admin');
             if(employeesToDelete.length === 0) {
-                 toast({ title: "No employees to delete." });
+                 toast({ title: "No employee records to delete." });
                  setIsDeleteAllOpen(false);
                  return;
             }
@@ -177,7 +183,7 @@ export default function EmployeesPage() {
     const validateUploadData = (jsonData: any[]) => {
         const errors: string[] = [];
         const validEmployees: any[] = [];
-        const existingLoginIds = new Set(employees.map(e => e.loginId.toLowerCase()));
+        const existingLoginIds = new Set(employeesData?.map(e => e.loginId.toLowerCase()));
         const fileLoginIds = new Set<string>();
         const validAssignments = new Set(assignments);
 
@@ -204,11 +210,11 @@ export default function EmployeesPage() {
 
             const normalizedLoginId = String(loginId).toLowerCase().trim();
             if (existingLoginIds.has(normalizedLoginId)) {
-                errors.push(`Row ${rowIndex}: Login ID "${loginId}" already exists.`);
+                errors.push(`Row ${rowIndex}: Login ID "${loginId}" already exists in the database.`);
                 return;
             }
             if (fileLoginIds.has(normalizedLoginId)) {
-                errors.push(`Row ${rowIndex}: Duplicate Login ID "${loginId}" in file.`);
+                errors.push(`Row ${rowIndex}: Duplicate Login ID "${loginId}" found in the file.`);
                 return;
             }
             
@@ -235,7 +241,7 @@ export default function EmployeesPage() {
                 await createIsolatedUser(empData, firestore, auth.app.options.authDomain);
                 successCount++;
             } catch (error: any) {
-                const message = error.code === 'auth/email-already-in-use' ? 'Login ID is already registered in Firebase.' : error.message;
+                const message = error.code === 'auth/email-already-in-use' ? 'This Login ID is already registered in Firebase Auth.' : error.message;
                 creationErrors.push(`Failed for ${empData.loginId}: ${message}`);
             }
             setUploadState(s => ({ ...s, progress: ((i + 1) / s.data.length) * 100 }));
@@ -326,6 +332,7 @@ export default function EmployeesPage() {
                     assignments={assignments}
                     firestore={firestore}
                     authDomain={auth?.app.options.authDomain}
+                    existingLoginIds={new Set(employeesData?.map(e => e.loginId.toLowerCase()))}
                 />
             )}
             
@@ -340,8 +347,12 @@ export default function EmployeesPage() {
 
             <AlertDialog open={!!employeeToDelete} onOpenChange={() => setEmployeeToDelete(null)}>
                 <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>This will delete the employee record for "{employeeToDelete?.name}". The user's login account will NOT be deleted for security reasons. To permanently prevent login, please contact support.</AlertDialogDescription>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will delete the employee record for "{employeeToDelete?.name}". 
+                            For security reasons, the user's login account will NOT be deleted. To permanently prevent login, please contact support to have the authentication account removed.
+                        </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete Record</AlertDialogAction></AlertDialogFooter>
                 </AlertDialogContent>
@@ -349,8 +360,18 @@ export default function EmployeesPage() {
             
             <AlertDialog open={isDeleteAllOpen} onOpenChange={setIsDeleteAllOpen}>
                 <AlertDialogContent>
-                    <AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This will permanently delete ALL employee records except for Super Admins. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDeleteAll} className="bg-destructive hover:bg-destructive/90">Delete All</AlertDialogAction></AlertDialogFooter>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete all employee records from the database, except for Super Admins. This action cannot be undone.
+                            <br/><br/>
+                            <span className="font-semibold">Note:</span> This does not delete their login accounts.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmDeleteAll} className="bg-destructive hover:bg-destructive/90">Yes, delete all records</AlertDialogAction>
+                    </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </>
@@ -359,7 +380,7 @@ export default function EmployeesPage() {
 
 // --- Sub-components ---
 
-function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore, authDomain }: any) {
+function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore, authDomain, existingLoginIds }: any) {
     const { toast } = useToast();
     const [name, setName] = useState(employee?.name || '');
     const [bengaliName, setBengaliName] = useState(employee?.bengaliName || '');
@@ -374,6 +395,12 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
             toast({ variant: "destructive", title: "Validation Error", description: "Please fill all fields." });
             return;
         }
+        
+        const normalizedLoginId = loginId.toLowerCase().trim();
+        if (!employee && existingLoginIds.has(normalizedLoginId)) {
+            toast({ variant: "destructive", title: "Login ID exists", description: "This Login ID is already in use. Please choose another." });
+            return;
+        }
 
         try {
             if (employee) { // Update
@@ -385,13 +412,14 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
                     toast({ variant: "destructive", title: "Auth Error", description: "Auth domain not configured." });
                     return;
                 }
-                const newEmployeeData = { name, bengaliName, code, role, assignment, loginId: loginId.toLowerCase().trim(), password };
+                const newEmployeeData = { name, bengaliName, code, role, assignment, loginId: normalizedLoginId, password };
                 await createIsolatedUser(newEmployeeData, firestore, authDomain);
                 toast({ title: "Employee created" });
             }
             setIsOpen(false);
         } catch (error: any) {
-            toast({ variant: "destructive", title: "An error occurred", description: error.message });
+            const message = error.code === 'auth/email-already-in-use' ? 'This Login ID is already registered in Firebase Auth.' : error.message;
+            toast({ variant: "destructive", title: "An error occurred", description: message });
         }
     };
 
@@ -470,6 +498,5 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
         </Dialog>
     );
 }
-
 
     
