@@ -4,8 +4,10 @@
 import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/context/AuthContext';
+import { useOthersData } from '@/context/OthersDataContext';
+import { type Branch, type OtherDataEntry, otherDataTypes as allDataTypes } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,9 +18,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
-import { useOthersData } from '@/context/OthersDataContext';
 import { collection, query, where, collectionGroup } from 'firebase/firestore';
-import type { Group, Branch, OtherDataEntry, SavingsTransaction, LoanDisbursement, LoanCollection } from '@/lib/data';
+import type { Group, LoanDisbursement, LoanCollection } from '@/lib/data';
 
 
 type UploadedRow = {
@@ -75,6 +76,56 @@ export default function RawDataEntryPage() {
         }
         return groupsData.filter(g => g.responsibleEmployeeId === currentUser.id);
     }, [groupsData, currentUser]);
+    
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+        }).format(amount);
+    };
+
+    const totals = useMemo(() => {
+        if (!uploadedData || uploadedData.length === 0) return null;
+
+        const initialTotals = {
+            'Savings Collection': 0,
+            'Interest On Savings': 0,
+            'Savings Refund': 0,
+            'Additional Fees Collection': 0,
+            'Disbursement Amount': 0,
+            'Regular Recovarable': 0,
+            'Loan Collection Regular': 0,
+            'Loan Collection Due': 0,
+            'Loan Collection Advance': 0,
+            'Loan Collection Rebate': 0,
+            'Loan Received (principle)': 0,
+            'Loan Received (Service Charge)': 0,
+            'Loan Collection Total': 0,
+            'Risk fund': 0,
+            'Processing Fees / Form fees': 0,
+            'Passbook fees': 0,
+            'Admission fees': 0,
+            'Total Collection': 0,
+        };
+
+        const numericKeys = Object.keys(initialTotals);
+
+        return uploadedData.reduce((acc, row) => {
+            numericKeys.forEach(key => {
+                 if (typeof row[key as keyof UploadedRow] === 'number') {
+                    acc[key as keyof typeof initialTotals] += row[key as keyof UploadedRow];
+                }
+            });
+            return acc;
+        }, initialTotals);
+    }, [uploadedData]);
+
+    const numericColumnKeys = useMemo(() => {
+        if (!uploadedData || uploadedData.length === 0) return [];
+        return Object.keys(uploadedData[0]).slice(5);
+    }, [uploadedData]);
 
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -440,9 +491,9 @@ export default function RawDataEntryPage() {
                           <Label htmlFor="upload-date">Date for Transactions</Label>
                           <Input id="upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
                         </div>
-                        <ScrollArea className="h-[55vh]">
-                             <Table>
-                                <TableHeader>
+                        <ScrollArea className="h-[60vh] border rounded-md">
+                            <Table>
+                                <TableHeader className="sticky top-0 bg-popover z-10">
                                     <TableRow>
                                         {uploadedData.length > 0 && Object.keys(uploadedData[0]).map((key) => (
                                             <TableHead key={key} className="whitespace-nowrap">{key}</TableHead>
@@ -452,12 +503,26 @@ export default function RawDataEntryPage() {
                                 <TableBody>
                                     {uploadedData.map((row, rowIndex) => (
                                         <TableRow key={rowIndex}>
-                                            {Object.values(row).map((cell, cellIndex) => (
-                                                <TableCell key={cellIndex} className="whitespace-nowrap">{String(cell)}</TableCell>
+                                            {Object.entries(row).map(([key, cell], cellIndex) => (
+                                                <TableCell key={cellIndex} className="whitespace-nowrap">
+                                                    {typeof cell === 'number' && cell > 0 ? formatCurrency(cell) : String(cell)}
+                                                </TableCell>
                                             ))}
                                         </TableRow>
                                     ))}
                                 </TableBody>
+                                {totals && uploadedData.length > 0 && (
+                                    <TableFooter className="sticky bottom-0 bg-popover font-bold">
+                                        <TableRow>
+                                            <TableCell colSpan={5}>Totals</TableCell>
+                                            {numericColumnKeys.map(key => (
+                                                <TableCell key={`total-${key}`} className="whitespace-nowrap text-right">
+                                                    {formatCurrency(totals[key as keyof typeof totals])}
+                                                </TableCell>
+                                            ))}
+                                        </TableRow>
+                                    </TableFooter>
+                                )}
                             </Table>
                         </ScrollArea>
                     </div>
