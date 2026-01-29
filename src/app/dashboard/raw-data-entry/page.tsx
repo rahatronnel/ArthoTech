@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
+import { useMember } from '@/context/MemberContext';
 import { collection, query, where, collectionGroup } from 'firebase/firestore';
 import type { Group, LoanDisbursement, LoanCollection } from '@/lib/data';
 
@@ -55,6 +56,7 @@ export default function RawDataEntryPage() {
     const { addSavingsTransaction } = useSavings();
     const { addLoanDisbursement, addLoanCollection } = useLoan();
     const { addBulkOthersData } = useOthersData();
+    const { addMemberChange } = useMember();
 
     const [file, setFile] = useState<File | null>(null);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
@@ -350,6 +352,21 @@ export default function RawDataEntryPage() {
                     notes: `Regular: ${row['Loan Collection Regular']}, Due: ${row['Loan Collection Due']}, Advance: ${row['Loan Collection Advance']}`
                 });
             }
+
+            // Member Additions from Admission Fees
+            const admissionFeesAmount = row['Admission fees'];
+            if (admissionFeesAmount > 0) {
+                const membersAdded = admissionFeesAmount / 10;
+                if (membersAdded > 0) {
+                     addMemberChange({
+                        date: uploadDate,
+                        groupId: group.id,
+                        added: membersAdded,
+                        dropped: 0,
+                        notes: `From raw data upload.`
+                    });
+                }
+            }
             
             // Others Data
             const otherDataMapping: { [key: string]: OtherDataEntry['type'] } = {
@@ -537,5 +554,3 @@ export default function RawDataEntryPage() {
     );
 
 }
-
-    
