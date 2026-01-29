@@ -153,16 +153,7 @@ export default function RawDataEntryPage() {
                 
                 const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
 
-                if (rawData.length < 10) { // 9 header rows + at least 1 data row
-                    toast({
-                        variant: "destructive",
-                        title: "Empty or Invalid File",
-                        description: "The file must contain at least 10 rows (9 for headers, 1 for data).",
-                    });
-                    return;
-                }
-                
-                const dataRows = rawData.slice(9);
+                const dataRows = rawData;
                 
                 const allProcessedData: UploadedRow[] = [];
                 let lastFieldWorkerId = '';
