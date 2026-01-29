@@ -99,6 +99,9 @@ export type Group = {
   code: string;
   day: string;
   branchId: string;
+  areaId?: string;
+  zoneId?: string;
+  regionId?: string;
 };
 
 export type Role = {

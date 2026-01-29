@@ -19,7 +19,7 @@ import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, collectionGroup, query, getDocs } from 'firebase/firestore';
-import type { Group, Employee, Branch } from '@/lib/data';
+import type { Group, Employee, Branch, Area, Zone } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -36,6 +36,12 @@ export default function GroupsPage() {
   
   const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
   const { data: branches, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
+
+  const areasQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'areas')) : null, [firestore]);
+  const { data: areas, isLoading: areasLoading } = useCollection<Area>(areasQuery);
+  
+  const zonesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'zones')) : null, [firestore]);
+  const { data: zones, isLoading: zonesLoading } = useCollection<Zone>(zonesQuery);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
@@ -150,7 +156,7 @@ export default function GroupsPage() {
 
         const errors: string[] = [];
         const validGroups: any[] = [];
-        const employeeMap = new Map(employees?.map(e => [e.code, e.id]));
+        const employeeMap = new Map(employees?.map(e => [String(e.code).trim().toLowerCase(), e.id]));
         const branchMap = new Map(branches?.map(b => [b.code, b.id]));
 
         jsonData.forEach((row, index) => {
@@ -163,13 +169,23 @@ export default function GroupsPage() {
             errors.push(`Row ${index + 2}: Branch with code "${branchCode}" not found.`);
             return;
           }
-          if (!employeeMap.has(leaderCode)) {
+          const leaderCodeValue = String(leaderCode).trim().toLowerCase();
+          if (!employeeMap.has(leaderCodeValue)) {
             errors.push(`Row ${index + 2}: Leader with code "${leaderCode}" not found.`);
             return;
           }
+
           const branchId = branchMap.get(branchCode)!;
-          const responsibleEmployeeId = employeeMap.get(leaderCode)!;
-          validGroups.push({ name, code, day, branchId, responsibleEmployeeId, initialMembers: Number(initialMembers) || 0, initialSavings: Number(initialSavings) || 0, status });
+          const responsibleEmployeeId = employeeMap.get(leaderCodeValue)!;
+          
+          const selectedBranch = branches?.find(b => b.id === branchId);
+          if (!selectedBranch) { errors.push(`Row ${index + 2}: Internal error - could not find branch details.`); return; }
+          const parentArea = areas?.find(a => a.id === selectedBranch.areaId);
+          if (!parentArea) { errors.push(`Row ${index + 2}: Internal error - could not find area for branch.`); return; }
+          const parentZone = zones?.find(z => z.id === parentArea.zoneId);
+          if (!parentZone) { errors.push(`Row ${index + 2}: Internal error - could not find zone for area.`); return; }
+          
+          validGroups.push({ name, code, day, branchId, responsibleEmployeeId, initialMembers: Number(initialMembers) || 0, initialSavings: Number(initialSavings) || 0, status, areaId: parentArea.id, zoneId: parentZone.id, regionId: parentZone.regionId });
         });
 
         setUploadedGroups(validGroups);
@@ -187,7 +203,7 @@ export default function GroupsPage() {
     if (uploadedGroups.length === 0) return;
     const batch = writeBatch(firestore);
     uploadedGroups.forEach(groupData => {
-      const newDocRef = doc(collection(firestore, 'branches', groupData.branchId, 'groups'));
+      const newDocRef = doc(collection(firestore, 'regions', groupData.regionId, 'zones', groupData.zoneId, 'areas', groupData.areaId, 'branches', groupData.branchId, 'groups'));
       const newGroup: Group = {
         id: newDocRef.id,
         name: groupData.name,
@@ -197,8 +213,11 @@ export default function GroupsPage() {
         responsibleEmployeeId: groupData.responsibleEmployeeId,
         initialMembers: groupData.initialMembers,
         initialSavings: groupData.initialSavings,
-        totalLoans: 0, // default value
+        totalLoans: 0,
         branchId: groupData.branchId,
+        areaId: groupData.areaId,
+        zoneId: groupData.zoneId,
+        regionId: groupData.regionId,
       };
       batch.set(newDocRef, newGroup);
     });
@@ -229,8 +248,19 @@ export default function GroupsPage() {
 
   const confirmDelete = async () => {
     if (groupToDelete && firestore) {
+      if (!groupToDelete.regionId || !groupToDelete.zoneId || !groupToDelete.areaId) {
+        toast({
+          variant: "destructive",
+          title: "Cannot Delete Group",
+          description: "This group is missing path information. It might be old data. Please re-create it to fix.",
+          duration: 7000,
+        });
+        setGroupToDelete(null);
+        return;
+      }
       try {
-        await deleteDoc(doc(firestore, "branches", groupToDelete.branchId, "groups", groupToDelete.id));
+        const groupDocRef = doc(firestore, "regions", groupToDelete.regionId, "zones", groupToDelete.zoneId, "areas", groupToDelete.areaId, "branches", groupToDelete.branchId, "groups", groupToDelete.id);
+        await deleteDoc(groupDocRef);
         toast({ title: "Group deleted", description: `"${groupToDelete.name}" has been deleted.` });
       } catch (error: any) {
         toast({ variant: 'destructive', title: 'Error deleting group', description: error.message });
@@ -287,12 +317,23 @@ export default function GroupsPage() {
       }
       try {
         if (editingGroup) { // Update
-          const groupDocRef = doc(firestore, 'branches', editingGroup.branchId, 'groups', editingGroup.id);
+          if (!editingGroup.regionId || !editingGroup.zoneId || !editingGroup.areaId) {
+            toast({ variant: "destructive", title: "Cannot Update", description: "Path information is missing for this group."});
+            return;
+          }
+          const groupDocRef = doc(firestore, 'regions', editingGroup.regionId, 'zones', editingGroup.zoneId, 'areas', editingGroup.areaId, 'branches', editingGroup.branchId, 'groups', editingGroup.id);
           const updatedGroup: Partial<Group> = { name, code, day, responsibleEmployeeId, status: status as Group['status'], initialMembers, initialSavings };
           await setDoc(groupDocRef, updatedGroup, { merge: true });
           toast({ title: "Group updated", description: `"${name}" has been updated.` });
         } else { // Create
-          const newDocRef = doc(collection(firestore, 'branches', branchId, 'groups'));
+          const selectedBranch = branches?.find(b => b.id === branchId);
+          if (!selectedBranch) { toast({ variant: "destructive", title: "Error", description: "Selected branch could not be found." }); return; }
+          const parentArea = areas?.find(a => a.id === selectedBranch.areaId);
+          if (!parentArea) { toast({ variant: "destructive", title: "Error", description: "Parent area could not be found." }); return; }
+          const parentZone = zones?.find(z => z.id === parentArea.zoneId);
+          if (!parentZone) { toast({ variant: "destructive", title: "Error", description: "Parent zone could not be found." }); return; }
+          
+          const newDocRef = doc(collection(firestore, 'regions', parentZone.regionId, 'zones', parentZone.id, 'areas', parentArea.id, 'branches', selectedBranch.id, 'groups'));
           const newGroup: Group = {
             id: newDocRef.id,
             name,
@@ -304,6 +345,9 @@ export default function GroupsPage() {
             status: status as Group['status'],
             totalLoans: 0,
             branchId,
+            areaId: parentArea.id,
+            zoneId: parentZone.id,
+            regionId: parentZone.regionId,
           };
           await setDoc(newDocRef, newGroup);
           toast({ title: "Group created", description: `"${name}" has been created.` });
@@ -423,7 +467,7 @@ export default function GroupsPage() {
     );
   };
   
-  const isLoading = groupsLoading || employeesLoading || branchesLoading;
+  const isLoading = groupsLoading || employeesLoading || branchesLoading || areasLoading || zonesLoading;
 
   return (
     <>
@@ -598,5 +642,3 @@ export default function GroupsPage() {
     </>
   );
 }
-
-    
