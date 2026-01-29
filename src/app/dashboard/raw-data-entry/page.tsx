@@ -368,31 +368,38 @@ export default function RawDataEntryPage() {
         <div className="flex flex-col gap-6">
             <div>
                 <h1 className="text-3xl font-bold">Raw Data Entry</h1>
-                <p className="text-muted-foreground">Download the daily transaction template, fill it out, and upload it here.</p>
+                <p className="text-muted-foreground">Upload your completed daily transaction report to process all transactions at once.</p>
             </div>
 
             <Card>
-                <CardHeader>
-                    <CardTitle>Upload Daily Transactions</CardTitle>
-                    <CardDescription>
-                        Only data for groups assigned to you will be processed.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <Button onClick={handleDownloadTemplate} variant="outline" className="w-full">
-                            <Download className="mr-2 h-4 w-4" />
-                            Download Template
-                        </Button>
-                        <div className="space-y-2">
-                            <Label htmlFor="raw-data-upload" className="sr-only">Upload File</Label>
-                            <Input id="raw-data-upload" type="file" accept=".xlsx, .xls" onChange={handleFileChange} className="file:text-foreground" />
+                 <CardContent className="p-6">
+                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                        <div className="flex flex-col justify-between space-y-4 rounded-lg border bg-background p-6">
+                            <div>
+                                <h3 className="text-lg font-semibold flex items-center gap-2"><Upload className="h-5 w-5 text-primary" />Upload Report</h3>
+                                <p className="text-sm text-muted-foreground mt-1">Select the completed Excel file from your computer.</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="raw-data-upload" className="sr-only">Upload File</Label>
+                                <Input id="raw-data-upload" type="file" accept=".xlsx, .xls" onChange={handleFileChange} className="file:text-foreground" />
+                            </div>
+                        </div>
+                        <div className="flex flex-col justify-between space-y-4 rounded-lg border bg-muted/20 p-6">
+                            <div>
+                                <h3 className="text-lg font-semibold flex items-center gap-2"><Download className="h-5 w-5" />Need a Template?</h3>
+                                <p className="text-sm text-muted-foreground mt-1">Download our pre-formatted Excel sheet to ensure a smooth upload.</p>
+                            </div>
+                            <Button onClick={handleDownloadTemplate} variant="secondary" className="w-full">
+                                Download Daily Transaction Template
+                            </Button>
                         </div>
                     </div>
-                     <Button onClick={handleProcessUpload} className="w-full" disabled={!file || isLoading}>
-                        <Upload className="mr-2 h-4 w-4" />
-                        {isLoading ? 'Loading Data...' : 'Upload and Preview'}
-                    </Button>
+                    <div className="mt-6">
+                        <Button onClick={handleProcessUpload} className="w-full" size="lg" disabled={!file || isLoading}>
+                            <Upload className="mr-2 h-5 w-5" />
+                            {isLoading ? 'Processing File...' : 'Upload and Preview Transactions'}
+                        </Button>
+                    </div>
                 </CardContent>
             </Card>
             
@@ -465,6 +472,7 @@ export default function RawDataEntryPage() {
                                 </TableRow>
                             </TableBody>
                         </Table>
+                        <ScrollBar orientation="horizontal" />
                     </ScrollArea>
                 </CardContent>
             </Card>
@@ -703,7 +711,7 @@ const Step4Summary = ({ data, groupsData, employeesData }: { data: UploadedRow[]
     const summaryData = useMemo(() => {
         if (!groupsData || !employeesData) return [];
 
-        const groupMap = new Map(groupsData.filter(g => g.code).map(g => [String(g.code).toLowerCase(), g]));
+        const groupMap = new Map(groupsData.filter(g => g.code).map(g => [g.code.toLowerCase(), g]));
         const employeeMap = new Map(employeesData.map(e => [e.id, e]));
         const officerMap = new Map<string, { name: string, total: number }>();
 
@@ -820,5 +828,3 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
         </Dialog>
     );
 };
-
-    
