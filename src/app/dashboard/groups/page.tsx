@@ -19,7 +19,7 @@ import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, collectionGroup, query, getDocs } from 'firebase/firestore';
-import type { Group, Employee, Branch } from '@/lib/data';
+import type { Group, Employee, Branch, Area } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -36,6 +36,9 @@ export default function GroupsPage() {
   
   const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
   const { data: branches, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
+
+  const areasQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'areas')) : null, [firestore]);
+  const { data: areas, isLoading: areasLoading } = useCollection<Area>(areasQuery);
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingGroup, setEditingGroup] = useState<Group | null>(null);
@@ -147,6 +150,7 @@ export default function GroupsPage() {
         const validGroups: any[] = [];
         const employeeMap = new Map(employees?.map(e => [String(e.code).trim().toLowerCase(), e.id]));
         const branchMap = new Map(branches?.map(b => [b.code, b]));
+        const areaMap = new Map(areas?.map(a => [a.id, a]));
 
         jsonData.forEach((row, index) => {
           const { "Group Name": name, "Code": code, "Day": day, "Branch Code": branchCode, "Leader Code": leaderCode, "Initial Members": initialMembers, "Initial Savings": initialSavings, "Status": status } = row;
@@ -164,16 +168,29 @@ export default function GroupsPage() {
             return;
           }
 
-          const branchId = branchMap.get(branchCode)!;
+          const branchForGroup = branchMap.get(branchCode)!;
           const responsibleEmployeeId = employeeMap.get(leaderCodeValue)!;
           
-          const selectedBranch = branches?.find(b => b.id === branchId);
-          if (!selectedBranch || !selectedBranch.regionId || !selectedBranch.zoneId || !selectedBranch.areaId) { 
-            errors.push(`Row ${index + 2}: Branch data for "${branchCode}" is incomplete.`); 
+          let regionId = branchForGroup.regionId;
+          let zoneId = branchForGroup.zoneId;
+          let areaId = branchForGroup.areaId;
+
+          // If the branch document is missing path info (e.g., it's older data),
+          // we fall back to looking up its parent Area to find the path.
+          if (!regionId || !zoneId) {
+            const area = areaMap.get(areaId);
+            if (area) {
+                regionId = area.regionId;
+                zoneId = area.zoneId;
+            }
+          }
+          
+          if (!regionId || !zoneId || !areaId) { 
+            errors.push(`Row ${index + 2}: Branch data for "${branchCode}" is incomplete. Could not resolve full path.`); 
             return; 
           }
           
-          validGroups.push({ name, code, day, branchId, responsibleEmployeeId, initialMembers: Number(initialMembers) || 0, initialSavings: Number(initialSavings) || 0, status, areaId: selectedBranch.areaId, zoneId: selectedBranch.zoneId, regionId: selectedBranch.regionId });
+          validGroups.push({ name, code, day, branchId: branchForGroup.id, responsibleEmployeeId, initialMembers: Number(initialMembers) || 0, initialSavings: Number(initialSavings) || 0, status, areaId: areaId, zoneId: zoneId, regionId: regionId });
         });
 
         setUploadedGroups(validGroups);
@@ -450,7 +467,7 @@ export default function GroupsPage() {
     );
   };
   
-  const isLoading = groupsLoading || employeesLoading || branchesLoading;
+  const isLoading = groupsLoading || employeesLoading || branchesLoading || areasLoading;
 
   return (
     <>
