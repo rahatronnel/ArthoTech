@@ -162,23 +162,34 @@ export default function RawDataEntryPage() {
                     return;
                 }
                 
-                const dataRows = rawData.slice(9).filter(row => row && row.length > 0 && row.some(cell => cell !== null && cell !== ''));
+                const dataRows = rawData.slice(9);
+                
+                const allProcessedData: UploadedRow[] = [];
+                let lastFieldWorkerId = '';
+                let lastFieldWorkerName = '';
 
-                if(dataRows.length === 0) {
-                     toast({
-                        variant: "destructive",
-                        title: "No Data Rows Found",
-                        description: "No data rows were found after the first 9 header rows.",
-                    });
-                    return;
-                }
+                for (const row of dataRows) {
+                    if (!row || row.length === 0 || row.every(cell => cell === null || cell === '')) {
+                        continue;
+                    }
 
-                const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => String(g.code).trim().toLowerCase()) || []);
+                    const firstCellContent = String(row[0] || '').trim();
+                    if (firstCellContent.includes('Officer Total')) {
+                        continue;
+                    }
 
-                const allProcessedData: UploadedRow[] = dataRows.map(row => {
-                    return {
-                        'Field Worker ID': String(row[0] || ''),
-                        'Field Worker Name': String(row[1] || ''),
+                    if (row[0] !== null && String(row[0]).trim() !== '') {
+                        lastFieldWorkerId = String(row[0]).trim();
+                        lastFieldWorkerName = String(row[1] || '').trim();
+                    }
+                    
+                    if (!row[2] || String(row[2]).trim() === '') {
+                        continue;
+                    }
+
+                    const processedRow: UploadedRow = {
+                        'Field Worker ID': lastFieldWorkerId,
+                        'Field Worker Name': lastFieldWorkerName,
                         'Samity ID': String(row[2] || ''),
                         'Samity Name': String(row[3] || ''),
                         'Component': String(row[4] || ''),
@@ -201,8 +212,11 @@ export default function RawDataEntryPage() {
                         'Admission fees': Number(row[21]) || 0,
                         'Total Collection': Number(row[22]) || 0,
                     };
-                });
-                
+                    allProcessedData.push(processedRow);
+                }
+
+                const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => String(g.code).trim().toLowerCase()) || []);
+
                 const validData = allProcessedData.filter(row => {
                     const normalizedSamityId = String(row['Samity ID']).trim().toLowerCase();
                     return userVisibleGroupCodes.has(normalizedSamityId);
@@ -466,5 +480,3 @@ export default function RawDataEntryPage() {
     );
 
 }
-
-    
