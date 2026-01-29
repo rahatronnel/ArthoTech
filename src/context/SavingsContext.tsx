@@ -6,6 +6,8 @@ import { SavingsTransaction } from '@/lib/data';
 type SavingsContextType = {
   savingsTransactions: SavingsTransaction[];
   addSavingsTransaction: (transaction: Omit<SavingsTransaction, 'id'>) => void;
+  deleteSavingsByDate: (date: string) => void;
+  deleteAllSavings: () => void;
 };
 
 const SavingsContext = createContext<SavingsContextType | undefined>(undefined);
@@ -21,8 +23,17 @@ export function SavingsProvider({ children }: { children: ReactNode }) {
     setSavingsTransactions(prev => [...prev, newTransaction]);
   };
 
+  const deleteSavingsByDate = (date: string) => {
+    setSavingsTransactions(prev => prev.filter(t => t.date !== date));
+  };
+
+  const deleteAllSavings = () => {
+    setSavingsTransactions([]);
+  };
+
+
   return (
-    <SavingsContext.Provider value={{ savingsTransactions, addSavingsTransaction }}>
+    <SavingsContext.Provider value={{ savingsTransactions, addSavingsTransaction, deleteSavingsByDate, deleteAllSavings }}>
       {children}
     </SavingsContext.Provider>
   );

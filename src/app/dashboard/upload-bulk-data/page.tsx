@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/context/AuthContext';
 import { useOthersData } from '@/context/OthersDataContext';
@@ -38,7 +38,7 @@ type UploadedRow = {
 export default function OthersDataPage() {
     const { toast } = useToast();
     const { currentUser } = useAuth();
-    const { othersData, addBulkOthersData, updateOthersData, deleteOthersData } = useOthersData();
+    const { othersData, addBulkOthersData, updateOthersData, deleteOthersData, deleteAllOthersData, deleteOthersDataByDate } = useOthersData();
 
     const firestore = useFirestore();
     const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
@@ -58,6 +58,8 @@ export default function OthersDataPage() {
     // State for editing/deleting
     const [editingEntry, setEditingEntry] = useState<OtherDataEntry | null>(null);
     const [entryToDelete, setEntryToDelete] = useState<OtherDataEntry | null>(null);
+    const [isDeleteByDateOpen, setIsDeleteByDateOpen] = useState(false);
+    const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
 
 
     const userBranches = currentUser?.role === 'Super Admin' 
@@ -198,6 +200,22 @@ export default function OthersDataPage() {
         }
     };
     
+    const handleDeleteDate = () => {
+      if (!filterDate) {
+        toast({ variant: "destructive", title: "No Date Selected", description: "Please select a date to delete." });
+        return;
+      }
+      deleteOthersDataByDate(filterDate);
+      toast({ title: "Data Deleted", description: `All 'Others Data' entries for ${filterDate} have been deleted.` });
+      setIsDeleteByDateOpen(false);
+    };
+
+    const handleDeleteAll = () => {
+      deleteAllOthersData();
+      toast({ title: "All Data Deleted", description: "All 'Others Data' entries have been deleted." });
+      setIsDeleteAllOpen(false);
+    };
+    
     const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
     const filteredAndSortedData = othersData
@@ -250,6 +268,14 @@ export default function OthersDataPage() {
                 <h1 className="text-3xl font-bold">Others Data Entry</h1>
                 <p className="text-muted-foreground">Manage other financial data for each branch via bulk upload.</p>
             </div>
+            
+            <div className="flex items-center gap-2">
+                <Button variant="destructive" onClick={() => setIsDeleteAllOpen(true)} className="gap-1">
+                    <Trash2 className="h-4 w-4" />
+                    Delete All Data
+                </Button>
+            </div>
+
 
              <Card>
                 <CardHeader>
@@ -277,6 +303,10 @@ export default function OthersDataPage() {
                             </Select>
                         </div>
                     )}
+                     <Button variant="destructive" onClick={() => setIsDeleteByDateOpen(true)} className="w-full sm:w-auto gap-1" disabled={!filterDate}>
+                        <Trash2 className="h-4 w-4" />
+                        Delete Data for {filterDate}
+                    </Button>
                 </CardContent>
             </Card>
 
@@ -425,8 +455,37 @@ export default function OthersDataPage() {
 
             {/* Edit Dialog */}
             {editingEntry && <EditDialog />}
+            
+            <AlertDialog open={isDeleteByDateOpen} onOpenChange={setIsDeleteByDateOpen}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete all 'Others Data' entries for {filterDate}. This action cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteDate} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+      
+              <AlertDialog open={isDeleteAllOpen} onOpenChange={setIsDeleteAllOpen}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete ALL 'Others Data' entries from the application. This is for clearing test data and cannot be undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteAll} className="bg-destructive hover:bg-destructive/90">Yes, Delete Everything</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
 
-            {/* Delete Confirmation */}
              <AlertDialog open={!!entryToDelete} onOpenChange={() => setEntryToDelete(null)}>
                 <AlertDialogContent>
                 <AlertDialogHeader>
@@ -444,4 +503,3 @@ export default function OthersDataPage() {
         </div>
     );
 }
-    

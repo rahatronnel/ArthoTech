@@ -13,13 +13,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useMember } from '@/context/MemberContext';
 import { useToast } from '@/hooks/use-toast';
 import { parseISO, isBefore } from 'date-fns';
-import { Upload, Download } from 'lucide-react';
+import { Upload, Download, Trash2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collectionGroup, query } from 'firebase/firestore';
 import type { Group } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 type ReportRow = {
   groupId: string;
@@ -40,7 +41,7 @@ type UploadedRow = {
 
 export default function MembersPage() {
   const { toast } = useToast();
-  const { memberChanges, addMemberChange } = useMember();
+  const { memberChanges, addMemberChange, deleteMemberChangesByDate, deleteAllMemberChanges } = useMember();
   const { currentUser } = useAuth();
   const firestore = useFirestore();
 
@@ -71,6 +72,10 @@ export default function MembersPage() {
   // State for the report
   const [searchDate, setSearchDate] = useState('');
   const [reportData, setReportData] = useState<ReportRow[] | null>(null);
+  
+  // State for deletion
+  const [isDeleteByDateOpen, setIsDeleteByDateOpen] = useState(false);
+  const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
 
   const handleAddChange = () => {
     if (!date || !groupId || (added === 0 && dropped === 0)) {
@@ -101,7 +106,7 @@ export default function MembersPage() {
   
   const handleDownloadTemplate = () => {
     const templateData = userVisibleGroups.map(g => ({
-        GroupID: g.id,
+        GroupID: String(g.code).trim().toLowerCase(),
         GroupName: g.name,
         MembersAdded: 0,
         MembersDropped: 0,
@@ -127,14 +132,23 @@ export default function MembersPage() {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+        
+        const groupCodeMap = new Map(userVisibleGroups.map(g => [String(g.code).trim().toLowerCase(), g.id]));
 
-        const validData: UploadedRow[] = jsonData.filter(row => row.GroupID && (Number(row.MembersAdded) > 0 || Number(row.MembersDropped) > 0)).map(row => ({
-            GroupID: String(row.GroupID),
-            GroupName: String(row.GroupName || userVisibleGroups.find(g => g.id === String(row.GroupID))?.name || 'Unknown'),
-            MembersAdded: Number(row.MembersAdded) || 0,
-            MembersDropped: Number(row.MembersDropped) || 0,
-            Notes: String(row.Notes || ''),
-        })).filter(row => userVisibleGroups.some(g => g.id === row.GroupID));
+        const validData: UploadedRow[] = jsonData
+          .filter(row => row.GroupID && (Number(row.MembersAdded) > 0 || Number(row.MembersDropped) > 0))
+          .map(row => ({
+              ...row,
+              GroupID: String(row.GroupID).trim().toLowerCase(),
+          }))
+          .filter(row => groupCodeMap.has(row.GroupID))
+          .map(row => ({
+              GroupID: groupCodeMap.get(row.GroupID)!,
+              GroupName: String(row.GroupName || userVisibleGroups.find(g => g.id === groupCodeMap.get(row.GroupID)!)?.name || 'Unknown'),
+              MembersAdded: Number(row.MembersAdded) || 0,
+              MembersDropped: Number(row.MembersDropped) || 0,
+              Notes: String(row.Notes || ''),
+          }));
 
         if (validData.length === 0) {
             toast({ variant: "destructive", title: "Invalid File", description: "The uploaded file contains no valid data to process." });
@@ -218,12 +232,38 @@ export default function MembersPage() {
     });
     setReportData(report);
   };
+  
+  const handleDeleteDate = () => {
+    if (!searchDate) {
+      toast({ variant: "destructive", title: "No Date Selected", description: "Please select a date to delete." });
+      return;
+    }
+    deleteMemberChangesByDate(searchDate);
+    toast({ title: "Data Deleted", description: `All member change entries for ${searchDate} have been deleted.` });
+    setIsDeleteByDateOpen(false);
+    setReportData(null); // Refresh report view
+  };
+
+  const handleDeleteAll = () => {
+    deleteAllMemberChanges();
+    toast({ title: "All Data Deleted", description: "All member change entries have been deleted." });
+    setIsDeleteAllOpen(false);
+    setReportData(null); // Refresh report view
+  };
+
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-3xl font-bold">Member Management</h1>
         <p className="text-muted-foreground">Record member changes and view daily balance reports.</p>
+      </div>
+      
+      <div className="flex items-center gap-2">
+         <Button variant="destructive" onClick={() => setIsDeleteAllOpen(true)} className="gap-1">
+            <Trash2 className="h-4 w-4" />
+            Delete All Data
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -305,6 +345,7 @@ export default function MembersPage() {
               <Input id="search-date" type="date" value={searchDate} onChange={(e) => setSearchDate(e.target.value)} />
             </div>
             <Button onClick={handleSearch} className="w-full sm:w-auto" disabled={groupsLoading}>Search</Button>
+             {searchDate && <Button variant="destructive" onClick={() => setIsDeleteByDateOpen(true)} className="w-full sm:w-auto gap-1"><Trash2 className="h-4 w-4" />Delete Data for {searchDate}</Button>}
           </div>
           
           <div className="mt-6">
@@ -386,6 +427,36 @@ export default function MembersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      <AlertDialog open={isDeleteByDateOpen} onOpenChange={setIsDeleteByDateOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all member change entries for {searchDate}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteDate} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
+      <AlertDialog open={isDeleteAllOpen} onOpenChange={setIsDeleteAllOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete ALL member change entries from the application. This is for clearing test data and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAll} className="bg-destructive hover:bg-destructive/90">Yes, Delete Everything</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

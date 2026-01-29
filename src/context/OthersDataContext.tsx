@@ -8,6 +8,8 @@ type OthersDataContextType = {
   addBulkOthersData: (entries: Omit<OtherDataEntry, 'id'>[]) => void;
   updateOthersData: (id: string, updatedEntry: Partial<Omit<OtherDataEntry, 'id'>>) => void;
   deleteOthersData: (id: string) => void;
+  deleteOthersDataByDate: (date: string) => void;
+  deleteAllOthersData: () => void;
 };
 
 const OthersDataContext = createContext<OthersDataContextType | undefined>(undefined);
@@ -31,8 +33,16 @@ export function OthersDataProvider({ children }: { children: ReactNode }) {
     setOthersData(prev => prev.filter(entry => entry.id !== id));
   };
 
+  const deleteOthersDataByDate = (date: string) => {
+    setOthersData(prev => prev.filter(entry => entry.date !== date));
+  };
+
+  const deleteAllOthersData = () => {
+    setOthersData([]);
+  };
+
   return (
-    <OthersDataContext.Provider value={{ othersData, addBulkOthersData, updateOthersData, deleteOthersData }}>
+    <OthersDataContext.Provider value={{ othersData, addBulkOthersData, updateOthersData, deleteOthersData, deleteOthersDataByDate, deleteAllOthersData }}>
       {children}
     </OthersDataContext.Provider>
   );

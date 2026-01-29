@@ -6,6 +6,8 @@ import { GroupMemberChange } from '@/lib/data';
 type MemberContextType = {
   memberChanges: GroupMemberChange[];
   addMemberChange: (change: Omit<GroupMemberChange, 'id'>) => void;
+  deleteMemberChangesByDate: (date: string) => void;
+  deleteAllMemberChanges: () => void;
 };
 
 const MemberContext = createContext<MemberContextType | undefined>(undefined);
@@ -21,8 +23,16 @@ export function MemberProvider({ children }: { children: ReactNode }) {
     setMemberChanges(prev => [...prev, newChange]);
   };
 
+  const deleteMemberChangesByDate = (date: string) => {
+    setMemberChanges(prev => prev.filter(change => change.date !== date));
+  };
+
+  const deleteAllMemberChanges = () => {
+    setMemberChanges([]);
+  };
+
   return (
-    <MemberContext.Provider value={{ memberChanges, addMemberChange }}>
+    <MemberContext.Provider value={{ memberChanges, addMemberChange, deleteMemberChangesByDate, deleteAllMemberChanges }}>
       {children}
     </MemberContext.Provider>
   );

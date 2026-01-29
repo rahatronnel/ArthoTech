@@ -11,6 +11,10 @@ type LoanContextType = {
   loanCollections: LoanCollection[];
   addLoanDisbursement: (disbursement: Omit<LoanDisbursement, 'id'>) => void;
   addLoanCollection: (collection: Omit<LoanCollection, 'id'>) => void;
+  deleteDisbursementsByDate: (date: string) => void;
+  deleteAllDisbursements: () => void;
+  deleteCollectionsByDate: (date: string) => void;
+  deleteAllCollections: () => void;
 };
 
 const LoanContext = createContext<LoanContextType | undefined>(undefined);
@@ -35,8 +39,33 @@ export function LoanProvider({ children }: { children: ReactNode }) {
     setLoanCollections(prev => [...prev, newCollection]);
   };
 
+  const deleteDisbursementsByDate = (date: string) => {
+    setLoanDisbursements(prev => prev.filter(d => d.date !== date));
+  };
+
+  const deleteAllDisbursements = () => {
+    setLoanDisbursements([]);
+  };
+
+  const deleteCollectionsByDate = (date: string) => {
+    setLoanCollections(prev => prev.filter(c => c.date !== date));
+  };
+
+  const deleteAllCollections = () => {
+    setLoanCollections([]);
+  };
+
   return (
-    <LoanContext.Provider value={{ loanDisbursements, loanCollections, addLoanDisbursement, addLoanCollection }}>
+    <LoanContext.Provider value={{ 
+      loanDisbursements, 
+      loanCollections, 
+      addLoanDisbursement, 
+      addLoanCollection, 
+      deleteDisbursementsByDate,
+      deleteAllDisbursements,
+      deleteCollectionsByDate,
+      deleteAllCollections
+    }}>
       {children}
     </LoanContext.Provider>
   );
