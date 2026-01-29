@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -13,8 +14,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where } from 'firebase/firestore';
-import type { Group } from '@/lib/data';
+import { useSavings } from '@/context/SavingsContext';
+import { useLoan } from '@/context/LoanContext';
+import { useOthersData } from '@/context/OthersDataContext';
+import { collection, query, where, collectionGroup } from 'firebase/firestore';
+import type { Group, Branch, OtherDataEntry, SavingsTransaction, LoanDisbursement, LoanCollection } from '@/lib/data';
 
 
 type UploadedRow = {
@@ -47,19 +51,30 @@ type UploadedRow = {
 export default function RawDataEntryPage() {
     const { toast } = useToast();
     const { currentUser } = useAuth();
+    const { addSavingsTransaction } = useSavings();
+    const { addLoanDisbursement, addLoanCollection } = useLoan();
+    const { addBulkOthersData } = useOthersData();
+
     const [file, setFile] = useState<File | null>(null);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
     const [uploadedData, setUploadedData] = useState<UploadedRow[]>([]);
+    const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
 
     const firestore = useFirestore();
-    const groupsQuery = useMemoFirebase(() => {
-        if (!firestore || !currentUser) return null;
-        if (currentUser.role === 'Super Admin') {
-            return collection(firestore, 'groups');
-        }
-        return query(collection(firestore, 'groups'), where('responsibleEmployeeId', '==', currentUser.id));
-    }, [firestore, currentUser]);
+
+    const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
     const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
+    
+    const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
+    const { data: branchesData, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
+
+    const userVisibleGroups = useMemo(() => {
+        if (!groupsData || !currentUser) return [];
+        if (currentUser.role === 'Super Admin') {
+            return groupsData;
+        }
+        return groupsData.filter(g => g.responsibleEmployeeId === currentUser.id);
+    }, [groupsData, currentUser]);
 
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,7 +173,7 @@ export default function RawDataEntryPage() {
                     return;
                 }
 
-                const userVisibleGroupCodes = new Set(groupsData?.map(g => g.code) || []);
+                const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => g.code) || []);
 
                 const allProcessedData: UploadedRow[] = dataRows.map(row => {
                     return {
@@ -223,7 +238,86 @@ export default function RawDataEntryPage() {
     };
 
     const handleConfirmUpload = () => {
-        toast({ title: "Upload Confirmed", description: `${uploadedData.length} rows are ready for processing.` });
+        if (!uploadDate) {
+            toast({ variant: 'destructive', title: 'Date Required', description: 'Please select a date for the transactions.' });
+            return;
+        }
+        if (!groupsData || !branchesData) {
+            toast({ variant: 'destructive', title: 'Data Loading', description: 'Group or branch data is not yet available. Please wait and try again.' });
+            return;
+        }
+
+        const groupMap = new Map(groupsData.map(g => [g.code, g]));
+        const branchMap = new Map(branchesData.map(b => [b.id, b]));
+        const othersEntriesToAdd: Omit<OtherDataEntry, 'id'>[] = [];
+
+        uploadedData.forEach(row => {
+            const group = groupMap.get(row['Samity ID']);
+            if (!group) return;
+
+            const branch = branchMap.get(group.branchId);
+            if (!branch) return;
+
+            const notes = `Raw data upload for ${group.name}`;
+
+            // Savings
+            if (row['Savings Collection'] > 0 || row['Savings Refund'] > 0) {
+                addSavingsTransaction({
+                    date: uploadDate,
+                    groupId: group.id,
+                    deposit: row['Savings Collection'],
+                    withdraw: row['Savings Refund'],
+                    notes
+                });
+            }
+            
+            // Loan Disbursement
+            if (row['Disbursement Amount'] > 0) {
+                addLoanDisbursement({
+                    date: uploadDate,
+                    groupId: group.id,
+                    amount: row['Disbursement Amount'],
+                    notes
+                });
+            }
+            
+            // Loan Collection
+            if (row['Loan Collection Total'] > 0) {
+                addLoanCollection({
+                    date: uploadDate,
+                    groupId: group.id,
+                    amount: row['Loan Collection Total'],
+                    notes: `Regular: ${row['Loan Collection Regular']}, Due: ${row['Loan Collection Due']}, Advance: ${row['Loan Collection Advance']}`
+                });
+            }
+            
+            // Others Data
+            const otherDataMapping: { [key: string]: OtherDataEntry['type'] } = {
+                'Risk fund': 'Risk Fund',
+                'Processing Fees / Form fees': 'Processing Fee',
+                'Passbook fees': 'Passbook Fee',
+                'Admission fees': 'Admission Fee'
+            };
+
+            for (const [key, type] of Object.entries(otherDataMapping)) {
+                const amount = row[key as keyof UploadedRow] as number;
+                if (amount > 0) {
+                    othersEntriesToAdd.push({
+                        date: uploadDate,
+                        branch: branch.name,
+                        type: type,
+                        amount: amount,
+                        notes
+                    });
+                }
+            }
+        });
+        
+        if (othersEntriesToAdd.length > 0) {
+            addBulkOthersData(othersEntriesToAdd);
+        }
+
+        toast({ title: "Upload Confirmed", description: `${uploadedData.length} rows processed successfully.` });
         
         setIsConfirmDialogOpen(false);
         setUploadedData([]);
@@ -232,6 +326,7 @@ export default function RawDataEntryPage() {
         if (fileInput) fileInput.value = '';
     };
 
+    const isLoading = groupsLoading || branchesLoading;
 
     return (
         <div className="flex flex-col gap-6">
@@ -258,9 +353,9 @@ export default function RawDataEntryPage() {
                             <Input id="raw-data-upload" type="file" accept=".xlsx, .xls" onChange={handleFileChange} className="file:text-foreground" />
                         </div>
                     </div>
-                     <Button onClick={handleProcessUpload} className="w-full" disabled={!file || groupsLoading}>
+                     <Button onClick={handleProcessUpload} className="w-full" disabled={!file || isLoading}>
                         <Upload className="mr-2 h-4 w-4" />
-                        {groupsLoading ? 'Loading Groups...' : 'Upload and Preview'}
+                        {isLoading ? 'Loading Data...' : 'Upload and Preview'}
                     </Button>
                 </CardContent>
             </Card>
@@ -327,37 +422,45 @@ export default function RawDataEntryPage() {
 
             <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
                 <DialogContent className="max-w-7xl">
-                <DialogHeader>
-                    <DialogTitle>Confirm Upload</DialogTitle>
-                    <DialogDescription>Review the data below. Click "Confirm" to proceed with saving the data.</DialogDescription>
-                </DialogHeader>
-                 <ScrollArea className="h-[60vh]">
-                     <Table>
-                        <TableHeader>
-                            <TableRow>
-                                {uploadedData.length > 0 && Object.keys(uploadedData[0]).map((key) => (
-                                    <TableHead key={key} className="whitespace-nowrap">{key}</TableHead>
-                                ))}
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {uploadedData.map((row, rowIndex) => (
-                                <TableRow key={rowIndex}>
-                                    {Object.values(row).map((cell, cellIndex) => (
-                                        <TableCell key={cellIndex} className="whitespace-nowrap">{String(cell)}</TableCell>
+                    <DialogHeader>
+                        <DialogTitle>Confirm Upload</DialogTitle>
+                        <DialogDescription>Review the data below. Select a date and click "Confirm" to save all transactions.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-2 max-w-sm">
+                          <Label htmlFor="upload-date">Date for Transactions</Label>
+                          <Input id="upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
+                        </div>
+                        <ScrollArea className="h-[55vh]">
+                             <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        {uploadedData.length > 0 && Object.keys(uploadedData[0]).map((key) => (
+                                            <TableHead key={key} className="whitespace-nowrap">{key}</TableHead>
+                                        ))}
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {uploadedData.map((row, rowIndex) => (
+                                        <TableRow key={rowIndex}>
+                                            {Object.values(row).map((cell, cellIndex) => (
+                                                <TableCell key={cellIndex} className="whitespace-nowrap">{String(cell)}</TableCell>
+                                            ))}
+                                        </TableRow>
                                     ))}
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </ScrollArea>
-                <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={handleConfirmUpload}>Confirm Upload</Button>
-                </DialogFooter>
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleConfirmUpload}>Confirm Upload</Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
     );
 
 }
+
+    
