@@ -70,7 +70,7 @@ export default function AreasPage() {
         "Bengali Name": "",
         "Code": "",
         "Zone Code": "",
-        "Responsible Employee Login ID": ""
+        "Responsible Employee Code": ""
       }
     ];
     const worksheet = XLSX.utils.json_to_sheet(templateData);
@@ -104,11 +104,11 @@ export default function AreasPage() {
 
         const errors: string[] = [];
         const validAreas: any[] = [];
-        const employeeMap = new Map(employees?.filter(e => e.role === 'Area User').map(e => [e.loginId, e.id]));
+        const employeeMap = new Map(employees?.filter(e => e.role === 'Area User').map(e => [e.code, e.id]));
         const zoneMap = new Map(zones?.map(z => [z.code, { id: z.id, regionId: z.regionId }]));
 
         jsonData.forEach((row, index) => {
-          const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Zone Code': zoneCode, 'Responsible Employee Login ID': loginId } = row;
+          const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Zone Code': zoneCode, 'Responsible Employee Code': employeeCode } = row;
           if (!name || !bengaliName || !code || !zoneCode) {
             errors.push(`Row ${index + 2}: Missing required fields (Name, Bengali Name, Code, Zone Code).`);
             return;
@@ -120,11 +120,11 @@ export default function AreasPage() {
           const { id: zoneId, regionId } = zoneMap.get(zoneCode)!;
 
           let responsibleEmployeeId: string | undefined = undefined;
-          if (loginId) {
-            if(employeeMap.has(loginId)) {
-                responsibleEmployeeId = employeeMap.get(loginId);
+          if (employeeCode) {
+            if(employeeMap.has(employeeCode)) {
+                responsibleEmployeeId = employeeMap.get(employeeCode);
             } else {
-                errors.push(`Row ${index + 2}: Employee with login ID "${loginId}" not found or they do not have the 'Area User' role.`);
+                errors.push(`Row ${index + 2}: Employee with code "${employeeCode}" not found or they do not have the 'Area User' role.`);
                 return;
             }
           }

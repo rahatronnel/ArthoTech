@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import type { Employee, Branch } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, MoreHorizontal, FileDown, FileUp, Copy, Trash2 } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FileDown, FileUp, Trash2 } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -16,10 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { firebaseConfig } from '@/firebase/config';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
-import { getAuth as getFirebaseAuth, createUserWithEmailAndPassword } from 'firebase/auth';
-import { initializeApp, deleteApp } from 'firebase/app';
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
@@ -27,44 +24,12 @@ import { Progress } from '@/components/ui/progress';
 // --- Constants and Types ---
 const ROLES: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office'];
 
-// --- Helper Functions ---
-
-/**
- * Creates a user and their profile without affecting the current admin's session.
- * Uses a secondary Firebase app instance for isolation.
- */
-async function createIsolatedUser(employeeData: any, firestore: any, authDomain: string) {
-    const tempApp = initializeApp(firebaseConfig, `employee-creator-${Date.now()}-${Math.random()}`);
-    try {
-        const tempAuth = getFirebaseAuth(tempApp);
-        const email = `${employeeData.loginId}@${authDomain}`;
-        
-        const userCredential = await createUserWithEmailAndPassword(tempAuth, email, employeeData.password);
-        const uid = userCredential.user.uid;
-
-        const newEmployee: Omit<Employee, 'id' | 'password'> = {
-            name: employeeData.name,
-            bengaliName: employeeData.bengaliName,
-            code: employeeData.code,
-            role: employeeData.role,
-            assignment: employeeData.assignment,
-            loginId: employeeData.loginId,
-        };
-        // The employee ID in Firestore MUST match the auth UID
-        await setDoc(doc(firestore, "employees", uid), newEmployee);
-    } finally {
-        // Ensure the temporary app is cleaned up
-        await deleteApp(tempApp);
-    }
-}
-
 
 export default function EmployeesPage() {
     // --- Hooks ---
     const { toast } = useToast();
     const { currentUser } = useAuth();
     const firestore = useFirestore();
-    const auth = useAuth().firebaseUser?.auth;
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     // --- Data Fetching ---
@@ -144,7 +109,7 @@ export default function EmployeesPage() {
         const templateData = [{
             "Name": "", "Bengali Name": "", "Code": "",
             "Role": "Branch User | Area User | Zonal User | Regional User | Head Office",
-            "Assignment (Branch Name or 'Head Office')": "", "Login ID": "", "Password": ""
+            "Assignment (Branch Name or 'Head Office')": "",
         }];
         const ws = XLSX.utils.json_to_sheet(templateData);
         const wb = XLSX.utils.book_new();
@@ -183,20 +148,16 @@ export default function EmployeesPage() {
     const validateUploadData = (jsonData: any[]) => {
         const errors: string[] = [];
         const validEmployees: any[] = [];
-        const existingLoginIds = new Set(employeesData?.map(e => e.loginId.toLowerCase()));
-        const fileLoginIds = new Set<string>();
+        const existingCodes = new Set(employeesData?.map(e => e.code.toLowerCase()));
+        const fileCodes = new Set<string>();
         const validAssignments = new Set(assignments);
 
         jsonData.forEach((row, index) => {
-            const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Role': role, 'Assignment (Branch Name or \'Head Office\')': assignment, 'Login ID': loginId, 'Password': password } = row;
+            const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Role': role, 'Assignment (Branch Name or \'Head Office\')': assignment } = row;
             const rowIndex = index + 2;
 
-            if (!name || !code || !role || !assignment || !loginId || !password) {
+            if (!name || !code || !role || !assignment ) {
                 errors.push(`Row ${rowIndex}: Missing required fields.`);
-                return;
-            }
-            if (String(password).length < 6) {
-                errors.push(`Row ${rowIndex}: Password for ${loginId} must be at least 6 characters.`);
                 return;
             }
             if (!ROLES.includes(role)) {
@@ -208,62 +169,57 @@ export default function EmployeesPage() {
                 return;
             }
 
-            const normalizedLoginId = String(loginId).toLowerCase().trim();
-            if (existingLoginIds.has(normalizedLoginId)) {
-                errors.push(`Row ${rowIndex}: Login ID "${loginId}" already exists in the database.`);
+            const normalizedCode = String(code).toLowerCase().trim();
+            if (existingCodes.has(normalizedCode)) {
+                errors.push(`Row ${rowIndex}: Employee Code "${code}" already exists in the database.`);
                 return;
             }
-            if (fileLoginIds.has(normalizedLoginId)) {
-                errors.push(`Row ${rowIndex}: Duplicate Login ID "${loginId}" found in the file.`);
+            if (fileCodes.has(normalizedCode)) {
+                errors.push(`Row ${rowIndex}: Duplicate Employee Code "${code}" found in the file.`);
                 return;
             }
             
-            fileLoginIds.add(normalizedLoginId);
-            validEmployees.push({ name, bengaliName, code, role, assignment, loginId: normalizedLoginId, password });
+            fileCodes.add(normalizedCode);
+            validEmployees.push({ name, bengaliName, code: String(code).trim(), role, assignment });
         });
 
         return { validEmployees, errors };
     };
 
     const handleConfirmUpload = async () => {
-        if (uploadState.data.length === 0 || !auth?.app.options.authDomain) {
-            toast({ variant: 'destructive', title: 'Upload Failed', description: 'No valid data or auth not configured.' });
+        if (uploadState.data.length === 0) {
+            toast({ variant: 'destructive', title: 'Upload Failed', description: 'No valid data to upload.' });
             return;
         }
 
         setUploadState(s => ({ ...s, status: 'uploading' }));
-        let successCount = 0;
-        const creationErrors: string[] = [];
-
-        for (let i = 0; i < uploadState.data.length; i++) {
-            const empData = uploadState.data[i];
-            try {
-                await createIsolatedUser(empData, firestore, auth.app.options.authDomain);
-                successCount++;
-            } catch (error: any) {
-                let message = error.message;
-                if (error.code === 'auth/email-already-in-use') {
-                    message = `This Login ID is already registered in Firebase Auth. Please use a new, unique Login ID.`;
-                }
-                creationErrors.push(`Failed for ${empData.loginId}: ${message}`);
-            }
+        const batch = writeBatch(firestore);
+        
+        uploadState.data.forEach((empData, i) => {
             setUploadState(s => ({ ...s, progress: ((i + 1) / s.data.length) * 100 }));
-        }
+            const newDocRef = doc(collection(firestore, "employees"));
+            const newEmployee: Employee = {
+                id: newDocRef.id,
+                name: empData.name,
+                bengaliName: empData.bengaliName,
+                code: empData.code,
+                role: empData.role,
+                assignment: empData.assignment,
+            };
+            batch.set(newDocRef, newEmployee);
+        });
 
-        if (creationErrors.length > 0) {
-            toast({ variant: 'destructive', title: 'Upload Partially Failed', description: `${successCount} created. ${creationErrors.length} failed.` });
-            setUploadState(s => ({ ...s, status: 'preview', errors: creationErrors }));
-        } else {
-            toast({ title: 'Upload Successful', description: `${successCount} employees created.` });
+        try {
+            await batch.commit();
+            toast({ title: 'Upload Successful', description: `${uploadState.data.length} employees created.` });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+        } finally {
             setIsUploadDialogOpen(false);
             setUploadState({ status: 'idle', data: [], errors: [], progress: 0 });
         }
     };
     
-    const handleCopy = (text: string) => {
-        navigator.clipboard.writeText(text).then(() => toast({ title: "Copied!", description: `Login ID "${text}" copied.` }));
-    };
-
     // --- Render ---
     return (
         <>
@@ -288,10 +244,9 @@ export default function EmployeesPage() {
                                 <TableRow>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Bengali Name</TableHead>
-                                    <TableHead className="hidden md:table-cell">Code</TableHead>
+                                    <TableHead>Code</TableHead>
                                     <TableHead>Role</TableHead>
                                     <TableHead>Assignment</TableHead>
-                                    <TableHead className="hidden md:table-cell">Login ID</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -300,15 +255,9 @@ export default function EmployeesPage() {
                                     <TableRow key={emp.id}>
                                         <TableCell className="font-medium">{emp.name}</TableCell>
                                         <TableCell>{emp.bengaliName}</TableCell>
-                                        <TableCell className="hidden md:table-cell">{emp.code}</TableCell>
+                                        <TableCell>{emp.code}</TableCell>
                                         <TableCell>{emp.role}</TableCell>
                                         <TableCell>{emp.assignment}</TableCell>
-                                        <TableCell className="hidden md:table-cell">
-                                            <div className="flex items-center gap-1">
-                                                <span>{emp.loginId}</span>
-                                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopy(emp.loginId)}><Copy className="h-3 w-3" /></Button>
-                                            </div>
-                                        </TableCell>
                                         <TableCell className="text-right">
                                             <DropdownMenu>
                                                 <DropdownMenuTrigger asChild><Button aria-haspopup="true" size="icon" variant="ghost"><MoreHorizontal /></Button></DropdownMenuTrigger>
@@ -334,8 +283,7 @@ export default function EmployeesPage() {
                     roles={ROLES}
                     assignments={assignments}
                     firestore={firestore}
-                    authDomain={auth?.app.options.authDomain}
-                    existingLoginIds={new Set(employeesData?.map(e => e.loginId.toLowerCase()))}
+                    existingCodes={new Set(employeesData?.map(e => e.code.toLowerCase()))}
                 />
             )}
             
@@ -354,7 +302,6 @@ export default function EmployeesPage() {
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
                             This will delete the employee record for "{employeeToDelete?.name}". 
-                            For security reasons, the user's login account will NOT be deleted. To permanently prevent login, please contact support to have the authentication account removed.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete Record</AlertDialogAction></AlertDialogFooter>
@@ -367,8 +314,6 @@ export default function EmployeesPage() {
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
                             This will permanently delete all employee records from the database, except for Super Admins. This action cannot be undone.
-                            <br/><br/>
-                            <span className="font-semibold">Note:</span> This does not delete their login accounts.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -383,25 +328,23 @@ export default function EmployeesPage() {
 
 // --- Sub-components ---
 
-function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore, authDomain, existingLoginIds }: any) {
+function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore, existingCodes }: any) {
     const { toast } = useToast();
     const [name, setName] = useState(employee?.name || '');
     const [bengaliName, setBengaliName] = useState(employee?.bengaliName || '');
     const [code, setCode] = useState(employee?.code || '');
     const [role, setRole] = useState<Employee['role'] | ''>(employee?.role || '');
     const [assignment, setAssignment] = useState(employee?.assignment || '');
-    const [loginId, setLoginId] = useState(employee?.loginId || '');
-    const [password, setPassword] = useState('');
 
     const handleSubmit = async () => {
-        if (!name || !code || !role || !assignment || !loginId || (!employee && !password)) {
+        if (!name || !code || !role || !assignment) {
             toast({ variant: "destructive", title: "Validation Error", description: "Please fill all fields." });
             return;
         }
         
-        const normalizedLoginId = loginId.toLowerCase().trim();
-        if (!employee && existingLoginIds.has(normalizedLoginId)) {
-            toast({ variant: "destructive", title: "Login ID exists", description: "This Login ID is already in use. Please choose another." });
+        const normalizedCode = code.toLowerCase().trim();
+        if (!employee && existingCodes.has(normalizedCode)) {
+            toast({ variant: "destructive", title: "Employee Code exists", description: "This Employee Code is already in use. Please choose another." });
             return;
         }
 
@@ -411,21 +354,21 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
                 await setDoc(doc(firestore, 'employees', employee.id), updatedData, { merge: true });
                 toast({ title: "Employee updated" });
             } else { // Create
-                if (!authDomain) {
-                    toast({ variant: "destructive", title: "Auth Error", description: "Auth domain not configured." });
-                    return;
-                }
-                const newEmployeeData = { name, bengaliName, code, role, assignment, loginId: normalizedLoginId, password };
-                await createIsolatedUser(newEmployeeData, firestore, authDomain);
+                const newDocRef = doc(collection(firestore, "employees"));
+                const newEmployee: Employee = {
+                    id: newDocRef.id,
+                    name,
+                    bengaliName,
+                    code,
+                    role: role as Employee['role'],
+                    assignment,
+                };
+                await setDoc(newDocRef, newEmployee);
                 toast({ title: "Employee created" });
             }
             setIsOpen(false);
         } catch (error: any) {
-            let message = error.message;
-            if (error.code === 'auth/email-already-in-use') {
-                message = 'This Login ID is already registered in Firebase Auth. Please choose a different one.';
-            }
-            toast({ variant: "destructive", title: "An error occurred", description: message });
+            toast({ variant: "destructive", title: "An error occurred", description: error.message });
         }
     };
 
@@ -449,8 +392,6 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
                         <SelectTrigger><SelectValue placeholder="Select assignment" /></SelectTrigger>
                         <SelectContent>{assignments.map((a: string) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
                     </Select>
-                    <Label>Login ID</Label><Input value={loginId} onChange={(e) => setLoginId(e.target.value)} disabled={!!employee} />
-                    <Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={employee ? "Leave blank to keep unchanged" : "Set password"} />
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
@@ -473,7 +414,7 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
                     <DialogDescription>
                         {isUploading ? "Uploading employees... please wait." : 
                          hasErrors ? 'Please fix the errors in your file and re-upload.' : 
-                         'Review the data below. Click "Confirm" to create new employee accounts.'}
+                         'Review the data below. Click "Confirm" to create new employee records.'}
                     </DialogDescription>
                 </DialogHeader>
 
@@ -490,8 +431,8 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
                 ) : (
                     <ScrollArea className="h-64">
                         <Table>
-                            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Code</TableHead><TableHead>Role</TableHead><TableHead>Assignment</TableHead><TableHead>Login ID</TableHead></TableRow></TableHeader>
-                            <TableBody>{state.data.map((emp: any, index: number) => (<TableRow key={index}><TableCell>{emp.name}</TableCell><TableCell>{emp.code}</TableCell><TableCell>{emp.role}</TableCell><TableCell>{emp.assignment}</TableCell><TableCell>{emp.loginId}</TableCell></TableRow>))}</TableBody>
+                            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Code</TableHead><TableHead>Role</TableHead><TableHead>Assignment</TableHead></TableRow></TableHeader>
+                            <TableBody>{state.data.map((emp: any, index: number) => (<TableRow key={index}><TableCell>{emp.name}</TableCell><TableCell>{emp.code}</TableCell><TableCell>{emp.role}</TableCell><TableCell>{emp.assignment}</TableCell></TableRow>))}</TableBody>
                         </Table>
                     </ScrollArea>
                 )}
@@ -504,6 +445,3 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
         </Dialog>
     );
 }
-
-    
-

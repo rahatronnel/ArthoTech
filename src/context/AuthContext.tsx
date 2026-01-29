@@ -13,16 +13,12 @@ const mockSuperAdmin: Employee = {
   bengaliName: 'সুপার অ্যাডমিন',
   role: 'Super Admin',
   assignment: 'Head Office',
-  loginId: 'superadmin',
 };
 
 type AuthContextType = {
   currentUser: Employee | null;
   firebaseUser: User | null; // This will be null
   loading: boolean;
-  login: (loginId: string, password?: string) => Promise<void>;
-  logout: () => void;
-  updatePassword: (newPassword: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,18 +28,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser] = useState<Employee | null>(mockSuperAdmin);
   const [loading] = useState(false);
 
-  // Dummy functions since there's no real authentication
-  const login = async () => { console.log("Login functionality removed."); };
-  const logout = async () => { console.log("Logout functionality removed."); };
-  const updatePassword = async () => { console.log("Password functionality removed.") };
-
   const value: AuthContextType = {
     currentUser,
     firebaseUser: null, // No real Firebase user
     loading,
-    login,
-    logout,
-    updatePassword,
   };
 
   return (

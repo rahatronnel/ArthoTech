@@ -41,8 +41,6 @@ export type Employee = {
   bengaliName: string;
   role: 'Branch User' | 'Area User' | 'Zonal User' | 'Regional User' | 'Head Office' | 'Super Admin';
   assignment: string;
-  loginId: string;
-  password?: string;
 };
 
 export type GroupMemberChange = {

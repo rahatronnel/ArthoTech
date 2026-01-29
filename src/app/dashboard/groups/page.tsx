@@ -112,7 +112,7 @@ export default function GroupsPage() {
         "Code": "",
         "Day": "Saturday",
         "Branch Code": "",
-        "Leader Login ID": "",
+        "Leader Code": "",
         "Initial Members": 0,
         "Initial Savings": 0,
         "Status": "Active"
@@ -149,12 +149,12 @@ export default function GroupsPage() {
 
         const errors: string[] = [];
         const validGroups: any[] = [];
-        const employeeMap = new Map(employees?.filter(e => e.role === 'Branch User').map(e => [e.loginId, e.id]));
+        const employeeMap = new Map(employees?.filter(e => e.role === 'Branch User').map(e => [e.code, e.id]));
         const branchMap = new Map(branches?.map(b => [b.code, b.id]));
 
         jsonData.forEach((row, index) => {
-          const { "Group Name": name, "Code": code, "Day": day, "Branch Code": branchCode, "Leader Login ID": leaderId, "Initial Members": initialMembers, "Initial Savings": initialSavings, "Status": status } = row;
-          if (!name || !code || !day || !branchCode || !leaderId || !status) {
+          const { "Group Name": name, "Code": code, "Day": day, "Branch Code": branchCode, "Leader Code": leaderCode, "Initial Members": initialMembers, "Initial Savings": initialSavings, "Status": status } = row;
+          if (!name || !code || !day || !branchCode || !leaderCode || !status) {
             errors.push(`Row ${index + 2}: Missing required fields.`);
             return;
           }
@@ -162,12 +162,12 @@ export default function GroupsPage() {
             errors.push(`Row ${index + 2}: Branch with code "${branchCode}" not found.`);
             return;
           }
-          if (!employeeMap.has(leaderId)) {
-            errors.push(`Row ${index + 2}: Leader with login ID "${leaderId}" not found or is not a 'Branch User'.`);
+          if (!employeeMap.has(leaderCode)) {
+            errors.push(`Row ${index + 2}: Leader with code "${leaderCode}" not found or is not a 'Branch User'.`);
             return;
           }
           const branchId = branchMap.get(branchCode)!;
-          const responsibleEmployeeId = employeeMap.get(leaderId)!;
+          const responsibleEmployeeId = employeeMap.get(leaderCode)!;
           validGroups.push({ name, code, day, branchId, responsibleEmployeeId, initialMembers: Number(initialMembers) || 0, initialSavings: Number(initialSavings) || 0, status });
         });
 

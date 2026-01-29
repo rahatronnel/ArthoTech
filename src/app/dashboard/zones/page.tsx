@@ -60,7 +60,7 @@ export default function ZonesPage() {
         "Bengali Name": "",
         "Code": "",
         "Region Code": "",
-        "Responsible Employee Login ID": ""
+        "Responsible Employee Code": ""
       }
     ];
     const worksheet = XLSX.utils.json_to_sheet(templateData);
@@ -94,11 +94,11 @@ export default function ZonesPage() {
 
         const errors: string[] = [];
         const validZones: any[] = [];
-        const employeeMap = new Map(employees?.filter(e => e.role === 'Zonal User').map(e => [e.loginId, e.id]));
+        const employeeMap = new Map(employees?.filter(e => e.role === 'Zonal User').map(e => [e.code, e.id]));
         const regionMap = new Map(regions?.map(r => [r.code, r.id]));
 
         jsonData.forEach((row, index) => {
-          const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Region Code': regionCode, 'Responsible Employee Login ID': loginId } = row;
+          const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Region Code': regionCode, 'Responsible Employee Code': employeeCode } = row;
           if (!name || !bengaliName || !code || !regionCode) {
             errors.push(`Row ${index + 2}: Missing required fields (Name, Bengali Name, Code, Region Code).`);
             return;
@@ -110,11 +110,11 @@ export default function ZonesPage() {
           const regionId = regionMap.get(regionCode)!;
 
           let responsibleEmployeeId: string | undefined = undefined;
-          if (loginId) {
-            if(employeeMap.has(loginId)) {
-                responsibleEmployeeId = employeeMap.get(loginId);
+          if (employeeCode) {
+            if(employeeMap.has(employeeCode)) {
+                responsibleEmployeeId = employeeMap.get(employeeCode);
             } else {
-                errors.push(`Row ${index + 2}: Employee with login ID "${loginId}" not found or they do not have the 'Zonal User' role.`);
+                errors.push(`Row ${index + 2}: Employee with code "${employeeCode}" not found or they do not have the 'Zonal User' role.`);
                 return;
             }
           }

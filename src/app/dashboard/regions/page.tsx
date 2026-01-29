@@ -52,7 +52,7 @@ export default function RegionsPage() {
         "Name": "",
         "Bengali Name": "",
         "Code": "",
-        "Responsible Employee Login ID": ""
+        "Responsible Employee Code": ""
       }
     ];
     const worksheet = XLSX.utils.json_to_sheet(templateData);
@@ -86,20 +86,20 @@ export default function RegionsPage() {
 
         const errors: string[] = [];
         const validRegions: any[] = [];
-        const employeeMap = new Map(employees?.map(e => [e.loginId, e.id]));
+        const employeeMap = new Map(employees?.filter(e => e.role === 'Regional User').map(e => [e.code, e.id]));
 
         jsonData.forEach((row, index) => {
-          const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Responsible Employee Login ID': loginId } = row;
+          const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Responsible Employee Code': employeeCode } = row;
           if (!name || !bengaliName || !code) {
             errors.push(`Row ${index + 2}: Missing required fields (Name, Bengali Name, Code).`);
             return;
           }
           let responsibleEmployeeId: string | undefined = undefined;
-          if (loginId) {
-            if(employeeMap.has(loginId)) {
-                responsibleEmployeeId = employeeMap.get(loginId);
+          if (employeeCode) {
+            if(employeeMap.has(employeeCode)) {
+                responsibleEmployeeId = employeeMap.get(employeeCode);
             } else {
-                errors.push(`Row ${index + 2}: Employee with login ID "${loginId}" not found or they do not have the 'Regional User' role.`);
+                errors.push(`Row ${index + 2}: Employee with code "${employeeCode}" not found or they do not have the 'Regional User' role.`);
                 return;
             }
           }
