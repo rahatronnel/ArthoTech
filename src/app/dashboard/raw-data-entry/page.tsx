@@ -733,7 +733,8 @@ const Step2Loans = ({ data }: { data: UploadedRow[] }) => {
             totalCollection: 0,
             advance: 0,
             principle: 0,
-            serviceCharge: 0
+            serviceCharge: 0,
+            disbursement: 0
         };
         const aggregated = data.reduce((acc, row) => {
             acc.recoverable += row['Regular Recovarable'];
@@ -741,6 +742,7 @@ const Step2Loans = ({ data }: { data: UploadedRow[] }) => {
             acc.advance += row['Loan Collection Advance'];
             acc.principle += row['Loan Received (principle)'];
             acc.serviceCharge += row['Loan Received (Service Charge)'];
+            acc.disbursement += row['Disbursement Amount'];
             return acc;
         }, initial);
         
@@ -753,8 +755,8 @@ const Step2Loans = ({ data }: { data: UploadedRow[] }) => {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Step 2: Loan Recovery Summary</CardTitle>
-                <CardDescription>Confirm the total loan collections and overall On-Time Recovery (OTR) percentage.</CardDescription>
+                <CardTitle>Step 2: Loan Recovery & Disbursement Summary</CardTitle>
+                <CardDescription>Confirm the total loan collections, disbursements, and On-Time Recovery (OTR) percentage.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                  <Card>
@@ -770,11 +772,17 @@ const Step2Loans = ({ data }: { data: UploadedRow[] }) => {
                         </div>
                     </CardHeader>
                  </Card>
-                 <div className="grid gap-4 md:grid-cols-2">
+                 <div className="grid gap-4 md:grid-cols-3">
                     <Card>
                         <CardHeader className="pb-2">
                             <CardDescription>Total Regular Recoverable</CardDescription>
                             <CardTitle className="text-2xl">{formatCurrency(totals.recoverable)}</CardTitle>
+                        </CardHeader>
+                    </Card>
+                     <Card>
+                        <CardHeader className="pb-2">
+                            <CardDescription>Total Loan Disbursed</CardDescription>
+                            <CardTitle className="text-2xl text-blue-600">{formatCurrency(totals.disbursement)}</CardTitle>
                         </CardHeader>
                     </Card>
                      <Card>
@@ -997,5 +1005,3 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
         </Dialog>
     );
 };
-
-    
