@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -13,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Download, MoreHorizontal, Trash2, Edit } from 'lucide-react';
+import { Upload, Download, MoreHorizontal, Trash2, Edit, PlusCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -22,7 +23,7 @@ import { collectionGroup, query } from 'firebase/firestore';
 
 
 // These are the data types managed by THIS page's bulk upload template.
-const templateDataTypes: Readonly<OtherDataEntry['type'][]> = ['Others Expenses', 'Cash', 'Bank', 'Afternoon Collection', 'Today Total Cash'];
+const templateDataTypes: Readonly<OtherDataEntry['type'][]> = ['Others Expenses', 'Cash', 'Bank', 'Afternoon Collection', 'Today Total Cash', 'Risk Fund', 'Processing Fee', 'Passbook Fee', 'Admission Fee'];
 
 // Shape of a row in the uploaded Excel file
 type UploadedRow = {
@@ -32,6 +33,10 @@ type UploadedRow = {
   Bank: number;
   'Afternoon Collection': number;
   'Today Total Cash': number;
+  'Risk Fund': number;
+  'Processing Fee': number;
+  'Passbook Fee': number;
+  'Admission Fee': number;
   Notes: string;
 };
 
@@ -55,7 +60,8 @@ export default function OthersDataPage() {
     const [uploadedData, setUploadedData] = useState<UploadedRow[]>([]);
     const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
 
-    // State for editing/deleting
+    // State for editing/deleting/adding
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [editingEntry, setEditingEntry] = useState<OtherDataEntry | null>(null);
     const [entryToDelete, setEntryToDelete] = useState<OtherDataEntry | null>(null);
     const [isDeleteByDateOpen, setIsDeleteByDateOpen] = useState(false);
@@ -222,6 +228,75 @@ export default function OthersDataPage() {
         .filter(d => d.date === filterDate && (currentUser?.role === 'Super Admin' ? (filterBranch ? d.branch === filterBranch : true) : d.branch === currentUser?.assignment))
         .sort((a,b) => a.branch.localeCompare(b.branch) || allDataTypes.indexOf(a.type) - allDataTypes.indexOf(b.type));
     
+    const AddEntryDialog = () => {
+        const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+        const [branch, setBranch] = useState('');
+        const [type, setType] = useState<OtherDataEntry['type'] | ''>('');
+        const [amount, setAmount] = useState(0);
+        const [notes, setNotes] = useState('');
+        
+        const handleSave = () => {
+            if (!date || !branch || !type || amount <= 0) {
+                toast({
+                    variant: "destructive",
+                    title: "Validation Error",
+                    description: "Please fill out date, branch, type, and a valid amount.",
+                });
+                return;
+            }
+            addBulkOthersData([{ date, branch, type: type as OtherDataEntry['type'], amount, notes }]);
+            toast({ title: "Entry Added" });
+            setIsAddDialogOpen(false);
+        };
+
+        return (
+             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Add New Data Entry</DialogTitle>
+                        <DialogDescription>Manually record a single data entry.</DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="new-date">Date</Label>
+                            <Input id="new-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="new-branch">Branch</Label>
+                            <Select onValueChange={setBranch} value={branch}>
+                                <SelectTrigger><SelectValue placeholder="Select a branch" /></SelectTrigger>
+                                <SelectContent>
+                                    {userBranches.map(b => <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                         <div className="space-y-2">
+                            <Label htmlFor="new-type">Data Type</Label>
+                            <Select onValueChange={(v) => setType(v as OtherDataEntry['type'])} value={type}>
+                                <SelectTrigger><SelectValue placeholder="Select a data type" /></SelectTrigger>
+                                <SelectContent>
+                                    {allDataTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="new-amount">Amount</Label>
+                            <Input id="new-amount" type="number" value={amount} onChange={e => setAmount(Number(e.target.value))} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="new-notes">Notes</Label>
+                            <Input id="new-notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes"/>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSave}>Save Entry</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
+
     const EditDialog = () => {
         const [amount, setAmount] = useState(editingEntry?.amount || 0);
         const [notes, setNotes] = useState(editingEntry?.notes || '');
@@ -266,10 +341,14 @@ export default function OthersDataPage() {
         <div className="flex flex-col gap-6">
             <div>
                 <h1 className="text-3xl font-bold">Others Data Entry</h1>
-                <p className="text-muted-foreground">Manage other financial data for each branch via bulk upload.</p>
+                <p className="text-muted-foreground">Manage other financial data for each branch.</p>
             </div>
             
             <div className="flex items-center gap-2">
+                <Button onClick={() => setIsAddDialogOpen(true)} className="gap-1">
+                    <PlusCircle className="h-4 w-4" />
+                    Add New Entry
+                </Button>
                 <Button variant="destructive" onClick={() => setIsDeleteAllOpen(true)} className="gap-1">
                     <Trash2 className="h-4 w-4" />
                     Delete All Data
@@ -453,7 +532,8 @@ export default function OthersDataPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Edit Dialog */}
+            {/* Add/Edit Dialogs */}
+            {isAddDialogOpen && <AddEntryDialog />}
             {editingEntry && <EditDialog />}
             
             <AlertDialog open={isDeleteByDateOpen} onOpenChange={setIsDeleteByDateOpen}>
@@ -503,3 +583,5 @@ export default function OthersDataPage() {
         </div>
     );
 }
+
+    
