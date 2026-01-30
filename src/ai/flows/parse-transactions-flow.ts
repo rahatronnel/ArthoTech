@@ -21,20 +21,24 @@ const prompt = ai.definePrompt({
   name: 'parseTransactionsPrompt',
   input: { schema: ParseTransactionsInputSchema },
   output: { schema: ParseTransactionsOutputSchema, },
-  prompt: `You are an expert data entry specialist. Your task is to extract tabular data from a PDF file.
-  The PDF contains daily transaction data for a microfinance organization.
-  The table has a complex, multi-row header. You must ignore the header and only extract the data rows.
-  Data rows contain information about a 'Samity' (a group).
+  prompt: `You are an expert data entry specialist. Your task is to extract tabular data from a PDF file that looks like a complex Excel spreadsheet.
 
-  IMPORTANT EXTRACTION LOGIC:
-  - Do NOT aggregate or sum rows. If a single 'Samity' has multiple rows for different 'Component' values (e.g., 'gl', 'Me'), return each row as a separate JSON object. This is the most critical rule.
-  - Some rows might not have a 'Field Worker ID' and 'Field Worker Name'. In these cases, you must fill in the values from the last row that had them.
-  - Some rows might not have a 'Samity ID' and 'Samity Name'. In these cases, you must fill in the values from the last row that had them.
-  - Some rows are summary rows for an officer, often containing 'Officer Total' in the 'Samity Name' column. You must ignore these rows completely and not include them in the output.
+CRITICAL BUSINESS RULES (NON-NEGOTIABLE):
+1.  **NEVER Aggregate Rows**: My system does its own aggregation. You MUST return one JSON object for every single transaction row you see in the table. If one 'Samity' (group) has two components ('GL' and 'ME'), you MUST return two separate JSON objects.
+2.  **Handle Merged Cells**: The PDF will look like it has merged cells for 'Field Worker' and 'Samity'. This means the ID and Name might only appear on the first row of a group. For all subsequent rows that belong to that same group (where the ID/Name columns are blank), you MUST copy the ID and Name from the row above. Do not skip these rows. Every row with financial data is a valid transaction.
+3.  **Ignore Headers and Footers**: Ignore the complex, multi-line header at the top. Also, ignore any summary rows at the bottom, especially those containing 'Officer Total'.
 
-  Extract all valid data rows and return a JSON array where each object represents one row from the table.
-  
-  PDF with transaction data: {{media url=pdfDataUri}}`,
+Your only job is to flatten the visual table into a clean array of JSON objects, with one object per transaction row.
+
+Example:
+If you see a Samity with two component rows like this:
+- Samity ID: 1.0026, Component: GL, Savings Collection: 330
+- (blank),       Component: ME, Savings Collection: 100
+You MUST return two JSON objects:
+- One for GL with Savings Collection 330.
+- One for ME with Savings Collection 100.
+
+Now, process the following PDF: {{media url=pdfDataUri}}`,
   config: {
     model: 'gemini-1.5-pro-latest'
   }
