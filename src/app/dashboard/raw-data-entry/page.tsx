@@ -202,7 +202,7 @@ export default function RawDataEntryPage() {
                     const hasFinancialData = row.slice(4).some(cell => cell !== null && cell !== '' && !isNaN(Number(cell)) && Number(cell) !== 0);
                     const hasComponent = row[4] !== null && String(row[4]).trim() !== '';
 
-                    if (lastSamityId && (hasFinancialData || hasComponent)) {
+                    if (hasFinancialData || hasComponent) {
                          const newTransaction: UploadedRow = {
                             'Field Worker ID': lastFieldWorkerId,
                             'Field Worker Name': lastFieldWorkerName,
@@ -236,6 +236,8 @@ export default function RawDataEntryPage() {
 
                 const validData = allTransactions.filter(row => {
                     const normalizedSamityId = String(row['Samity ID']).trim().toLowerCase();
+                    // If samity ID is blank, it's valid for preview, but won't be saved later.
+                    if (!normalizedSamityId) return true; 
                     return userVisibleGroupCodes.has(normalizedSamityId);
                 });
 
@@ -977,3 +979,5 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
     );
 };
 
+
+    
