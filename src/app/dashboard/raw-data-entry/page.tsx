@@ -172,8 +172,9 @@ export default function RawDataEntryPage() {
                 const worksheet = workbook.Sheets[sheetName];
                 
                 const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
-
-                const dataRows = rawData;
+                
+                // The first 3 rows are complex headers, so we skip them.
+                const dataRows = rawData.slice(3);
                 
                 const aggregatedDataMap = new Map<string, UploadedRow>();
                 let lastFieldWorkerId = '';
