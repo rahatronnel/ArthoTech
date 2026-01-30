@@ -25,16 +25,18 @@ const prompt = ai.definePrompt({
 
 CRITICAL BUSINESS RULES (NON-NEGOTIABLE):
 1.  **NEVER Aggregate Rows**: My system does its own aggregation. You MUST return one JSON object for every single transaction row you see in the table. If one 'Samity' (group) has two components ('GL' and 'ME'), you MUST return two separate JSON objects.
-2.  **Handle Merged Cells**: The PDF will look like it has merged cells for 'Field Worker' and 'Samity'. This means the ID and Name might only appear on the first row of a group. For all subsequent rows that belong to that same group (where the ID/Name columns are blank), you MUST copy the ID and Name from the row above. Do not skip these rows. Every row with financial data is a valid transaction.
-3.  **Ignore Headers and Footers**: Ignore the complex, multi-line header at the top. Also, ignore any summary rows at the bottom, especially those containing 'Officer Total'.
+2.  **Handle Merged Cells**: The PDF will look like it has merged cells for 'Field Worker' and 'Samity'. This means the ID and Name might only appear on the first row of a group. For all subsequent rows that belong to that same group (where the ID/Name columns are blank), you MUST copy the ID and Name from the row above.
+3.  **Filter by Component**: A row is only a valid transaction if the 'Component' column is not blank. You MUST ignore and skip any rows where the 'Component' column is empty, as these are sub-total or grand-total rows.
+4.  **Ignore Headers and Footers**: Ignore the complex, multi-line header at the top. Also, ignore any summary rows at the bottom that you might have missed with the Component rule, especially those containing 'Officer Total'.
 
-Your only job is to flatten the visual table into a clean array of JSON objects, with one object per transaction row.
+Your only job is to flatten the visual table into a clean array of JSON objects, with one object per transaction row that has a component.
 
 Example:
 If you see a Samity with two component rows like this:
 - Samity ID: 1.0026, Component: GL, Savings Collection: 330
 - (blank),       Component: ME, Savings Collection: 100
-You MUST return two JSON objects:
+- (blank),       Component: (blank), Savings Collection: 430 (This is a sub-total row)
+You MUST return two JSON objects and ignore the third:
 - One for GL with all its data.
 - One for ME with all its data, ensuring you copy the Samity ID and Name from the row above.
 

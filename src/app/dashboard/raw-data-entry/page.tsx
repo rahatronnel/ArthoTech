@@ -198,11 +198,11 @@ export default function RawDataEntryPage() {
                     if (row[2] !== null && String(row[2]).trim() !== '') lastSamityId = String(row[2]).trim();
                     if (row[3] !== null && String(row[3]).trim() !== '') lastSamityName = String(row[3]).trim();
                     
-                    // A row is considered a transaction if it has a component or any financial data
-                    const hasFinancialData = row.slice(4).some(cell => cell !== null && cell !== '' && !isNaN(Number(cell)) && Number(cell) !== 0);
+                    // A row is only a valid transaction if it has a component.
+                    // This is to avoid picking up sub-total and grand-total rows.
                     const hasComponent = row[4] !== null && String(row[4]).trim() !== '';
 
-                    if (hasFinancialData || hasComponent) {
+                    if (hasComponent) {
                          const newTransaction: UploadedRow = {
                             'Field Worker ID': lastFieldWorkerId,
                             'Field Worker Name': lastFieldWorkerName,
