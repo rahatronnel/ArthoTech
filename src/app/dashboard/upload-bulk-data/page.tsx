@@ -231,66 +231,104 @@ export default function OthersDataPage() {
     const AddEntryDialog = () => {
         const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
         const [branch, setBranch] = useState('');
-        const [type, setType] = useState<OtherDataEntry['type'] | ''>('');
-        const [amount, setAmount] = useState(0);
         const [notes, setNotes] = useState('');
+        const [amounts, setAmounts] = useState<Record<OtherDataEntry['type'], number>>(() => {
+            const initialAmounts = {} as Record<OtherDataEntry['type'], number>;
+            allDataTypes.forEach(type => {
+                initialAmounts[type] = 0;
+            });
+            return initialAmounts;
+        });
+
+        const handleAmountChange = (type: OtherDataEntry['type'], value: string) => {
+            setAmounts(prev => ({ ...prev, [type]: Number(value) || 0 }));
+        };
         
         const handleSave = () => {
-            if (!date || !branch || !type || amount <= 0) {
+            if (!date || !branch) {
                 toast({
                     variant: "destructive",
                     title: "Validation Error",
-                    description: "Please fill out date, branch, type, and a valid amount.",
+                    description: "Please fill out date and branch.",
                 });
                 return;
             }
-            addBulkOthersData([{ date, branch, type: type as OtherDataEntry['type'], amount, notes }]);
-            toast({ title: "Entry Added" });
+
+            const entriesToAdd: Omit<OtherDataEntry, 'id'>[] = [];
+            for (const type of allDataTypes) {
+                const amount = amounts[type as keyof typeof amounts];
+                if (amount > 0) {
+                    entriesToAdd.push({
+                        date,
+                        branch,
+                        type: type as OtherDataEntry['type'],
+                        amount,
+                        notes,
+                    });
+                }
+            }
+
+            if (entriesToAdd.length === 0) {
+                toast({
+                    variant: "destructive",
+                    title: "No data entered",
+                    description: "Please enter an amount for at least one data type.",
+                });
+                return;
+            }
+
+            addBulkOthersData(entriesToAdd);
+            toast({ title: `${entriesToAdd.length} entries added successfully.` });
             setIsAddDialogOpen(false);
         };
 
         return (
              <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                <DialogContent>
+                <DialogContent className="sm:max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle>Add New Data Entry</DialogTitle>
-                        <DialogDescription>Manually record a single data entry.</DialogDescription>
+                        <DialogTitle>Add Branch Data</DialogTitle>
+                        <DialogDescription>Manually record all 'Others Data' for a single branch and date at once.</DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="new-date">Date</Label>
-                            <Input id="new-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+                    <div className="grid gap-6 py-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="new-date">Date</Label>
+                                <Input id="new-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="new-branch">Branch</Label>
+                                <Select onValueChange={setBranch} value={branch}>
+                                    <SelectTrigger><SelectValue placeholder="Select a branch" /></SelectTrigger>
+                                    <SelectContent>
+                                        {userBranches.map(b => <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="new-branch">Branch</Label>
-                            <Select onValueChange={setBranch} value={branch}>
-                                <SelectTrigger><SelectValue placeholder="Select a branch" /></SelectTrigger>
-                                <SelectContent>
-                                    {userBranches.map(b => <SelectItem key={b.id} value={b.name}>{b.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        <ScrollArea className="h-72 pr-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
+                                {allDataTypes.map(type => (
+                                    <div className="space-y-2" key={type}>
+                                        <Label htmlFor={`amount-${type}`}>{type}</Label>
+                                        <Input
+                                            id={`amount-${type}`}
+                                            type="number"
+                                            value={amounts[type as keyof typeof amounts] === 0 ? '' : amounts[type as keyof typeof amounts]}
+                                            onChange={e => handleAmountChange(type as OtherDataEntry['type'], e.target.value)}
+                                            placeholder="0"
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </ScrollArea>
                          <div className="space-y-2">
-                            <Label htmlFor="new-type">Data Type</Label>
-                            <Select onValueChange={(v) => setType(v as OtherDataEntry['type'])} value={type}>
-                                <SelectTrigger><SelectValue placeholder="Select a data type" /></SelectTrigger>
-                                <SelectContent>
-                                    {allDataTypes.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="new-amount">Amount</Label>
-                            <Input id="new-amount" type="number" value={amount} onChange={e => setAmount(Number(e.target.value))} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="new-notes">Notes</Label>
-                            <Input id="new-notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes"/>
+                            <Label htmlFor="new-notes">Notes (Optional)</Label>
+                            <Input id="new-notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Add a note for all entries"/>
                         </div>
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
-                        <Button onClick={handleSave}>Save Entry</Button>
+                        <Button onClick={handleSave}>Save Entries</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
@@ -583,5 +621,3 @@ export default function OthersDataPage() {
         </div>
     );
 }
-
-    
