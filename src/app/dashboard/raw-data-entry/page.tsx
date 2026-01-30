@@ -634,6 +634,16 @@ const Step0RawDataPreview = ({ data }: { data: UploadedRow[] }) => {
 
     const columns = Object.keys(data[0]) as (keyof UploadedRow)[];
 
+    const totals = useMemo(() => {
+        return columns.reduce((acc, col) => {
+            if (typeof data[0][col] === 'number') {
+                acc[col] = data.reduce((sum, row) => sum + (row[col] as number), 0);
+            }
+            return acc;
+        }, {} as { [key: string]: number });
+    }, [data, columns]);
+
+
     return (
         <Card className="h-full flex flex-col">
             <CardHeader>
@@ -663,6 +673,16 @@ const Step0RawDataPreview = ({ data }: { data: UploadedRow[] }) => {
                                 </TableRow>
                             ))}
                         </TableBody>
+                        <TableFooter className="sticky bottom-0 bg-background z-10 font-bold">
+                            <TableRow>
+                                <TableCell colSpan={5} className="text-right">Grand Total</TableCell>
+                                {columns.slice(5).map(col => (
+                                    <TableCell key={`total-${col}`} className="whitespace-nowrap text-right">
+                                        {totals[col] !== undefined ? formatCurrency(totals[col]) : ''}
+                                    </TableCell>
+                                ))}
+                            </TableRow>
+                        </TableFooter>
                     </Table>
                     <ScrollBar orientation="horizontal" />
                 </ScrollArea>
@@ -987,6 +1007,8 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
     );
 };
 
+
+    
 
     
 
