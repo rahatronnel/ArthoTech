@@ -1,17 +1,18 @@
+
 "use client";
 
 import * as React from 'react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/context/AuthContext';
 import { useOthersData } from '@/context/OthersDataContext';
-import { type Branch, type OtherDataEntry, type Group, type Employee } from '@/lib/data';
+import { type Branch, type OtherDataEntry, type Group as GroupData, type Employee } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Download, Upload, CheckCircle, Wallet, Landmark, Users, UserCheck } from 'lucide-react';
+import { Download, Upload, CheckCircle, Wallet, Landmark, Users, UserCheck, FileScan, BrainCircuit, Ban, Filter } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
@@ -78,6 +79,7 @@ export default function RawDataEntryPage() {
 
     const [file, setFile] = useState<File | null>(null);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
     const [uploadedData, setUploadedData] = useState<UploadedRow[]>([]);
     const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
     const [wizardStep, setWizardStep] = useState(0);
@@ -86,7 +88,7 @@ export default function RawDataEntryPage() {
     const firestore = useFirestore();
 
     const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
-    const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
+    const { data: groupsData, isLoading: groupsLoading } = useCollection<GroupData>(groupsQuery);
     
     const employeesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'employees'): null, [firestore]);
     const { data: employeesData, isLoading: employeesLoading } = useCollection<Employee>(employeesQuery);
@@ -265,7 +267,7 @@ export default function RawDataEntryPage() {
         const fileExtension = file.name.split('.').pop()?.toLowerCase();
 
         if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-            processExcel(file);
+            setIsProcessing(true);
         } else {
             toast({ variant: 'destructive', title: 'Unsupported File Type', description: 'Please upload an Excel file (.xlsx, .xls).' });
         }
@@ -418,6 +420,16 @@ export default function RawDataEntryPage() {
                 </CardContent>
             </Card>
             
+            <ProcessingAnimation
+                open={isProcessing}
+                onFinished={() => {
+                    if (file) {
+                        processExcel(file);
+                    }
+                    setIsProcessing(false);
+                }}
+            />
+
             <ConfirmationWizard
                 isOpen={isConfirmDialogOpen}
                 onOpenChange={setIsConfirmDialogOpen}
@@ -503,6 +515,64 @@ const formatCurrency = (amount: number) => {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     }).format(amount);
+};
+
+const ProcessingAnimation = ({ open, onFinished }: { open: boolean, onFinished: () => void }) => {
+    const messagesWithIcons = [
+        { text: "Initializing data stream...", icon: FileScan, color: "text-chart-1" },
+        { text: "Analyzing spreadsheet structure...", icon: BrainCircuit, color: "text-chart-2" },
+        { text: "Ignoring summary rows (e.g., Grand Total)...", icon: Ban, color: "text-chart-3" },
+        { text: "Filtering rows with blank 'Component' values...", icon: Filter, color: "text-chart-4" },
+        { text: "Intelligently assigning groups to transactions...", icon: Users, color: "text-chart-5" },
+        { text: "Finalizing preview...", icon: CheckCircle, color: "text-green-600" }
+    ];
+    const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+
+    useEffect(() => {
+        if (!open) {
+            setTimeout(() => setCurrentMessageIndex(0), 300);
+            return;
+        }
+
+        const interval = setInterval(() => {
+            setCurrentMessageIndex(prevIndex => {
+                if (prevIndex < messagesWithIcons.length - 1) {
+                    return prevIndex + 1;
+                }
+                clearInterval(interval);
+                setTimeout(onFinished, 500); 
+                return prevIndex;
+            });
+        }, 900);
+
+        return () => clearInterval(interval);
+    }, [open, onFinished]);
+    
+    const currentMessage = messagesWithIcons[currentMessageIndex];
+    const CurrentIcon = currentMessage.icon;
+
+    return (
+        <Dialog open={open} onOpenChange={() => {}}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle className="text-center">Analyzing Your Report</DialogTitle>
+                    <DialogDescription className="text-center">Applying intelligence to understand your data...</DialogDescription>
+                </DialogHeader>
+                <div className="flex flex-col items-center justify-center p-8 space-y-6">
+                    <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
+                    
+                    <div className="text-center h-10 transition-all duration-300">
+                        {currentMessage && (
+                             <p key={currentMessageIndex} className="flex items-center gap-2 text-sm text-muted-foreground animate-in fade-in-0 slide-in-from-bottom-4 duration-500">
+                                <CurrentIcon className={cn("h-5 w-5", currentMessage.color)} />
+                                {currentMessage.text}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+    );
 };
 
 const WizardStepper = ({ currentStep }: { currentStep: number }) => {
@@ -793,7 +863,7 @@ const Step3Others = ({ data }: { data: UploadedRow[] }) => {
 
 
 // Step 4: Summary
-const Step4Summary = ({ data, groupsData, employeesData }: { data: UploadedRow[], groupsData: Group[] | null, employeesData: Employee[] | null }) => {
+const Step4Summary = ({ data, groupsData, employeesData }: { data: UploadedRow[], groupsData: GroupData[] | null, employeesData: Employee[] | null }) => {
     const summaryData = useMemo(() => {
         if (!groupsData || !employeesData) return [];
 
@@ -927,3 +997,5 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
         </Dialog>
     );
 };
+
+    
