@@ -48,7 +48,7 @@ const parseTransactionsFlow = ai.defineFlow(
     outputSchema: ParseTransactionsOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input, { model: googleAI.model('gemini-1.5-pro') });
+    const { output } = await prompt(input, { model: 'gemini-1.5-pro' });
     if (!output) {
       throw new Error('Failed to parse data from PDF.');
     }
