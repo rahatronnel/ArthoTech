@@ -39,9 +39,6 @@ You MUST return two JSON objects:
 - One for ME with all its data, ensuring you copy the Samity ID and Name from the row above.
 
 Now, process the following PDF: {{media url=pdfDataUri}}`,
-  config: {
-    model: googleAI.model('gemini-1.5-pro-latest')
-  }
 });
 
 const parseTransactionsFlow = ai.defineFlow(
@@ -51,7 +48,7 @@ const parseTransactionsFlow = ai.defineFlow(
     outputSchema: ParseTransactionsOutputSchema,
   },
   async (input) => {
-    const { output } = await prompt(input);
+    const { output } = await prompt(input, { model: googleAI.model('gemini-1.5-pro-latest') });
     if (!output) {
       throw new Error('Failed to parse data from PDF.');
     }
