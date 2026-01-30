@@ -7,7 +7,7 @@ import { UploadedRowSchema } from '@/ai/schemas';
 
 const ParseTransactionsInputSchema = z.object({
   pdfDataUri: z.string().describe(
-    "A PDF file containing financial transactions, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:application/pdf;base64,<encoded_data>'."
+    "A PDF file containing financial transactions, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:application/pdf;base64,<encoded_data>'"
   ),
 });
 
@@ -27,9 +27,10 @@ const prompt = ai.definePrompt({
   Data rows contain information about a 'Samity' (a group).
 
   IMPORTANT EXTRACTION LOGIC:
-  - Do NOT aggregate or sum rows. If a single 'Samity' has multiple rows for different 'Component' values (e.g., 'gl', 'Me'), return each row as a separate JSON object.
-  - Some rows might not have a 'Field Worker ID' and 'Field Worker Name'. In these cases, you must fill in the values from the last row that had them. This is critical.
-  - Some rows are summary rows for an officer, often containing 'Officer Total' in the first column. You must ignore these rows completely and not include them in the output.
+  - Do NOT aggregate or sum rows. If a single 'Samity' has multiple rows for different 'Component' values (e.g., 'gl', 'Me'), return each row as a separate JSON object. This is the most critical rule.
+  - Some rows might not have a 'Field Worker ID' and 'Field Worker Name'. In these cases, you must fill in the values from the last row that had them.
+  - Some rows might not have a 'Samity ID' and 'Samity Name'. In these cases, you must fill in the values from the last row that had them.
+  - Some rows are summary rows for an officer, often containing 'Officer Total' in the 'Samity Name' column. You must ignore these rows completely and not include them in the output.
 
   Extract all valid data rows and return a JSON array where each object represents one row from the table.
   

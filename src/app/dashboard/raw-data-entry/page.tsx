@@ -173,7 +173,6 @@ export default function RawDataEntryPage() {
                 
                 const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
                 
-                // The first 3 rows are complex headers, so we skip them.
                 const dataRows = rawData.slice(3);
                 
                 const processedRows: UploadedRow[] = [];
@@ -192,21 +191,10 @@ export default function RawDataEntryPage() {
                         continue;
                     }
 
-                    // Fill down Field Worker info
-                    if (row[0] !== null && String(row[0]).trim() !== '') {
-                        lastFieldWorkerId = String(row[0]).trim();
-                    }
-                    if (row[1] !== null && String(row[1]).trim() !== '') {
-                        lastFieldWorkerName = String(row[1]).trim();
-                    }
-
-                    // Fill down Samity info
-                    if (row[2] !== null && String(row[2]).trim() !== '') {
-                        lastSamityId = String(row[2]).trim();
-                    }
-                     if (row[3] !== null && String(row[3]).trim() !== '') {
-                        lastSamityName = String(row[3]).trim();
-                    }
+                    if (row[0] !== null && String(row[0]).trim() !== '') lastFieldWorkerId = String(row[0]).trim();
+                    if (row[1] !== null && String(row[1]).trim() !== '') lastFieldWorkerName = String(row[1]).trim();
+                    if (row[2] !== null && String(row[2]).trim() !== '') lastSamityId = String(row[2]).trim();
+                    if (row[3] !== null && String(row[3]).trim() !== '') lastSamityName = String(row[3]).trim();
                     
                     const hasFinancialData = row.slice(4).some(cell => cell !== null && cell !== '');
 
@@ -214,7 +202,7 @@ export default function RawDataEntryPage() {
                          const newRow: UploadedRow = {
                             'Field Worker ID': lastFieldWorkerId,
                             'Field Worker Name': lastFieldWorkerName,
-                            'Samity ID': lastSamityId,
+                            'Samity ID': formatGroupCode(lastSamityId),
                             'Samity Name': lastSamityName,
                             'Component': String(row[4] || ''),
                             'Savings Collection': Number(row[5]) || 0,
@@ -240,43 +228,18 @@ export default function RawDataEntryPage() {
                     }
                 }
                 
-                // Now aggregate the processed rows
-                const aggregatedDataMap = new Map<string, UploadedRow>();
-                for (const row of processedRows) {
-                    const formattedSamityId = formatGroupCode(row['Samity ID']);
-                    
-                    if (aggregatedDataMap.has(formattedSamityId)) {
-                        const existingEntry = aggregatedDataMap.get(formattedSamityId)!;
-                        for (const key in row) {
-                             if (key !== 'Field Worker ID' && key !== 'Field Worker Name' && key !== 'Samity ID' && key !== 'Samity Name' && key !== 'Component' && typeof (row as any)[key] === 'number') {
-                                (existingEntry as any)[key] += (row as any)[key];
-                            }
-                        }
-                        const currentComponent = row.Component;
-                        if (currentComponent && !existingEntry.Component.split(', ').includes(currentComponent)) {
-                            existingEntry.Component += `, ${currentComponent}`;
-                        }
-                    } else {
-                        aggregatedDataMap.set(formattedSamityId, { ...row, 'Samity ID': formattedSamityId });
-                    }
-                }
-                
-                const allProcessedData = Array.from(aggregatedDataMap.values());
-
                 const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => String(g.code).trim().toLowerCase()) || []);
 
-                const validData = allProcessedData.filter(row => {
+                const validData = processedRows.filter(row => {
                     const normalizedSamityId = String(row['Samity ID']).trim().toLowerCase();
                     return userVisibleGroupCodes.has(normalizedSamityId);
                 });
 
-                if (allProcessedData.length > 0 && validData.length === 0) {
-                    const foundIds = [...new Set(allProcessedData.map(row => String(row['Samity ID']).trim().toLowerCase()).filter(id => id))];
-                    const description = `The file contains data, but none of the Samity IDs match the Group Codes of your assigned groups. Found Samity IDs in file: ${foundIds.slice(0, 5).join(', ')}.`;
+                if (processedRows.length > 0 && validData.length === 0) {
                      toast({
                         variant: "destructive",
                         title: "No Matching Data",
-                        description: description,
+                        description: `The file contains data, but none of the Samity IDs match your assigned groups.`,
                         duration: 9000,
                     });
                     return;
@@ -286,7 +249,7 @@ export default function RawDataEntryPage() {
                     toast({ 
                         variant: "destructive", 
                         title: "No Valid Data", 
-                        description: "No processable data found. This could be because no data corresponds to your assigned groups, or the file is empty after the headers." 
+                        description: "No processable data found in the file." 
                     });
                     return;
                 }
@@ -317,66 +280,13 @@ export default function RawDataEntryPage() {
                     toast({ variant: 'destructive', title: 'PDF Parsing Failed', description: 'The AI could not extract any valid data from the PDF. Please check the file format or try the Excel template.' });
                     return;
                 }
-
-                // --- Start Aggregation Logic for PDF Data ---
-                const aggregatedDataMap = new Map<string, UploadedRow>();
-
-                for (const row of parsedData) {
-                    const formattedSamityId = formatGroupCode(row['Samity ID']);
-                    const currentComponent = row.Component || '';
-
-                    // The AI should return numbers, but let's ensure they are numbers.
-                    const numericData = {
-                        'Savings Collection': Number(row['Savings Collection']) || 0,
-                        'Interest On Savings': Number(row['Interest On Savings']) || 0,
-                        'Savings Refund': Number(row['Savings Refund']) || 0,
-                        'Additional Fees Collection': Number(row['Additional Fees Collection']) || 0,
-                        'Disbursement Amount': Number(row['Disbursement Amount']) || 0,
-                        'Regular Recovarable': Number(row['Regular Recovarable']) || 0,
-                        'Loan Collection Regular': Number(row['Loan Collection Regular']) || 0,
-                        'Loan Collection Due': Number(row['Loan Collection Due']) || 0,
-                        'Loan Collection Advance': Number(row['Loan Collection Advance']) || 0,
-                        'Loan Collection Rebate': Number(row['Loan Collection Rebate']) || 0,
-                        'Loan Received (principle)': Number(row['Loan Received (principle)']) || 0,
-                        'Loan Received (Service Charge)': Number(row['Loan Received (Service Charge)']) || 0,
-                        'Loan Collection Total': Number(row['Loan Collection Total']) || 0,
-                        'Risk fund': Number(row['Risk fund']) || 0,
-                        'Processing Fees / Form fees': Number(row['Processing Fees / Form fees']) || 0,
-                        'Passbook fees': Number(row['Passbook fees']) || 0,
-                        'Admission fees': Number(row['Admission fees']) || 0,
-                        'Total Collection': Number(row['Total Collection']) || 0,
-                    };
-
-                    if (aggregatedDataMap.has(formattedSamityId)) {
-                        const existingEntry = aggregatedDataMap.get(formattedSamityId)!;
-
-                        for (const key in numericData) {
-                            (existingEntry as any)[key] += (numericData as any)[key];
-                        }
-                        
-                        if (currentComponent && !existingEntry.Component.split(', ').includes(currentComponent)) {
-                            existingEntry.Component += `, ${currentComponent}`;
-                        }
-                    } else {
-                        const newEntry: UploadedRow = {
-                            'Field Worker ID': row['Field Worker ID'],
-                            'Field Worker Name': row['Field Worker Name'],
-                            'Samity ID': formattedSamityId,
-                            'Samity Name': row['Samity Name'],
-                            'Component': currentComponent,
-                            ...numericData,
-                        };
-                        aggregatedDataMap.set(formattedSamityId, newEntry);
-                    }
-                }
-
-                const allProcessedData = Array.from(aggregatedDataMap.values());
-                // --- End Aggregation Logic ---
+                
+                const formattedData = parsedData.map(row => ({...row, 'Samity ID': formatGroupCode(row['Samity ID'])}));
                 
                 const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => String(g.code).trim().toLowerCase()) || []);
-                const validData = allProcessedData.filter(row => userVisibleGroupCodes.has(String(row['Samity ID']).trim().toLowerCase()));
+                const validData = formattedData.filter(row => userVisibleGroupCodes.has(String(row['Samity ID']).trim().toLowerCase()));
 
-                if (allProcessedData.length > 0 && validData.length === 0) {
+                if (formattedData.length > 0 && validData.length === 0) {
                      toast({
                         variant: "destructive",
                         title: "No Matching Data in PDF",
@@ -520,7 +430,7 @@ export default function RawDataEntryPage() {
             addBulkOthersData(othersEntriesToAdd);
         }
 
-        toast({ title: "Upload Confirmed", description: `${uploadedData.length} rows processed successfully.` });
+        toast({ title: "Upload Confirmed", description: `${uploadedData.length} transaction rows processed successfully.` });
         
         setIsConfirmDialogOpen(false);
         setUploadedData([]);
