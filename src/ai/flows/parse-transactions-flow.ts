@@ -58,5 +58,3 @@ const parseTransactionsFlow = ai.defineFlow(
     return output;
   }
 );
-
-    
