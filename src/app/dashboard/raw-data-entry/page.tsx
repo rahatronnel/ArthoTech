@@ -175,7 +175,7 @@ export default function RawDataEntryPage() {
                 
                 const dataRows = rawData.slice(3);
                 
-                const processedRows: UploadedRow[] = [];
+                const allTransactions: UploadedRow[] = [];
                 let lastFieldWorkerId = '';
                 let lastFieldWorkerName = '';
                 let lastSamityId = '';
@@ -186,20 +186,20 @@ export default function RawDataEntryPage() {
                         continue;
                     }
 
-                    const firstCellContent = String(row[0] || '').trim();
-                    if (firstCellContent.toLowerCase().includes('officer total')) {
+                    const samityNameCell = String(row[3] || '').trim();
+                    if (samityNameCell.toLowerCase().includes('officer total')) {
                         continue;
                     }
-
+                    
                     if (row[0] !== null && String(row[0]).trim() !== '') lastFieldWorkerId = String(row[0]).trim();
                     if (row[1] !== null && String(row[1]).trim() !== '') lastFieldWorkerName = String(row[1]).trim();
                     if (row[2] !== null && String(row[2]).trim() !== '') lastSamityId = String(row[2]).trim();
                     if (row[3] !== null && String(row[3]).trim() !== '') lastSamityName = String(row[3]).trim();
                     
-                    const hasFinancialData = row.slice(4).some(cell => cell !== null && cell !== '');
+                    const hasFinancialData = row.slice(4).some(cell => cell !== null && cell !== '' && !isNaN(Number(cell)) && Number(cell) !== 0);
 
                     if (lastSamityId && hasFinancialData) {
-                         const newRow: UploadedRow = {
+                         const newTransaction: UploadedRow = {
                             'Field Worker ID': lastFieldWorkerId,
                             'Field Worker Name': lastFieldWorkerName,
                             'Samity ID': formatGroupCode(lastSamityId),
@@ -224,18 +224,18 @@ export default function RawDataEntryPage() {
                             'Admission fees': Number(row[21]) || 0,
                             'Total Collection': Number(row[22]) || 0,
                         };
-                        processedRows.push(newRow);
+                        allTransactions.push(newTransaction);
                     }
                 }
                 
                 const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => String(g.code).trim().toLowerCase()) || []);
 
-                const validData = processedRows.filter(row => {
+                const validData = allTransactions.filter(row => {
                     const normalizedSamityId = String(row['Samity ID']).trim().toLowerCase();
                     return userVisibleGroupCodes.has(normalizedSamityId);
                 });
 
-                if (processedRows.length > 0 && validData.length === 0) {
+                if (allTransactions.length > 0 && validData.length === 0) {
                      toast({
                         variant: "destructive",
                         title: "No Matching Data",
