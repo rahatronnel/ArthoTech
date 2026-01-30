@@ -66,7 +66,7 @@ export default function RawDataEntryPage() {
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
     const [uploadedData, setUploadedData] = useState<UploadedRow[]>([]);
     const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
-    const [wizardStep, setWizardStep] = useState(1);
+    const [wizardStep, setWizardStep] = useState(0);
 
     const firestore = useFirestore();
 
@@ -245,7 +245,7 @@ export default function RawDataEntryPage() {
                 }
                 
                 setUploadedData(validData);
-                setWizardStep(1);
+                setWizardStep(0);
                 setIsConfirmDialogOpen(true);
 
             } catch (error) {
@@ -357,7 +357,7 @@ export default function RawDataEntryPage() {
         setIsConfirmDialogOpen(false);
         setUploadedData([]);
         setFile(null);
-        setWizardStep(1);
+        setWizardStep(0);
         const fileInput = document.getElementById('raw-data-upload') as HTMLInputElement;
         if (fileInput) fileInput.value = '';
     };
@@ -523,6 +523,53 @@ const WizardStepper = ({ currentStep }: { currentStep: number }) => {
                 );
             })}
         </div>
+    );
+};
+
+const Step0RawDataPreview = ({ data }: { data: UploadedRow[] }) => {
+    if (!data || data.length === 0) {
+        return (
+            <Card>
+                <CardHeader>
+                    <CardTitle>No Data to Preview</CardTitle>
+                    <CardDescription>The uploaded file did not contain any valid data rows.</CardDescription>
+                </CardHeader>
+            </Card>
+        );
+    }
+
+    const columns = Object.keys(data[0]) as (keyof UploadedRow)[];
+
+    return (
+        <Card className="h-full flex flex-col">
+            <CardHeader>
+                <CardTitle>Raw Data Preview</CardTitle>
+                <CardDescription>Review the processed data from your file. If it looks correct, proceed to the summary steps.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex-grow overflow-hidden">
+                <ScrollArea className="h-full w-full">
+                    <Table className="min-w-[3000px]">
+                        <TableHeader className="sticky top-0 bg-background z-10">
+                            <TableRow>
+                                {columns.map(col => <TableHead key={col}>{col}</TableHead>)}
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {data.map((row, index) => (
+                                <TableRow key={index}>
+                                    {columns.map(col => (
+                                        <TableCell key={col} className="whitespace-nowrap">
+                                            {typeof row[col] === 'number' ? formatCurrency(row[col] as number) : String(row[col])}
+                                        </TableCell>
+                                    ))}
+                                </TableRow>
+                            ))}
+                        </TableBody>
+                    </Table>
+                    <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+            </CardContent>
+        </Card>
     );
 };
 
@@ -777,7 +824,7 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
      const handleClose = (open: boolean) => {
         if (!open) {
             onOpenChange(false);
-            setTimeout(() => setWizardStep(1), 300); // Reset step after dialog closes
+            setTimeout(() => setWizardStep(0), 300); // Reset step after dialog closes
         } else {
             onOpenChange(true);
         }
@@ -788,17 +835,25 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
             <DialogContent className="max-w-7xl h-[90vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle>Confirm Raw Data Upload</DialogTitle>
-                    <DialogDescription>Review the transactions in a step-by-step process before saving.</DialogDescription>
+                    <DialogDescription>
+                        {wizardStep === 0
+                            ? "Review the raw data extracted from your file. Click 'Proceed to Summary' to continue."
+                            : "Review the transactions in a step-by-step process before saving."}
+                    </DialogDescription>
                 </DialogHeader>
 
-                <div className="space-y-2 max-w-sm">
-                    <Label htmlFor="upload-date">Date for All Transactions</Label>
-                    <Input id="upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
-                </div>
+                 {wizardStep > 0 && (
+                    <>
+                        <div className="space-y-2 max-w-sm">
+                            <Label htmlFor="upload-date">Date for All Transactions</Label>
+                            <Input id="upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
+                        </div>
+                        <WizardStepper currentStep={wizardStep} />
+                    </>
+                )}
                 
-                <WizardStepper currentStep={wizardStep} />
-
                 <div className="flex-grow overflow-hidden relative">
+                    {wizardStep === 0 && <Step0RawDataPreview data={uploadedData} />}
                     {wizardStep === 1 && <Step1Savings data={uploadedData} />}
                     {wizardStep === 2 && <Step2Loans data={uploadedData} />}
                     {wizardStep === 3 && <Step3Others data={uploadedData} />}
@@ -808,16 +863,21 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
                 <DialogFooter className="mt-auto pt-4 border-t !justify-between">
                      <Button variant="outline" onClick={() => handleClose(false)}>Cancel</Button>
                     <div className="flex gap-2">
-                        {wizardStep > 1 && (
+                        {wizardStep > 0 && (
                             <Button variant="secondary" onClick={() => setWizardStep((s: number) => s - 1)}>
                                 Previous
                             </Button>
                         )}
-                        {wizardStep < 4 ? (
-                            <Button onClick={() => setWizardStep((s: number) => s + 1)}>
-                                Next
-                            </Button>
-                        ) : (
+                        
+                        {wizardStep === 0 && (
+                            <Button onClick={() => setWizardStep(1)}>Proceed to Summary</Button>
+                        )}
+                        
+                        {wizardStep > 0 && wizardStep < 4 && (
+                            <Button onClick={() => setWizardStep((s: number) => s + 1)}>Next</Button>
+                        )}
+
+                        {wizardStep === 4 && (
                             <Button onClick={handleConfirmUpload} className="bg-green-600 hover:bg-green-700">
                                 Confirm & Save All
                             </Button>
