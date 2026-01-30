@@ -236,12 +236,20 @@ export default function RawDataEntryPage() {
 
                 const validData = allTransactions.filter(row => {
                     const normalizedSamityId = String(row['Samity ID']).trim().toLowerCase();
-                    // If samity ID is blank, it's valid for preview, but won't be saved later.
-                    if (!normalizedSamityId) return true; 
+                    // A row is valid for PREVIEW if it has financial data, even if the group ID is blank.
+                    // It won't be saved later, but the user can see it.
+                    if (!normalizedSamityId) {
+                        return true; 
+                    }
                     return userVisibleGroupCodes.has(normalizedSamityId);
                 });
+                
+                const allRowsHaveMatchingGroup = allTransactions.every(row => {
+                     const normalizedSamityId = String(row['Samity ID']).trim().toLowerCase();
+                     return !normalizedSamityId || userVisibleGroupCodes.has(normalizedSamityId);
+                });
 
-                if (allTransactions.length > 0 && validData.length === 0) {
+                if (allTransactions.length > 0 && !allRowsHaveMatchingGroup && validData.length === 0) {
                      toast({
                         variant: "destructive",
                         title: "No Matching Data",
@@ -251,7 +259,7 @@ export default function RawDataEntryPage() {
                     return;
                 }
 
-                if (validData.length === 0) {
+                if (allTransactions.length === 0) {
                     toast({ 
                         variant: "destructive", 
                         title: "No Valid Data", 
@@ -260,7 +268,7 @@ export default function RawDataEntryPage() {
                     return;
                 }
                 
-                setUploadedData(validData);
+                setUploadedData(allTransactions);
                 setWizardStep(0);
                 setIsConfirmDialogOpen(true);
 
@@ -631,7 +639,7 @@ const Step0RawDataPreview = ({ data }: { data: UploadedRow[] }) => {
             <CardHeader>
                 <CardTitle>Data Preview - All Transactions</CardTitle>
                 <CardDescription>
-                    All individual transactions read from the file are listed below. Both 'GL' and 'ME' rows should be visible. Subsequent steps will show aggregated summaries.
+                    All individual transactions read from the file are listed below. Rows with blank Samity IDs will be assigned to the group from the row above.
                 </CardDescription>
             </CardHeader>
             <CardContent className="flex-grow overflow-hidden">
@@ -644,7 +652,7 @@ const Step0RawDataPreview = ({ data }: { data: UploadedRow[] }) => {
                         </TableHeader>
                         <TableBody>
                             {data.map((row, index) => (
-                                <TableRow key={index}>
+                                <TableRow key={index} className={cn(!row['Samity ID'] && 'bg-yellow-100 dark:bg-yellow-900/30')}>
                                     {columns.map(col => (
                                         <TableCell key={col} className="whitespace-nowrap">
                                             {typeof row[col] === 'number' && col !== 'Samity ID' && col !== 'Field Worker ID'
@@ -979,5 +987,7 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
     );
 };
 
+
+    
 
     
