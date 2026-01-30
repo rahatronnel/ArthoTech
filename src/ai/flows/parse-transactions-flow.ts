@@ -1,7 +1,7 @@
-
 'use server';
 
 import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/google-genai';
 import { z } from 'zod';
 import { UploadedRowSchema } from '@/ai/schemas';
 
@@ -40,7 +40,7 @@ You MUST return two JSON objects:
 
 Now, process the following PDF: {{media url=pdfDataUri}}`,
   config: {
-    model: 'gemini-1.5-pro-latest'
+    model: googleAI.model('gemini-1.5-pro-latest')
   }
 });
 
