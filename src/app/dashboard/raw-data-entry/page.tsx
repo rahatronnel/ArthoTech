@@ -176,9 +176,11 @@ export default function RawDataEntryPage() {
                 // The first 3 rows are complex headers, so we skip them.
                 const dataRows = rawData.slice(3);
                 
-                const aggregatedDataMap = new Map<string, UploadedRow>();
+                const processedRows: UploadedRow[] = [];
                 let lastFieldWorkerId = '';
                 let lastFieldWorkerName = '';
+                let lastSamityId = '';
+                let lastSamityName = '';
 
                 for (const row of dataRows) {
                     if (!row || row.length === 0 || row.every(cell => cell === null || cell === '')) {
@@ -190,66 +192,75 @@ export default function RawDataEntryPage() {
                         continue;
                     }
 
+                    // Fill down Field Worker info
                     if (row[0] !== null && String(row[0]).trim() !== '') {
                         lastFieldWorkerId = String(row[0]).trim();
-                        lastFieldWorkerName = String(row[1] || '').trim();
                     }
-                    
-                    const samityIdFromExcel = String(row[2] || '').trim();
-                    if (!samityIdFromExcel) {
-                        continue;
+                    if (row[1] !== null && String(row[1]).trim() !== '') {
+                        lastFieldWorkerName = String(row[1]).trim();
                     }
-                    const formattedSamityId = formatGroupCode(samityIdFromExcel);
 
-                    const currentComponent = String(row[4] || '');
+                    // Fill down Samity info
+                    if (row[2] !== null && String(row[2]).trim() !== '') {
+                        lastSamityId = String(row[2]).trim();
+                    }
+                     if (row[3] !== null && String(row[3]).trim() !== '') {
+                        lastSamityName = String(row[3]).trim();
+                    }
                     
-                    const numericData = {
-                        'Savings Collection': Number(row[5]) || 0,
-                        'Interest On Savings': Number(row[6]) || 0,
-                        'Savings Refund': Number(row[7]) || 0,
-                        'Additional Fees Collection': Number(row[8]) || 0,
-                        'Disbursement Amount': Number(row[9]) || 0,
-                        'Regular Recovarable': Number(row[10]) || 0,
-                        'Loan Collection Regular': Number(row[11]) || 0,
-                        'Loan Collection Due': Number(row[12]) || 0,
-                        'Loan Collection Advance': Number(row[13]) || 0,
-                        'Loan Collection Rebate': Number(row[14]) || 0,
-                        'Loan Received (principle)': Number(row[15]) || 0,
-                        'Loan Received (Service Charge)': Number(row[16]) || 0,
-                        'Loan Collection Total': Number(row[17]) || 0,
-                        'Risk fund': Number(row[18]) || 0,
-                        'Processing Fees / Form fees': Number(row[19]) || 0,
-                        'Passbook fees': Number(row[20]) || 0,
-                        'Admission fees': Number(row[21]) || 0,
-                        'Total Collection': Number(row[22]) || 0,
-                    };
+                    const hasFinancialData = row.slice(4).some(cell => cell !== null && cell !== '');
+
+                    if (lastSamityId && hasFinancialData) {
+                         const newRow: UploadedRow = {
+                            'Field Worker ID': lastFieldWorkerId,
+                            'Field Worker Name': lastFieldWorkerName,
+                            'Samity ID': lastSamityId,
+                            'Samity Name': lastSamityName,
+                            'Component': String(row[4] || ''),
+                            'Savings Collection': Number(row[5]) || 0,
+                            'Interest On Savings': Number(row[6]) || 0,
+                            'Savings Refund': Number(row[7]) || 0,
+                            'Additional Fees Collection': Number(row[8]) || 0,
+                            'Disbursement Amount': Number(row[9]) || 0,
+                            'Regular Recovarable': Number(row[10]) || 0,
+                            'Loan Collection Regular': Number(row[11]) || 0,
+                            'Loan Collection Due': Number(row[12]) || 0,
+                            'Loan Collection Advance': Number(row[13]) || 0,
+                            'Loan Collection Rebate': Number(row[14]) || 0,
+                            'Loan Received (principle)': Number(row[15]) || 0,
+                            'Loan Received (Service Charge)': Number(row[16]) || 0,
+                            'Loan Collection Total': Number(row[17]) || 0,
+                            'Risk fund': Number(row[18]) || 0,
+                            'Processing Fees / Form fees': Number(row[19]) || 0,
+                            'Passbook fees': Number(row[20]) || 0,
+                            'Admission fees': Number(row[21]) || 0,
+                            'Total Collection': Number(row[22]) || 0,
+                        };
+                        processedRows.push(newRow);
+                    }
+                }
+                
+                // Now aggregate the processed rows
+                const aggregatedDataMap = new Map<string, UploadedRow>();
+                for (const row of processedRows) {
+                    const formattedSamityId = formatGroupCode(row['Samity ID']);
                     
                     if (aggregatedDataMap.has(formattedSamityId)) {
                         const existingEntry = aggregatedDataMap.get(formattedSamityId)!;
-
-                        // Aggregate numerical values
-                        for (const key in numericData) {
-                            (existingEntry as any)[key] += (numericData as any)[key];
+                        for (const key in row) {
+                             if (key !== 'Field Worker ID' && key !== 'Field Worker Name' && key !== 'Samity ID' && key !== 'Samity Name' && key !== 'Component' && typeof (row as any)[key] === 'number') {
+                                (existingEntry as any)[key] += (row as any)[key];
+                            }
                         }
-
-                        // Append component if it's new and not already present
+                        const currentComponent = row.Component;
                         if (currentComponent && !existingEntry.Component.split(', ').includes(currentComponent)) {
                             existingEntry.Component += `, ${currentComponent}`;
                         }
                     } else {
-                        // Create a new entry
-                        const newEntry: UploadedRow = {
-                            'Field Worker ID': lastFieldWorkerId,
-                            'Field Worker Name': lastFieldWorkerName,
-                            'Samity ID': formattedSamityId,
-                            'Samity Name': String(row[3] || ''),
-                            'Component': currentComponent,
-                            ...numericData,
-                        };
-                        aggregatedDataMap.set(formattedSamityId, newEntry);
+                        aggregatedDataMap.set(formattedSamityId, { ...row, 'Samity ID': formattedSamityId });
                     }
                 }
-
+                
                 const allProcessedData = Array.from(aggregatedDataMap.values());
 
                 const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => String(g.code).trim().toLowerCase()) || []);
