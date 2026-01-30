@@ -183,50 +183,52 @@ export default function RawDataEntryPage() {
                         continue;
                     }
 
-                    // Stop processing if we hit a summary row
-                    const samityNameCell = String(row[3] || '').trim();
-                    if (samityNameCell.toLowerCase().includes('officer total')) {
-                        break;
+                    // Hint 1: Ignore rows that are likely subtotals or grand totals
+                    const fieldWorkerIdCell = String(row[0] || '').trim().toLowerCase();
+                    const summaryTerms = ['officer total', 'grand total', 'savings grand total'];
+                    if (summaryTerms.some(term => fieldWorkerIdCell.includes(term))) {
+                        continue; // Skip this summary row
+                    }
+
+                    // Hint 2: The 'Component' column MUST have a value. If it's blank, it's a summary row.
+                    const componentCell = String(row[4] || '').trim();
+                    if (componentCell === '') {
+                        continue; // Skip rows without a component.
                     }
                     
-                    // This is the "fill-down" logic for merged cells
+                    // This is the "fill-down" logic for merged cells, which you approved.
                     if (row[0] !== null && String(row[0]).trim() !== '') lastFieldWorkerId = String(row[0]).trim();
                     if (row[1] !== null && String(row[1]).trim() !== '') lastFieldWorkerName = String(row[1]).trim();
                     if (row[2] !== null && String(row[2]).trim() !== '') lastSamityId = String(row[2]).trim();
                     if (row[3] !== null && String(row[3]).trim() !== '') lastSamityName = String(row[3]).trim();
                     
-                    // A row is only a valid transaction if it has a component.
-                    // This is to avoid picking up sub-total and grand-total rows.
-                    const hasComponent = row[4] !== null && String(row[4]).trim() !== '';
-
-                    if (hasComponent) {
-                         const newTransaction: UploadedRow = {
-                            'Field Worker ID': lastFieldWorkerId,
-                            'Field Worker Name': lastFieldWorkerName,
-                            'Samity ID': formatGroupCode(lastSamityId),
-                            'Samity Name': lastSamityName,
-                            'Component': String(row[4] || ''),
-                            'Savings Collection': Number(row[5]) || 0,
-                            'Interest On Savings': Number(row[6]) || 0,
-                            'Savings Refund': Number(row[7]) || 0,
-                            'Additional Fees Collection': Number(row[8]) || 0,
-                            'Disbursement Amount': Number(row[9]) || 0,
-                            'Regular Recovarable': Number(row[10]) || 0,
-                            'Loan Collection Regular': Number(row[11]) || 0,
-                            'Loan Collection Due': Number(row[12]) || 0,
-                            'Loan Collection Advance': Number(row[13]) || 0,
-                            'Loan Collection Rebate': Number(row[14]) || 0,
-                            'Loan Received (principle)': Number(row[15]) || 0,
-                            'Loan Received (Service Charge)': Number(row[16]) || 0,
-                            'Loan Collection Total': Number(row[17]) || 0,
-                            'Risk fund': Number(row[18]) || 0,
-                            'Processing Fees / Form fees': Number(row[19]) || 0,
-                            'Passbook fees': Number(row[20]) || 0,
-                            'Admission fees': Number(row[21]) || 0,
-                            'Total Collection': Number(row[22]) || 0,
-                        };
-                        allTransactions.push(newTransaction);
-                    }
+                    // If we reach here, it's a valid transaction row.
+                    const newTransaction: UploadedRow = {
+                        'Field Worker ID': lastFieldWorkerId,
+                        'Field Worker Name': lastFieldWorkerName,
+                        'Samity ID': formatGroupCode(lastSamityId),
+                        'Samity Name': lastSamityName,
+                        'Component': componentCell,
+                        'Savings Collection': Number(row[5]) || 0,
+                        'Interest On Savings': Number(row[6]) || 0,
+                        'Savings Refund': Number(row[7]) || 0,
+                        'Additional Fees Collection': Number(row[8]) || 0,
+                        'Disbursement Amount': Number(row[9]) || 0,
+                        'Regular Recovarable': Number(row[10]) || 0,
+                        'Loan Collection Regular': Number(row[11]) || 0,
+                        'Loan Collection Due': Number(row[12]) || 0,
+                        'Loan Collection Advance': Number(row[13]) || 0,
+                        'Loan Collection Rebate': Number(row[14]) || 0,
+                        'Loan Received (principle)': Number(row[15]) || 0,
+                        'Loan Received (Service Charge)': Number(row[16]) || 0,
+                        'Loan Collection Total': Number(row[17]) || 0,
+                        'Risk fund': Number(row[18]) || 0,
+                        'Processing Fees / Form fees': Number(row[19]) || 0,
+                        'Passbook fees': Number(row[20]) || 0,
+                        'Admission fees': Number(row[21]) || 0,
+                        'Total Collection': Number(row[22]) || 0,
+                    };
+                    allTransactions.push(newTransaction);
                 }
                 
                 if (allTransactions.length === 0) {
@@ -925,12 +927,3 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
         </Dialog>
     );
 };
-
-
-    
-
-    
-
-    
-
-    
