@@ -232,38 +232,11 @@ export default function RawDataEntryPage() {
                     }
                 }
                 
-                const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => String(g.code).trim().toLowerCase()) || []);
-
-                const validData = allTransactions.filter(row => {
-                    const normalizedSamityId = String(row['Samity ID']).trim().toLowerCase();
-                    // A row is valid for PREVIEW if it has financial data, even if the group ID is blank.
-                    // It won't be saved later, but the user can see it.
-                    if (!normalizedSamityId) {
-                        return true; 
-                    }
-                    return userVisibleGroupCodes.has(normalizedSamityId);
-                });
-                
-                const allRowsHaveMatchingGroup = allTransactions.every(row => {
-                     const normalizedSamityId = String(row['Samity ID']).trim().toLowerCase();
-                     return !normalizedSamityId || userVisibleGroupCodes.has(normalizedSamityId);
-                });
-
-                if (allTransactions.length > 0 && !allRowsHaveMatchingGroup && validData.length === 0) {
-                     toast({
-                        variant: "destructive",
-                        title: "No Matching Data",
-                        description: `The file contains data, but none of the Samity IDs match your assigned groups.`,
-                        duration: 9000,
-                    });
-                    return;
-                }
-
                 if (allTransactions.length === 0) {
                     toast({ 
                         variant: "destructive", 
                         title: "No Valid Data", 
-                        description: "No processable data found in the file." 
+                        description: "No processable transaction rows found in the file. Please ensure some rows have a 'Component' value." 
                     });
                     return;
                 }
@@ -1007,6 +980,8 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
     );
 };
 
+
+    
 
     
 
