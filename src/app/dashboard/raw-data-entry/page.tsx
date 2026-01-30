@@ -171,7 +171,7 @@ export default function RawDataEntryPage() {
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
                 
-                const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
+                const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                 
                 const dataRows = rawData.slice(3);
                 
@@ -186,19 +186,23 @@ export default function RawDataEntryPage() {
                         continue;
                     }
 
+                    // Stop processing if we hit a summary row
                     const samityNameCell = String(row[3] || '').trim();
                     if (samityNameCell.toLowerCase().includes('officer total')) {
-                        continue;
+                        break;
                     }
                     
+                    // This is the "fill-down" logic for merged cells
                     if (row[0] !== null && String(row[0]).trim() !== '') lastFieldWorkerId = String(row[0]).trim();
                     if (row[1] !== null && String(row[1]).trim() !== '') lastFieldWorkerName = String(row[1]).trim();
                     if (row[2] !== null && String(row[2]).trim() !== '') lastSamityId = String(row[2]).trim();
                     if (row[3] !== null && String(row[3]).trim() !== '') lastSamityName = String(row[3]).trim();
                     
+                    // A row is considered a transaction if it has a component or any financial data
                     const hasFinancialData = row.slice(4).some(cell => cell !== null && cell !== '' && !isNaN(Number(cell)) && Number(cell) !== 0);
+                    const hasComponent = row[4] !== null && String(row[4]).trim() !== '';
 
-                    if (lastSamityId && hasFinancialData) {
+                    if (lastSamityId && (hasFinancialData || hasComponent)) {
                          const newTransaction: UploadedRow = {
                             'Field Worker ID': lastFieldWorkerId,
                             'Field Worker Name': lastFieldWorkerName,
@@ -278,6 +282,7 @@ export default function RawDataEntryPage() {
 
                 if (!parsedData || parsedData.length === 0) {
                     toast({ variant: 'destructive', title: 'PDF Parsing Failed', description: 'The AI could not extract any valid data from the PDF. Please check the file format or try the Excel template.' });
+                    setIsParsing(false);
                     return;
                 }
                 
@@ -293,6 +298,7 @@ export default function RawDataEntryPage() {
                         description: "The AI extracted data, but none of it matches your assigned groups.",
                         duration: 7000,
                     });
+                    setIsParsing(false);
                     return;
                 }
                 
@@ -618,11 +624,41 @@ const Step0RawDataPreview = ({ data }: { data: UploadedRow[] }) => {
 
     const columns = Object.keys(data[0]) as (keyof UploadedRow)[];
 
+    // Group rows by Samity ID
+    const groupedData = data.reduce((acc, row) => {
+        const key = row['Samity ID'];
+        if (!acc[key]) {
+            acc[key] = { ...row, 'Component': [row.Component] };
+             Object.keys(row).forEach(colKey => {
+                const typedKey = colKey as keyof UploadedRow;
+                if (typeof row[typedKey] === 'number') {
+                    acc[key][typedKey] = row[typedKey];
+                }
+            });
+        } else {
+            acc[key].Component.push(row.Component);
+            Object.keys(row).forEach(colKey => {
+                 const typedKey = colKey as keyof UploadedRow;
+                if (typeof row[typedKey] === 'number' && typedKey !== 'Samity ID') {
+                    (acc[key][typedKey] as number) += row[typedKey];
+                }
+            });
+        }
+        return acc;
+    }, {} as Record<string, UploadedRow & { Component: string[] }>);
+
+
+    const aggregatedRows = Object.values(groupedData).map(group => ({
+        ...group,
+        'Component': group.Component.join(', ')
+    }));
+
+
     return (
         <Card className="h-full flex flex-col">
             <CardHeader>
-                <CardTitle>Raw Data Preview</CardTitle>
-                <CardDescription>Review the processed data from your file. If it looks correct, proceed to the summary steps.</CardDescription>
+                <CardTitle>Aggregated Data Preview</CardTitle>
+                <CardDescription>Transactions have been grouped by Samity. Review the totals before proceeding.</CardDescription>
             </CardHeader>
             <CardContent className="flex-grow overflow-hidden">
                 <ScrollArea className="h-full w-full">
@@ -633,11 +669,11 @@ const Step0RawDataPreview = ({ data }: { data: UploadedRow[] }) => {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {data.map((row, index) => (
+                            {aggregatedRows.map((row, index) => (
                                 <TableRow key={index}>
                                     {columns.map(col => (
                                         <TableCell key={col} className="whitespace-nowrap">
-                                            {typeof row[col] === 'number' ? formatCurrency(row[col] as number) : String(row[col])}
+                                            {typeof row[col] === 'number' && col !== 'Samity ID' ? formatCurrency(row[col] as number) : String(row[col])}
                                         </TableCell>
                                     ))}
                                 </TableRow>
@@ -966,3 +1002,5 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
         </Dialog>
     );
 };
+
+    

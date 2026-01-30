@@ -35,8 +35,8 @@ If you see a Samity with two component rows like this:
 - Samity ID: 1.0026, Component: GL, Savings Collection: 330
 - (blank),       Component: ME, Savings Collection: 100
 You MUST return two JSON objects:
-- One for GL with Savings Collection 330.
-- One for ME with Savings Collection 100.
+- One for GL with all its data.
+- One for ME with all its data, ensuring you copy the Samity ID and Name from the row above.
 
 Now, process the following PDF: {{media url=pdfDataUri}}`,
   config: {
@@ -58,3 +58,5 @@ const parseTransactionsFlow = ai.defineFlow(
     return output;
   }
 );
+
+    
