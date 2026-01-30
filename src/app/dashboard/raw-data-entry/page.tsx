@@ -53,6 +53,22 @@ type UploadedRow = {
   'Total Collection': number;
 };
 
+const formatGroupCode = (rawCode: string | number): string => {
+    const codeStr = String(rawCode).trim();
+    if (!codeStr.includes('.')) return codeStr; 
+
+    const parts = codeStr.split('.');
+    if (parts.length !== 2) return codeStr;
+
+    const beforeDot = parts[0];
+    const afterDot = parts[1];
+
+    const paddedBefore = beforeDot.padStart(3, '0');
+    const paddedAfter = afterDot.padEnd(4, '0');
+
+    return `${paddedBefore}.${paddedAfter}`;
+};
+
 
 export default function RawDataEntryPage() {
     const { toast } = useToast();
@@ -178,14 +194,15 @@ export default function RawDataEntryPage() {
                         lastFieldWorkerName = String(row[1] || '').trim();
                     }
                     
-                    if (!row[2] || String(row[2]).trim() === '') {
+                    const samityIdFromExcel = String(row[2] || '').trim();
+                    if (!samityIdFromExcel) {
                         continue;
                     }
 
                     const processedRow: UploadedRow = {
                         'Field Worker ID': lastFieldWorkerId,
                         'Field Worker Name': lastFieldWorkerName,
-                        'Samity ID': String(row[2] || '').trim().toLowerCase(),
+                        'Samity ID': formatGroupCode(samityIdFromExcel),
                         'Samity Name': String(row[3] || ''),
                         'Component': String(row[4] || ''),
                         'Savings Collection': Number(row[5]) || 0,
@@ -264,11 +281,16 @@ export default function RawDataEntryPage() {
                     toast({ variant: 'destructive', title: 'PDF Parsing Failed', description: 'The AI could not extract any valid data from the PDF. Please check the file format or try the Excel template.' });
                     return;
                 }
+
+                const formattedParsedData = parsedData.map(row => ({
+                    ...row,
+                    'Samity ID': formatGroupCode(row['Samity ID'])
+                }));
                 
                 const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => String(g.code).trim().toLowerCase()) || []);
-                const validData = parsedData.filter(row => userVisibleGroupCodes.has(String(row['Samity ID']).trim().toLowerCase()));
+                const validData = formattedParsedData.filter(row => userVisibleGroupCodes.has(String(row['Samity ID']).trim().toLowerCase()));
 
-                if (parsedData.length > 0 && validData.length === 0) {
+                if (formattedParsedData.length > 0 && validData.length === 0) {
                      toast({
                         variant: "destructive",
                         title: "No Matching Data in PDF",

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -37,6 +38,22 @@ type UploadedRow = {
   MembersAdded: number;
   MembersDropped: number;
   Notes: string;
+};
+
+const formatGroupCode = (rawCode: string | number): string => {
+    const codeStr = String(rawCode).trim();
+    if (!codeStr.includes('.')) return codeStr; 
+
+    const parts = codeStr.split('.');
+    if (parts.length !== 2) return codeStr;
+
+    const beforeDot = parts[0];
+    const afterDot = parts[1];
+
+    const paddedBefore = beforeDot.padStart(3, '0');
+    const paddedAfter = afterDot.padEnd(4, '0');
+
+    return `${paddedBefore}.${paddedAfter}`;
 };
 
 export default function MembersPage() {
@@ -137,18 +154,20 @@ export default function MembersPage() {
 
         const validData: UploadedRow[] = jsonData
           .filter(row => row.GroupID && (Number(row.MembersAdded) > 0 || Number(row.MembersDropped) > 0))
-          .map(row => ({
-              ...row,
-              GroupID: String(row.GroupID).trim().toLowerCase(),
-          }))
-          .filter(row => groupCodeMap.has(row.GroupID))
-          .map(row => ({
-              GroupID: groupCodeMap.get(row.GroupID)!,
-              GroupName: String(row.GroupName || userVisibleGroups.find(g => g.id === groupCodeMap.get(row.GroupID)!)?.name || 'Unknown'),
-              MembersAdded: Number(row.MembersAdded) || 0,
-              MembersDropped: Number(row.MembersDropped) || 0,
-              Notes: String(row.Notes || ''),
-          }));
+          .map(row => {
+              const formattedCode = formatGroupCode(row.GroupID).toLowerCase();
+              if (groupCodeMap.has(formattedCode)) {
+                  return {
+                      GroupID: groupCodeMap.get(formattedCode)!,
+                      GroupName: String(row.GroupName || userVisibleGroups.find(g => g.id === groupCodeMap.get(formattedCode)!)?.name || 'Unknown'),
+                      MembersAdded: Number(row.MembersAdded) || 0,
+                      MembersDropped: Number(row.MembersDropped) || 0,
+                      Notes: String(row.Notes || ''),
+                  };
+              }
+              return null;
+          })
+          .filter((row): row is UploadedRow => row !== null);
 
         if (validData.length === 0) {
             toast({ variant: "destructive", title: "Invalid File", description: "The uploaded file contains no valid data to process." });
