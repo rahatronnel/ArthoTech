@@ -175,7 +175,7 @@ export default function RawDataEntryPage() {
 
                 const dataRows = rawData;
                 
-                const allProcessedData: UploadedRow[] = [];
+                const aggregatedDataMap = new Map<string, UploadedRow>();
                 let lastFieldWorkerId = '';
                 let lastFieldWorkerName = '';
 
@@ -198,13 +198,11 @@ export default function RawDataEntryPage() {
                     if (!samityIdFromExcel) {
                         continue;
                     }
+                    const formattedSamityId = formatGroupCode(samityIdFromExcel);
 
-                    const processedRow: UploadedRow = {
-                        'Field Worker ID': lastFieldWorkerId,
-                        'Field Worker Name': lastFieldWorkerName,
-                        'Samity ID': formatGroupCode(samityIdFromExcel),
-                        'Samity Name': String(row[3] || ''),
-                        'Component': String(row[4] || ''),
+                    const currentComponent = String(row[4] || '');
+                    
+                    const numericData = {
                         'Savings Collection': Number(row[5]) || 0,
                         'Interest On Savings': Number(row[6]) || 0,
                         'Savings Refund': Number(row[7]) || 0,
@@ -224,8 +222,34 @@ export default function RawDataEntryPage() {
                         'Admission fees': Number(row[21]) || 0,
                         'Total Collection': Number(row[22]) || 0,
                     };
-                    allProcessedData.push(processedRow);
+                    
+                    if (aggregatedDataMap.has(formattedSamityId)) {
+                        const existingEntry = aggregatedDataMap.get(formattedSamityId)!;
+
+                        // Aggregate numerical values
+                        for (const key in numericData) {
+                            (existingEntry as any)[key] += (numericData as any)[key];
+                        }
+
+                        // Append component if it's new and not already present
+                        if (currentComponent && !existingEntry.Component.split(', ').includes(currentComponent)) {
+                            existingEntry.Component += `, ${currentComponent}`;
+                        }
+                    } else {
+                        // Create a new entry
+                        const newEntry: UploadedRow = {
+                            'Field Worker ID': lastFieldWorkerId,
+                            'Field Worker Name': lastFieldWorkerName,
+                            'Samity ID': formattedSamityId,
+                            'Samity Name': String(row[3] || ''),
+                            'Component': currentComponent,
+                            ...numericData,
+                        };
+                        aggregatedDataMap.set(formattedSamityId, newEntry);
+                    }
                 }
+
+                const allProcessedData = Array.from(aggregatedDataMap.values());
 
                 const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => String(g.code).trim().toLowerCase()) || []);
 
@@ -282,15 +306,65 @@ export default function RawDataEntryPage() {
                     return;
                 }
 
-                const formattedParsedData = parsedData.map(row => ({
-                    ...row,
-                    'Samity ID': formatGroupCode(row['Samity ID'])
-                }));
+                // --- Start Aggregation Logic for PDF Data ---
+                const aggregatedDataMap = new Map<string, UploadedRow>();
+
+                for (const row of parsedData) {
+                    const formattedSamityId = formatGroupCode(row['Samity ID']);
+                    const currentComponent = row.Component || '';
+
+                    // The AI should return numbers, but let's ensure they are numbers.
+                    const numericData = {
+                        'Savings Collection': Number(row['Savings Collection']) || 0,
+                        'Interest On Savings': Number(row['Interest On Savings']) || 0,
+                        'Savings Refund': Number(row['Savings Refund']) || 0,
+                        'Additional Fees Collection': Number(row['Additional Fees Collection']) || 0,
+                        'Disbursement Amount': Number(row['Disbursement Amount']) || 0,
+                        'Regular Recovarable': Number(row['Regular Recovarable']) || 0,
+                        'Loan Collection Regular': Number(row['Loan Collection Regular']) || 0,
+                        'Loan Collection Due': Number(row['Loan Collection Due']) || 0,
+                        'Loan Collection Advance': Number(row['Loan Collection Advance']) || 0,
+                        'Loan Collection Rebate': Number(row['Loan Collection Rebate']) || 0,
+                        'Loan Received (principle)': Number(row['Loan Received (principle)']) || 0,
+                        'Loan Received (Service Charge)': Number(row['Loan Received (Service Charge)']) || 0,
+                        'Loan Collection Total': Number(row['Loan Collection Total']) || 0,
+                        'Risk fund': Number(row['Risk fund']) || 0,
+                        'Processing Fees / Form fees': Number(row['Processing Fees / Form fees']) || 0,
+                        'Passbook fees': Number(row['Passbook fees']) || 0,
+                        'Admission fees': Number(row['Admission fees']) || 0,
+                        'Total Collection': Number(row['Total Collection']) || 0,
+                    };
+
+                    if (aggregatedDataMap.has(formattedSamityId)) {
+                        const existingEntry = aggregatedDataMap.get(formattedSamityId)!;
+
+                        for (const key in numericData) {
+                            (existingEntry as any)[key] += (numericData as any)[key];
+                        }
+                        
+                        if (currentComponent && !existingEntry.Component.split(', ').includes(currentComponent)) {
+                            existingEntry.Component += `, ${currentComponent}`;
+                        }
+                    } else {
+                        const newEntry: UploadedRow = {
+                            'Field Worker ID': row['Field Worker ID'],
+                            'Field Worker Name': row['Field Worker Name'],
+                            'Samity ID': formattedSamityId,
+                            'Samity Name': row['Samity Name'],
+                            'Component': currentComponent,
+                            ...numericData,
+                        };
+                        aggregatedDataMap.set(formattedSamityId, newEntry);
+                    }
+                }
+
+                const allProcessedData = Array.from(aggregatedDataMap.values());
+                // --- End Aggregation Logic ---
                 
                 const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => String(g.code).trim().toLowerCase()) || []);
-                const validData = formattedParsedData.filter(row => userVisibleGroupCodes.has(String(row['Samity ID']).trim().toLowerCase()));
+                const validData = allProcessedData.filter(row => userVisibleGroupCodes.has(String(row['Samity ID']).trim().toLowerCase()));
 
-                if (formattedParsedData.length > 0 && validData.length === 0) {
+                if (allProcessedData.length > 0 && validData.length === 0) {
                      toast({
                         variant: "destructive",
                         title: "No Matching Data in PDF",
