@@ -20,7 +20,7 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
 import { useMember } from '@/context/MemberContext';
-import { collectionGroup, query } from 'firebase/firestore';
+import { collection, collectionGroup, query } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
