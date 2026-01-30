@@ -6,7 +6,7 @@ import { useState, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useAuth } from '@/context/AuthContext';
 import { useOthersData } from '@/context/OthersDataContext';
-import { type Branch, type OtherDataEntry, otherDataTypes as allDataTypes, type Group, type Employee } from '@/lib/data';
+import { type Branch, type OtherDataEntry, type Group, type Employee } from '@/lib/data';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -20,11 +20,11 @@ import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
 import { useMember } from '@/context/MemberContext';
-import { collection, query, where, collectionGroup } from 'firebase/firestore';
-import type { LoanDisbursement, LoanCollection } from '@/lib/data';
+import { collectionGroup, query } from 'firebase/firestore';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
+import { parseTransactions } from '@/ai/flows/parse-transactions-flow';
 
 
 type UploadedRow = {
@@ -67,6 +67,8 @@ export default function RawDataEntryPage() {
     const [uploadedData, setUploadedData] = useState<UploadedRow[]>([]);
     const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
     const [wizardStep, setWizardStep] = useState(0);
+    const [isParsing, setIsParsing] = useState(false);
+
 
     const firestore = useFirestore();
 
@@ -144,15 +146,7 @@ export default function RawDataEntryPage() {
         toast({ title: "Template Downloaded", description: "Please fill out the blank template and upload it." });
     };
 
-    const handleProcessUpload = () => {
-        if (!file) {
-            toast({ variant: "destructive", title: "No file selected", description: "Please select a file to upload." });
-            return;
-        }
-        if (groupsLoading) {
-            toast({ title: "Please wait", description: "Groups are still loading. Try again in a moment." });
-            return;
-        }
+    const processExcel = (excelFile: File) => {
         const reader = new FileReader();
         reader.onload = (e) => {
             try {
@@ -253,7 +247,73 @@ export default function RawDataEntryPage() {
                 toast({ variant: "destructive", title: "Error Reading File", description: "There was a problem processing the file. Please ensure it matches the downloaded template structure." });
             }
         };
-        reader.readAsArrayBuffer(file);
+        reader.readAsArrayBuffer(excelFile);
+    }
+    
+    const processPdf = (pdfFile: File) => {
+        setIsParsing(true);
+        const reader = new FileReader();
+        reader.readAsDataURL(pdfFile);
+        reader.onload = async () => {
+            try {
+                const pdfDataUri = reader.result as string;
+                toast({ title: 'AI Parsing Started', description: 'Please wait while the AI processes your PDF file. This may take a moment.' });
+                const parsedData = await parseTransactions({ pdfDataUri });
+
+                if (!parsedData || parsedData.length === 0) {
+                    toast({ variant: 'destructive', title: 'PDF Parsing Failed', description: 'The AI could not extract any valid data from the PDF. Please check the file format or try the Excel template.' });
+                    return;
+                }
+                
+                const userVisibleGroupCodes = new Set(userVisibleGroups?.map(g => String(g.code).trim().toLowerCase()) || []);
+                const validData = parsedData.filter(row => userVisibleGroupCodes.has(String(row['Samity ID']).trim().toLowerCase()));
+
+                if (parsedData.length > 0 && validData.length === 0) {
+                     toast({
+                        variant: "destructive",
+                        title: "No Matching Data in PDF",
+                        description: "The AI extracted data, but none of it matches your assigned groups.",
+                        duration: 7000,
+                    });
+                    return;
+                }
+                
+                setUploadedData(validData);
+                setWizardStep(0);
+                setIsConfirmDialogOpen(true);
+
+            } catch (error) {
+                console.error("PDF Parsing error:", error);
+                toast({ variant: "destructive", title: "PDF Parsing Error", description: "An unexpected error occurred while parsing the PDF." });
+            } finally {
+                setIsParsing(false);
+            }
+        };
+        reader.onerror = () => {
+            setIsParsing(false);
+            toast({ variant: 'destructive', title: 'File Read Error', description: 'Could not read the selected PDF file.' });
+        };
+    };
+
+    const handleProcessUpload = () => {
+        if (!file) {
+            toast({ variant: "destructive", title: "No file selected", description: "Please select a file to upload." });
+            return;
+        }
+        if (isLoading) {
+            toast({ title: "Please wait", description: "Groups are still loading. Try again in a moment." });
+            return;
+        }
+        
+        const fileExtension = file.name.split('.').pop()?.toLowerCase();
+
+        if (fileExtension === 'pdf') {
+            processPdf(file);
+        } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
+            processExcel(file);
+        } else {
+            toast({ variant: 'destructive', title: 'Unsupported File Type', description: 'Please upload an Excel (.xlsx, .xls) or PDF file.' });
+        }
     };
 
     const handleConfirmUpload = () => {
@@ -377,11 +437,11 @@ export default function RawDataEntryPage() {
                         <div className="flex flex-col justify-between space-y-4 rounded-lg border bg-background p-6">
                             <div>
                                 <h3 className="text-lg font-semibold flex items-center gap-2"><Upload className="h-5 w-5 text-primary" />Upload Report</h3>
-                                <p className="text-sm text-muted-foreground mt-1">Select the completed Excel file from your computer.</p>
+                                <p className="text-sm text-muted-foreground mt-1">Select the completed Excel or PDF file from your computer.</p>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="raw-data-upload" className="sr-only">Upload File</Label>
-                                <Input id="raw-data-upload" type="file" accept=".xlsx, .xls" onChange={handleFileChange} className="file:text-foreground" />
+                                <Input id="raw-data-upload" type="file" accept=".xlsx, .xls, .pdf" onChange={handleFileChange} className="file:text-foreground" />
                             </div>
                         </div>
                         <div className="flex flex-col justify-between space-y-4 rounded-lg border bg-muted/20 p-6">
@@ -395,9 +455,9 @@ export default function RawDataEntryPage() {
                         </div>
                     </div>
                     <div className="mt-6">
-                        <Button onClick={handleProcessUpload} className="w-full" size="lg" disabled={!file || isLoading}>
+                        <Button onClick={handleProcessUpload} className="w-full" size="lg" disabled={!file || isLoading || isParsing}>
                             <Upload className="mr-2 h-5 w-5" />
-                            {isLoading ? 'Processing File...' : 'Upload and Preview Transactions'}
+                            {isParsing ? 'AI is Parsing PDF...' : isLoading ? 'Loading Data...' : 'Upload and Preview Transactions'}
                         </Button>
                     </div>
                 </CardContent>
