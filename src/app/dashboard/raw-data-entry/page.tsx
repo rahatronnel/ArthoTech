@@ -579,8 +579,9 @@ const WizardStepper = ({ currentStep }: { currentStep: number }) => {
     const steps = [
         { name: 'Savings', icon: Wallet },
         { name: 'Loans & OTR', icon: Landmark },
-        { name: 'Fees & Admissions', icon: Users },
         { name: 'Officer Summary', icon: UserCheck },
+        { name: 'Other Fees', icon: Wallet },
+        { name: 'Member Changes', icon: Users },
     ];
     return (
         <div className="flex items-center justify-between w-full my-4 px-4 md:px-8">
@@ -817,61 +818,8 @@ const Step2Loans = ({ data }: { data: UploadedRow[] }) => {
     );
 };
 
-// Step 3: Other Collections & Admissions
-const Step3Others = ({ data }: { data: UploadedRow[] }) => {
-    const totals = useMemo(() => {
-        return data.reduce((acc, row) => {
-            acc.admission += row['Admission fees'];
-            acc.members += Math.floor(row['Admission fees'] / 10);
-            acc.passbook += row['Passbook fees'];
-            acc.processing += row['Processing Fees / Form fees'];
-            acc.risk += row['Risk fund'];
-            return acc;
-        }, { admission: 0, members: 0, passbook: 0, processing: 0, risk: 0 });
-    }, [data]);
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Step 3: Fees & Member Admissions Summary</CardTitle>
-                <CardDescription>Confirm total other fee collections and the total number of new members to be admitted.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-3">
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardDescription>Total Members Admitted</CardDescription>
-                        <CardTitle className="text-3xl text-green-600">{totals.members}</CardTitle>
-                    </CardHeader>
-                     <CardContent>
-                        <p className="text-sm text-muted-foreground">From {formatCurrency(totals.admission)} in Admission Fees</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardDescription>Total Passbook Fees</CardDescription>
-                        <CardTitle className="text-3xl">{formatCurrency(totals.passbook)}</CardTitle>
-                    </CardHeader>
-                </Card>
-                <Card>
-                     <CardHeader className="pb-2">
-                        <CardDescription>Total Processing Fees</CardDescription>
-                        <CardTitle className="text-3xl">{formatCurrency(totals.processing)}</CardTitle>
-                    </CardHeader>
-                </Card>
-                 <Card>
-                     <CardHeader className="pb-2">
-                        <CardDescription>Total Risk Fund</CardDescription>
-                        <CardTitle className="text-3xl">{formatCurrency(totals.risk)}</CardTitle>
-                    </CardHeader>
-                </Card>
-            </CardContent>
-        </Card>
-    );
-};
-
-
-// Step 4: Summary
-const Step4Summary = ({ data, groupsData, employeesData }: { data: UploadedRow[], groupsData: GroupData[] | null, employeesData: Employee[] | null }) => {
+// Step 3: Officer Summary
+const Step3OfficerSummary = ({ data, groupsData, employeesData }: { data: UploadedRow[], groupsData: GroupData[] | null, employeesData: Employee[] | null }) => {
     const summaryData = useMemo(() => {
         if (!groupsData || !employeesData) return [];
 
@@ -903,7 +851,7 @@ const Step4Summary = ({ data, groupsData, employeesData }: { data: UploadedRow[]
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Step 4: Field Officer Summary</CardTitle>
+                <CardTitle>Step 3: Field Officer Summary</CardTitle>
                 <CardDescription>Final review of total collections per field officer, based on group assignments.</CardDescription>
             </CardHeader>
             <CardContent>
@@ -931,6 +879,93 @@ const Step4Summary = ({ data, groupsData, employeesData }: { data: UploadedRow[]
                         </TableFooter>
                     </Table>
                 </ScrollArea>
+            </CardContent>
+        </Card>
+    );
+};
+
+// Step 4: Other Fee Collections
+const Step4Fees = ({ data }: { data: UploadedRow[] }) => {
+    const totals = useMemo(() => {
+        return data.reduce((acc, row) => {
+            acc.admission += row['Admission fees'];
+            acc.passbook += row['Passbook fees'];
+            acc.processing += row['Processing Fees / Form fees'];
+            acc.risk += row['Risk fund'];
+            return acc;
+        }, { admission: 0, passbook: 0, processing: 0, risk: 0 });
+    }, [data]);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Step 4: Other Fee Collections</CardTitle>
+                <CardDescription>Confirm total collections for miscellaneous fees.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                <Card>
+                     <CardHeader className="pb-2">
+                        <CardDescription>Total Admission Fees</CardDescription>
+                        <CardTitle className="text-3xl">{formatCurrency(totals.admission)}</CardTitle>
+                    </CardHeader>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardDescription>Total Passbook Fees</CardDescription>
+                        <CardTitle className="text-3xl">{formatCurrency(totals.passbook)}</CardTitle>
+                    </CardHeader>
+                </Card>
+                <Card>
+                     <CardHeader className="pb-2">
+                        <CardDescription>Total Processing Fees</CardDescription>
+                        <CardTitle className="text-3xl">{formatCurrency(totals.processing)}</CardTitle>
+                    </CardHeader>
+                </Card>
+                 <Card>
+                     <CardHeader className="pb-2">
+                        <CardDescription>Total Risk Fund</CardDescription>
+                        <CardTitle className="text-3xl">{formatCurrency(totals.risk)}</CardTitle>
+                    </CardHeader>
+                </Card>
+            </CardContent>
+        </Card>
+    );
+};
+
+// Step 5: Member Changes
+const Step5MemberChanges = ({ data }: { data: UploadedRow[] }) => {
+    const totals = useMemo(() => {
+        return data.reduce((acc, row) => {
+            acc.members += Math.floor(row['Admission fees'] / 10);
+            return acc;
+        }, { members: 0 });
+    }, [data]);
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Step 5: Member Changes & Final Confirmation</CardTitle>
+                <CardDescription>Review member changes and confirm the upload to save all transactions.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4 md:grid-cols-2">
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardDescription>Total Members Admitted</CardDescription>
+                        <CardTitle className="text-3xl text-green-600">+{totals.members}</CardTitle>
+                    </CardHeader>
+                     <CardContent>
+                        <p className="text-sm text-muted-foreground">Calculated from Admission Fees.</p>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardDescription>Total Members Dropped</CardDescription>
+                        <CardTitle className="text-3xl text-red-600">-0</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="text-sm text-muted-foreground">This upload does not handle member dropouts.</p>
+                    </CardContent>
+                </Card>
             </CardContent>
         </Card>
     );
@@ -973,8 +1008,9 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
                     {wizardStep === 0 && <Step0RawDataPreview data={uploadedData} />}
                     {wizardStep === 1 && <Step1Savings data={uploadedData} />}
                     {wizardStep === 2 && <Step2Loans data={uploadedData} />}
-                    {wizardStep === 3 && <Step3Others data={uploadedData} />}
-                    {wizardStep === 4 && <Step4Summary data={uploadedData} groupsData={groupsData} employeesData={employeesData} />}
+                    {wizardStep === 3 && <Step3OfficerSummary data={uploadedData} groupsData={groupsData} employeesData={employeesData} />}
+                    {wizardStep === 4 && <Step4Fees data={uploadedData} />}
+                    {wizardStep === 5 && <Step5MemberChanges data={uploadedData} />}
                 </div>
 
                 <DialogFooter className="mt-auto pt-4 border-t !justify-between">
@@ -990,11 +1026,11 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
                             <Button onClick={() => setWizardStep(1)}>Proceed to Summary</Button>
                         )}
                         
-                        {wizardStep > 0 && wizardStep < 4 && (
+                        {wizardStep > 0 && wizardStep < 5 && (
                             <Button onClick={() => setWizardStep((s: number) => s + 1)}>Next</Button>
                         )}
 
-                        {wizardStep === 4 && (
+                        {wizardStep === 5 && (
                             <Button onClick={handleConfirmUpload} className="bg-green-600 hover:bg-green-700">
                                 Confirm & Save All
                             </Button>
