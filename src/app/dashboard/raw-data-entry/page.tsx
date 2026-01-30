@@ -270,7 +270,7 @@ export default function RawDataEntryPage() {
         reader.readAsArrayBuffer(excelFile);
     }
     
-    const processPdf = (pdfFile: File) => {
+    const processPdf = async (pdfFile: File) => {
         setIsParsing(true);
         const reader = new FileReader();
         reader.readAsDataURL(pdfFile);
@@ -624,41 +624,13 @@ const Step0RawDataPreview = ({ data }: { data: UploadedRow[] }) => {
 
     const columns = Object.keys(data[0]) as (keyof UploadedRow)[];
 
-    // Group rows by Samity ID
-    const groupedData = data.reduce((acc, row) => {
-        const key = row['Samity ID'];
-        if (!acc[key]) {
-            acc[key] = { ...row, 'Component': [row.Component] };
-             Object.keys(row).forEach(colKey => {
-                const typedKey = colKey as keyof UploadedRow;
-                if (typeof row[typedKey] === 'number') {
-                    acc[key][typedKey] = row[typedKey];
-                }
-            });
-        } else {
-            acc[key].Component.push(row.Component);
-            Object.keys(row).forEach(colKey => {
-                 const typedKey = colKey as keyof UploadedRow;
-                if (typeof row[typedKey] === 'number' && typedKey !== 'Samity ID') {
-                    (acc[key][typedKey] as number) += row[typedKey];
-                }
-            });
-        }
-        return acc;
-    }, {} as Record<string, UploadedRow & { Component: string[] }>);
-
-
-    const aggregatedRows = Object.values(groupedData).map(group => ({
-        ...group,
-        'Component': group.Component.join(', ')
-    }));
-
-
     return (
         <Card className="h-full flex flex-col">
             <CardHeader>
-                <CardTitle>Aggregated Data Preview</CardTitle>
-                <CardDescription>Transactions have been grouped by Samity. Review the totals before proceeding.</CardDescription>
+                <CardTitle>Data Preview - All Transactions</CardTitle>
+                <CardDescription>
+                    All individual transactions read from the file are listed below. Both 'GL' and 'ME' rows should be visible. Subsequent steps will show aggregated summaries.
+                </CardDescription>
             </CardHeader>
             <CardContent className="flex-grow overflow-hidden">
                 <ScrollArea className="h-full w-full">
@@ -669,11 +641,13 @@ const Step0RawDataPreview = ({ data }: { data: UploadedRow[] }) => {
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {aggregatedRows.map((row, index) => (
+                            {data.map((row, index) => (
                                 <TableRow key={index}>
                                     {columns.map(col => (
                                         <TableCell key={col} className="whitespace-nowrap">
-                                            {typeof row[col] === 'number' && col !== 'Samity ID' ? formatCurrency(row[col] as number) : String(row[col])}
+                                            {typeof row[col] === 'number' && col !== 'Samity ID' && col !== 'Field Worker ID'
+                                                ? formatCurrency(row[col] as number)
+                                                : String(row[col])}
                                         </TableCell>
                                     ))}
                                 </TableRow>
@@ -1003,4 +977,3 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
     );
 };
 
-    
