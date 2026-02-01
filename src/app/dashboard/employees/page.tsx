@@ -21,7 +21,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 
 // --- Constants and Types ---
 const ROLES: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office', 'Super Admin'];
@@ -359,6 +359,7 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<Employee['role'] | ''>('');
     const [assignment, setAssignment] = useState('');
+    const auth = getAuth();
 
     useEffect(() => {
         if (isOpen) {
@@ -372,6 +373,19 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
         }
     }, [employee, isOpen]);
 
+    const handlePasswordReset = async () => {
+        if (!employee || !employee.email) {
+            toast({ variant: "destructive", title: "Cannot reset password", description: "Employee email not found." });
+            return;
+        }
+        try {
+            await sendPasswordResetEmail(auth, employee.email);
+            toast({ title: "Password Reset Email Sent", description: `An email has been sent to ${employee.email}.` });
+        } catch (error: any) {
+            toast({ variant: "destructive", title: "Failed to send email", description: error.message });
+        }
+    };
+
     const handleSubmit = async () => {
         if (!name || !code || !role || !assignment || !email) {
             toast({ variant: "destructive", title: "Validation Error", description: "Please fill all fields." });
@@ -379,7 +393,7 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
         }
 
         if (employee) { // Update existing employee
-            const updatedData: Partial<Employee> = { name, bengaliName, code, role: role as Employee['role'], assignment };
+            const updatedData: Partial<Employee> = { name, bengaliName, code, role: role as Employee['role'], assignment, email };
             await setDoc(doc(firestore, 'employees', employee.id), updatedData, { merge: true });
             toast({ title: "Employee updated" });
             setIsOpen(false);
@@ -437,7 +451,15 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
                 <div className="grid gap-3 py-4">
                     <Label>Name (English)</Label><Input value={name} onChange={(e) => setName(e.target.value)} />
                     <Label>Name (Bengali)</Label><Input value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} />
-                    <Label>Email (Login ID)</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!!employee} />
+                    <div className="space-y-1">
+                        <Label>Email (Login ID)</Label>
+                        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                         {employee && (
+                            <p className="text-xs text-muted-foreground pt-1">
+                                Changing this does not change the login email. The user must be deleted and re-created to change their login credential.
+                            </p>
+                        )}
+                    </div>
                     {!employee && (<><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></>)}
                     <Label>Employee Code</Label><Input value={code} onChange={(e) => setCode(e.target.value)} />
                     <Label>Role</Label>
@@ -450,6 +472,15 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
                         <SelectTrigger><SelectValue placeholder="Select assignment" /></SelectTrigger>
                         <SelectContent>{assignments.map((a: string) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
                     </Select>
+                     {employee && (
+                        <div className="space-y-2 rounded-lg border border-dashed p-3 mt-4">
+                            <h4 className="font-medium">Manage Password</h4>
+                            <p className="text-sm text-muted-foreground">
+                                For security, you cannot set another user's password directly. You can send them a link to reset it themselves.
+                            </p>
+                            <Button type="button" variant="outline" onClick={handlePasswordReset}>Send Password Reset Email</Button>
+                        </div>
+                    )}
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
@@ -503,9 +534,5 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
         </Dialog>
     );
 }
-
-    
-
-    
 
     
