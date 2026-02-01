@@ -372,6 +372,7 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
             const updatedData: Partial<Employee> = { name, bengaliName, code, role: role as Employee['role'], assignment };
             await setDoc(doc(firestore, 'employees', employee.id), updatedData, { merge: true });
             toast({ title: "Employee updated" });
+            setIsOpen(false);
         } else { // Create new employee
             if (!password || password.length < 6) {
                 toast({ variant: "destructive", title: "Validation Error", description: "Password must be at least 6 characters long." });
