@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -19,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Calendar as CalendarIcon, Printer, ChevronLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -219,24 +219,34 @@ export default function CrossCheckReportPage() {
                 </PopoverContent>
               </Popover>
             </div>
-            <div className="grid gap-2">
-              <Label>Branch</Label>
-              <Select
-                value={filterBranchId}
-                onValueChange={setFilterBranchId}
-                disabled={currentUser?.role === 'Branch User'}
-              >
-                <SelectTrigger className="w-[240px]">
-                  <SelectValue placeholder="Select a branch" />
-                </SelectTrigger>
-                <SelectContent>
-                  {currentUser?.role !== 'Branch User' && <SelectItem value="all">All Branches</SelectItem>}
-                  {(currentUser?.role === 'Branch User' ? branchesData?.filter(b => b.id === userBranch?.id) : branchesData)?.map(b => (
-                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {currentUser?.role === 'Branch User' ? (
+                <div className="grid gap-2">
+                    <Label>Branch</Label>
+                    <Input 
+                        value={userBranch?.name || ''} 
+                        disabled 
+                        className="w-[240px]"
+                    />
+                </div>
+            ) : (
+                <div className="grid gap-2">
+                <Label>Branch</Label>
+                <Select
+                    value={filterBranchId}
+                    onValueChange={setFilterBranchId}
+                >
+                    <SelectTrigger className="w-[240px]">
+                    <SelectValue placeholder="Select a branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Branches</SelectItem>
+                        {branchesData?.map(b => (
+                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                </div>
+            )}
             <Button onClick={handleGenerateReport} disabled={isLoading || !date}>
                 {isLoading ? "Loading data..." : "Generate Report"}
             </Button>
