@@ -373,6 +373,7 @@ export default function BranchesPage() {
         </Table>
         )}
       </CardContent>
+      {isDialogOpen && <FormDialog />}
        <Dialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen}>
         <DialogContent className="max-w-4xl">
             <DialogHeader>
@@ -447,5 +448,7 @@ export default function BranchesPage() {
     </Card>
   );
 }
+
+    
 
     
