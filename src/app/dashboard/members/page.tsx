@@ -70,17 +70,22 @@ export default function MembersPage() {
 
   const userBranch = useMemo(() => {
     if (!branchesData || !currentUser || currentUser.role !== 'Branch User') return null;
-    return branchesData.find(b => b.name === currentUser.assignment);
+    return branchesData.find(b => b.id === currentUser.assignment);
   }, [branchesData, currentUser]);
   
   const userVisibleGroups = useMemo(() => {
-      if (!groupsData) return [];
-      if (currentUser?.role === 'Branch User') {
-          if (!userBranch) return [];
-          return groupsData.filter(g => g.branchId === userBranch.id);
+      if (!groupsData || !currentUser) return [];
+      
+      const { role, assignment } = currentUser;
+      if (role === 'Super Admin' || role === 'Head Office') return groupsData;
+      if (role === 'Branch User') {
+          return groupsData.filter(g => g.branchId === assignment);
       }
+      // For Area, Zonal, Regional roles, we need to filter down from their assignment
+      // This part is simplified for now, assuming they can see all groups if not a branch user.
+      // A more complex implementation would trace the hierarchy.
       return groupsData;
-  }, [groupsData, currentUser, userBranch]);
+  }, [groupsData, currentUser]);
 
 
   // State for the entry form
@@ -95,6 +100,7 @@ export default function MembersPage() {
   const [file, setFile] = useState<File | null>(null);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [uploadedData, setUploadedData] = useState<UploadedRow[]>([]);
+  const [skippedData, setSkippedData] = useState<{row: any, reason: string}[]>([]);
   const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
 
   // State for the report
@@ -127,13 +133,24 @@ export default function MembersPage() {
       });
       return;
     }
+
+    const isDuplicate = memberChanges.some(c => c.date === date && c.groupId === groupId);
+    if (isDuplicate) {
+        toast({
+            variant: "destructive",
+            title: "Duplicate Entry",
+            description: `An entry for this group on ${date} already exists. Please delete the existing entry to add a new one.`,
+        });
+        return;
+    }
+
     addMemberChange({ date, groupId, added, dropped, notes });
     toast({
       title: "Change Recorded",
       description: `Member change for ${groupsData?.find(g => g.id === groupId)?.name} on ${date} has been saved.`
     });
     // Reset form
-    if (currentUser?.role === 'Super Admin') setEntryBranchId('');
+    if (currentUser?.role !== 'Branch User') setEntryBranchId('');
     setGroupId('');
     setAdded(0);
     setDropped(0);
@@ -163,9 +180,14 @@ export default function MembersPage() {
 
   const handleProcessUpload = () => {
     if (!file) {
-      toast({ variant: "destructive", title: "No file selected", description: "Please select a file to upload." });
+      toast({ variant: "destructive", title: "No file selected" });
       return;
     }
+    if (!uploadDate) {
+        toast({ variant: "destructive", title: "Date required", description: "Please select a date for the bulk upload." });
+        return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -176,30 +198,53 @@ export default function MembersPage() {
         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
         
         const groupCodeMap = new Map(userVisibleGroups.map(g => [String(g.code).trim().toLowerCase(), g.id]));
+        const existingEntries = new Set(memberChanges.filter(c => c.date === uploadDate).map(c => c.groupId));
+        const processedInFile = new Set<string>();
 
-        const validData: UploadedRow[] = jsonData
-          .filter(row => row.GroupID && (Number(row.MembersAdded) > 0 || Number(row.MembersDropped) > 0))
-          .map(row => {
-              const formattedCode = formatGroupCode(row.GroupID).toLowerCase();
-              if (groupCodeMap.has(formattedCode)) {
-                  return {
-                      GroupID: groupCodeMap.get(formattedCode)!,
-                      GroupName: String(row.GroupName || userVisibleGroups.find(g => g.id === groupCodeMap.get(formattedCode)!)?.name || 'Unknown'),
-                      MembersAdded: Number(row.MembersAdded) || 0,
-                      MembersDropped: Number(row.MembersDropped) || 0,
-                      Notes: String(row.Notes || ''),
-                  };
-              }
-              return null;
-          })
-          .filter((row): row is UploadedRow => row !== null);
+        const validRows: UploadedRow[] = [];
+        const skippedRows: { row: any, reason: string }[] = [];
 
-        if (validData.length === 0) {
-            toast({ variant: "destructive", title: "Invalid File", description: "The uploaded file contains no valid data for your assigned branch." });
+        jsonData.forEach((row, index) => {
+            const groupCode = row.GroupID ? String(row.GroupID).trim().toLowerCase() : '';
+            if (!groupCode || (Number(row.MembersAdded) === 0 && Number(row.MembersDropped) === 0)) {
+                return; // Skip empty or no-change rows
+            }
+            
+            const formattedCode = formatGroupCode(groupCode);
+            if (!groupCodeMap.has(formattedCode)) {
+                skippedRows.push({ row, reason: `Group with code "${row.GroupID}" not found.` });
+                return;
+            }
+
+            const groupId = groupCodeMap.get(formattedCode)!;
+
+            if (existingEntries.has(groupId)) {
+                skippedRows.push({ row, reason: `An entry for this group on ${uploadDate} already exists.` });
+                return;
+            }
+
+            if (processedInFile.has(groupId)) {
+                skippedRows.push({ row, reason: `Duplicate entry for this group within the file.` });
+                return;
+            }
+
+            processedInFile.add(groupId);
+            validRows.push({
+                GroupID: groupId,
+                GroupName: String(row.GroupName || userVisibleGroups.find(g => g.id === groupId)?.name || 'Unknown'),
+                MembersAdded: Number(row.MembersAdded) || 0,
+                MembersDropped: Number(row.MembersDropped) || 0,
+                Notes: String(row.Notes || ''),
+            });
+        });
+
+        if (validRows.length === 0 && skippedRows.length === 0) {
+            toast({ variant: "destructive", title: "No Data Found", description: "The uploaded file appears to be empty or contains no valid data." });
             return;
         }
 
-        setUploadedData(validData);
+        setUploadedData(validRows);
+        setSkippedData(skippedRows);
         setIsConfirmDialogOpen(true);
 
       } catch (error) {
@@ -211,34 +256,27 @@ export default function MembersPage() {
   };
   
   const handleConfirmUpload = () => {
-    if (!uploadDate) {
-        toast({ variant: "destructive", title: "Date required", description: "Please select a date for the bulk upload." });
-        return;
-    }
     let changesCount = 0;
     uploadedData.forEach(row => {
-        if (row.MembersAdded > 0 || row.MembersDropped > 0) {
-            addMemberChange({
-                date: uploadDate,
-                groupId: row.GroupID,
-                added: row.MembersAdded,
-                dropped: row.MembersDropped,
-                notes: `Bulk upload: ${row.Notes || ''}`.trim(),
-            });
-            changesCount++;
-        }
+        addMemberChange({
+            date: uploadDate,
+            groupId: row.GroupID,
+            added: row.MembersAdded,
+            dropped: row.MembersDropped,
+            notes: `Bulk upload: ${row.Notes || ''}`.trim(),
+        });
+        changesCount++;
     });
 
-    toast({ title: "Bulk Upload Successful", description: `${changesCount} member changes have been recorded for ${uploadDate}.` });
+    toast({ title: "Bulk Upload Complete", description: `${changesCount} member changes have been recorded for ${uploadDate}.` });
     
     // Reset state
     setIsConfirmDialogOpen(false);
     setUploadedData([]);
+    setSkippedData([]);
     setFile(null);
     const fileInput = document.getElementById('bulk-upload') as HTMLInputElement;
-    if (fileInput) {
-        fileInput.value = '';
-    }
+    if (fileInput) fileInput.value = '';
   };
 
 
@@ -380,6 +418,10 @@ export default function MembersPage() {
                 <Download className="mr-2 h-4 w-4" />
                 {isLoading ? "Loading..." : "Download Template"}
             </Button>
+             <div className="space-y-2">
+              <Label htmlFor="bulk-upload-date">Date for Upload</Label>
+              <Input id="bulk-upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="bulk-upload">Upload Filled Template</Label>
               <Input id="bulk-upload" type="file" accept=".xlsx, .xls" onChange={handleFileChange} />
@@ -387,7 +429,7 @@ export default function MembersPage() {
                 File must be the downloaded template with your data filled in.
               </p>
             </div>
-            <Button onClick={handleProcessUpload} className="w-full" disabled={!file || isLoading}>
+            <Button onClick={handleProcessUpload} className="w-full" disabled={!file || !uploadDate || isLoading}>
               <Upload className="mr-2 h-4 w-4" />
               {isLoading ? "Loading..." : "Upload and Preview"}
             </Button>
@@ -410,7 +452,7 @@ export default function MembersPage() {
                     </SelectTrigger>
                     <SelectContent>
                         {currentUser?.role === 'Super Admin' && <SelectItem value="all">All Branches</SelectItem>}
-                        {branchesData?.filter(b => currentUser?.role === 'Super Admin' || b.name === currentUser?.assignment).map(b => (
+                        {branchesData?.filter(b => currentUser?.role === 'Super Admin' || b.id === currentUser?.assignment).map(b => (
                             <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                         ))}
                     </SelectContent>
@@ -464,19 +506,26 @@ export default function MembersPage() {
       </Card>
 
       <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Confirm Bulk Upload</DialogTitle>
             <DialogDescription>
-              Review the member changes below. Select a date for these changes and click "Confirm" to save.
+              Review the changes below. {skippedData.length > 0 ? "Some rows were skipped." : ""} Click "Confirm" to save.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-             <div className="space-y-2">
-              <Label htmlFor="upload-date">Date for Changes</Label>
-              <Input id="upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
+          {skippedData.length > 0 && (
+            <div className="my-4">
+              <h3 className="font-semibold text-destructive">Skipped Rows</h3>
+              <ScrollArea className="h-24 mt-2 rounded-md border p-2">
+                <ul className="list-disc pl-5 text-sm text-destructive">
+                  {skippedData.map((item, i) => <li key={i}>{item.reason} (Row: {JSON.stringify(item.row)})</li>)}
+                </ul>
+              </ScrollArea>
             </div>
-            <ScrollArea className="h-64">
+          )}
+          <div className="my-4">
+            <h3 className="font-semibold text-primary">Valid Rows to be Imported</h3>
+            <ScrollArea className="h-48 mt-2">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -499,7 +548,7 @@ export default function MembersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleConfirmUpload}>Confirm & Save</Button>
+            <Button onClick={handleConfirmUpload} disabled={uploadedData.length === 0}>Confirm & Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -536,7 +585,3 @@ export default function MembersPage() {
     </div>
   );
 }
-
-    
-
-    

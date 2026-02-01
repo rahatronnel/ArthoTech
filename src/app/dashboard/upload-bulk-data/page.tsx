@@ -57,6 +57,7 @@ export default function OthersDataPage() {
     const [file, setFile] = useState<File | null>(null);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
     const [uploadedData, setUploadedData] = useState<UploadedRow[]>([]);
+    const [skippedData, setSkippedData] = useState<{row: any, reason: string}[]>([]);
     const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
 
     // State for editing/deleting/adding
@@ -69,7 +70,7 @@ export default function OthersDataPage() {
 
     const userBranches = currentUser?.role === 'Super Admin' 
         ? branches 
-        : branches.filter(b => b.name === currentUser?.assignment);
+        : branches.filter(b => b.id === currentUser?.assignment);
 
     if (currentUser?.role === 'Branch User' && !filterBranch) {
         setFilterBranch(currentUser.assignment);
@@ -83,12 +84,12 @@ export default function OthersDataPage() {
 
         const branchesForTemplate = filterBranch ? userBranches.filter(b => b.name === filterBranch) : userBranches;
 
-        if (branchesForTemplate.length === 0) {
-            toast({ variant: 'destructive', title: 'No branch selected', description: 'Please select a branch to download the template.' });
+        if (branchesForTemplate.length === 0 && currentUser?.role !== 'Super Admin') {
+            toast({ variant: 'destructive', title: 'No Branch Assigned', description: 'Your account is not assigned to a branch.' });
             return;
         }
 
-        const templateData = branchesForTemplate.map(b => {
+        const templateData = (branchesForTemplate.length > 0 ? branchesForTemplate : branches).map(b => {
             const row: any = { 'Branch': b.name };
             templateDataTypes.forEach(dt => row[dt] = 0);
             row['Notes'] = '';
@@ -113,7 +114,10 @@ export default function OthersDataPage() {
             toast({ variant: "destructive", title: "No file selected" });
             return;
         }
-
+        if (!uploadDate) {
+            toast({ variant: "destructive", title: "Date required", description: "Please select a date for the upload." });
+            return;
+        }
         if (branchesLoading) {
             toast({ title: "Please wait", description: "Branches are loading..." });
             return;
@@ -128,23 +132,46 @@ export default function OthersDataPage() {
                 const worksheet = workbook.Sheets[sheetName];
                 const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
 
-                const validData: UploadedRow[] = jsonData.filter(row => 
-                    row.Branch &&
-                    userBranches.some(b => b.name === row.Branch) && // Ensure branch is valid for user
-                    templateDataTypes.some(dt => Number(row[dt]) > 0) // Ensure at least one value is present
-                ).map(row => {
-                    const newRow: any = { Branch: String(row.Branch), Notes: String(row.Notes || '') };
+                const existingEntries = new Set(othersData.filter(d => d.date === uploadDate).map(d => d.branch));
+                const processedInFile = new Set<string>();
+
+                const validRows: UploadedRow[] = [];
+                const skippedRows: { row: any, reason: string }[] = [];
+
+                jsonData.forEach(row => {
+                    if (!row.Branch || !userBranches.some(b => b.name === row.Branch)) {
+                         return; // Skip rows for branches not assigned to user
+                    }
+                    if (!templateDataTypes.some(dt => Number(row[dt]) > 0)) {
+                        return; // Skip rows with no data
+                    }
+
+                    const branchName = String(row.Branch);
+
+                    if (existingEntries.has(branchName)) {
+                        skippedRows.push({ row, reason: `An entry for ${branchName} on ${uploadDate} already exists.` });
+                        return;
+                    }
+                    if (processedInFile.has(branchName)) {
+                        skippedRows.push({ row, reason: `Duplicate entry for ${branchName} within the file.` });
+                        return;
+                    }
+                    
+                    processedInFile.add(branchName);
+                    const newRow: any = { Branch: branchName, Notes: String(row.Notes || '') };
                     templateDataTypes.forEach(dt => {
                         newRow[dt] = Number(row[dt]) || 0;
                     });
-                    return newRow as UploadedRow;
+                    validRows.push(newRow as UploadedRow);
                 });
 
-                if (validData.length === 0) {
-                    toast({ variant: "destructive", title: "Invalid File", description: "No valid data to process for your assigned branch(es)." });
+
+                if (validRows.length === 0 && skippedRows.length === 0) {
+                    toast({ variant: "destructive", title: "No Valid Data", description: "No valid data to process for your assigned branch(es)." });
                     return;
                 }
-                setUploadedData(validData);
+                setUploadedData(validRows);
+                setSkippedData(skippedRows);
                 setIsConfirmDialogOpen(true);
             } catch (error) {
                 console.error("Upload error:", error);
@@ -155,11 +182,6 @@ export default function OthersDataPage() {
     };
 
     const handleConfirmUpload = () => {
-        if (!uploadDate) {
-            toast({ variant: "destructive", title: "Date required" });
-            return;
-        }
-        
         const entriesToAdd: Omit<OtherDataEntry, 'id'>[] = [];
         uploadedData.forEach(row => {
             templateDataTypes.forEach(type => {
@@ -184,6 +206,7 @@ export default function OthersDataPage() {
         // Reset state
         setIsConfirmDialogOpen(false);
         setUploadedData([]);
+        setSkippedData([]);
         setFile(null);
         const fileInput = document.getElementById('bulk-upload-others') as HTMLInputElement;
         if (fileInput) fileInput.value = '';
@@ -224,7 +247,7 @@ export default function OthersDataPage() {
     const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
     const filteredAndSortedData = othersData
-        .filter(d => d.date === filterDate && (currentUser?.role === 'Super Admin' ? (filterBranch ? d.branch === filterBranch : true) : d.branch === currentUser?.assignment))
+        .filter(d => d.date === filterDate && (currentUser?.role === 'Super Admin' || currentUser?.role === 'Head Office' ? (filterBranch ? d.branch === filterBranch : true) : d.branch === branches.find(b => b.id === currentUser?.assignment)?.name))
         .sort((a,b) => a.branch.localeCompare(b.branch) || allDataTypes.indexOf(a.type) - allDataTypes.indexOf(b.type));
     
     const AddEntryDialog = () => {
@@ -249,6 +272,16 @@ export default function OthersDataPage() {
                     variant: "destructive",
                     title: "Validation Error",
                     description: "Please fill out date and branch.",
+                });
+                return;
+            }
+
+            const isDuplicate = othersData.some(d => d.date === date && d.branch === branch);
+            if (isDuplicate) {
+                toast({
+                    variant: "destructive",
+                    title: "Duplicate Entry",
+                    description: `An entry for ${branch} on ${date} already exists.`,
                 });
                 return;
             }
@@ -403,7 +436,7 @@ export default function OthersDataPage() {
                         <Label htmlFor="filter-date">Date</Label>
                         <Input id="filter-date" type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)} />
                     </div>
-                    {currentUser?.role === 'Super Admin' && (
+                    {(currentUser?.role === 'Super Admin' || currentUser?.role === 'Head Office') && (
                         <div className="space-y-2 flex-grow">
                             <Label htmlFor="filter-branch">Branch</Label>
                             <Select onValueChange={(value) => setFilterBranch(value === 'all-branches' ? '' : value)} value={filterBranch || 'all-branches'}>
@@ -436,11 +469,15 @@ export default function OthersDataPage() {
                         <Button onClick={handleDownloadTemplate} variant="outline" className="w-full" disabled={branchesLoading}>
                             <Download className="mr-2 h-4 w-4" /> {branchesLoading ? 'Loading...' : 'Download Template'}
                         </Button>
+                         <div className="space-y-2">
+                            <Label htmlFor="upload-date">Date for Upload</Label>
+                            <Input id="upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
+                        </div>
                         <div className="space-y-2">
                             <Label htmlFor="bulk-upload-others">Upload Filled Template</Label>
                             <Input id="bulk-upload-others" type="file" accept=".xlsx, .xls" onChange={handleFileChange} className="file:text-foreground" />
                         </div>
-                        <Button onClick={handleProcessUpload} className="w-full" disabled={!file || branchesLoading}>
+                        <Button onClick={handleProcessUpload} className="w-full" disabled={!file || !uploadDate || branchesLoading}>
                             <Upload className="mr-2 h-4 w-4" />
                             {branchesLoading ? 'Loading Branches...' : 'Upload and Preview'}
                         </Button>
@@ -530,19 +567,25 @@ export default function OthersDataPage() {
                 </CardContent>
             </Card>
             
-            {/* Upload Confirmation Dialog */}
             <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
                 <DialogContent className="max-w-4xl">
                 <DialogHeader>
                     <DialogTitle>Confirm Bulk Upload</DialogTitle>
-                    <DialogDescription>Review the data below. Select a date and click "Confirm" to save.</DialogDescription>
+                    <DialogDescription>Review the data below. {skippedData.length > 0 ? "Some rows were skipped." : ""} Click "Confirm" to save.</DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="upload-date">Date for Uploads</Label>
-                        <Input id="upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
+                 {skippedData.length > 0 && (
+                    <div className="my-4">
+                      <h3 className="font-semibold text-destructive">Skipped Rows</h3>
+                      <ScrollArea className="h-24 mt-2 rounded-md border p-2">
+                        <ul className="list-disc pl-5 text-sm text-destructive">
+                          {skippedData.map((item, i) => <li key={i}>{item.reason} (Row: {JSON.stringify(item.row)})</li>)}
+                        </ul>
+                      </ScrollArea>
                     </div>
-                    <ScrollArea className="h-64">
+                  )}
+                  <div className="my-4">
+                    <h3 className="font-semibold text-primary">Valid Rows to be Imported</h3>
+                    <ScrollArea className="h-48 mt-2">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -560,15 +603,14 @@ export default function OthersDataPage() {
                             </TableBody>
                         </Table>
                     </ScrollArea>
-                </div>
+                  </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>Cancel</Button>
-                    <Button onClick={handleConfirmUpload}>Confirm & Save</Button>
+                    <Button onClick={handleConfirmUpload} disabled={uploadedData.length === 0}>Confirm & Save</Button>
                 </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Add/Edit Dialogs */}
             {isAddDialogOpen && <AddEntryDialog />}
             {editingEntry && <EditDialog />}
             
@@ -619,5 +661,3 @@ export default function OthersDataPage() {
         </div>
     );
 }
-
-    

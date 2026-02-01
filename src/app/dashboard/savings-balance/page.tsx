@@ -66,11 +66,15 @@ export default function SavingsBalancePage() {
   const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
 
   const userVisibleGroups = useMemo(() => {
-    if (!groupsData) return [];
-    if (currentUser?.role === 'Super Admin') {
-      return groupsData;
+    if (!groupsData || !currentUser) return [];
+    
+    const { role, assignment } = currentUser;
+    if (role === 'Super Admin' || role === 'Head Office') return groupsData;
+    if (role === 'Branch User') {
+        return groupsData.filter(g => g.branchId === assignment);
     }
-    return groupsData.filter(g => g.responsibleEmployeeId === currentUser?.id);
+    // A more complex implementation for hierarchical roles would be needed here.
+    return groupsData;
   }, [groupsData, currentUser]);
   
   // State for the entry form
@@ -84,6 +88,7 @@ export default function SavingsBalancePage() {
   const [file, setFile] = useState<File | null>(null);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [uploadedData, setUploadedData] = useState<UploadedRow[]>([]);
+  const [skippedData, setSkippedData] = useState<{row: any, reason: string}[]>([]);
   const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
 
   // State for the report
@@ -107,6 +112,16 @@ export default function SavingsBalancePage() {
       });
       return;
     }
+    const isDuplicate = savingsTransactions.some(t => t.date === date && t.groupId === groupId);
+    if (isDuplicate) {
+        toast({
+            variant: "destructive",
+            title: "Duplicate Entry",
+            description: `A savings entry for this group on ${date} already exists.`,
+        });
+        return;
+    }
+
     addSavingsTransaction({ date, groupId, deposit, withdraw, notes });
     toast({
       title: "Transaction Recorded",
@@ -142,9 +157,14 @@ export default function SavingsBalancePage() {
 
   const handleProcessUpload = () => {
     if (!file) {
-      toast({ variant: "destructive", title: "No file selected", description: "Please select a file to upload." });
+      toast({ variant: "destructive", title: "No file selected" });
       return;
     }
+     if (!uploadDate) {
+        toast({ variant: "destructive", title: "Date required", description: "Please select a date for the bulk upload." });
+        return;
+    }
+
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -155,30 +175,53 @@ export default function SavingsBalancePage() {
         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
 
         const groupCodeMap = new Map(userVisibleGroups.map(g => [String(g.code).trim().toLowerCase(), g.id]));
+        const existingEntries = new Set(savingsTransactions.filter(t => t.date === uploadDate).map(t => t.groupId));
+        const processedInFile = new Set<string>();
 
-        const validData: UploadedRow[] = jsonData
-            .filter(row => row.GroupID && (Number(row.Deposit) > 0 || Number(row.Withdraw) > 0))
-            .map(row => {
-                const formattedCode = formatGroupCode(row.GroupID).toLowerCase();
-                if (groupCodeMap.has(formattedCode)) {
-                    return {
-                        GroupID: groupCodeMap.get(formattedCode)!,
-                        GroupName: String(row.GroupName || userVisibleGroups.find(g => g.id === groupCodeMap.get(formattedCode)!)?.name || 'Unknown'),
-                        Deposit: Number(row.Deposit) || 0,
-                        Withdraw: Number(row.Withdraw) || 0,
-                        Notes: String(row.Notes || ''),
-                    };
-                }
-                return null;
-            })
-            .filter((row): row is UploadedRow => row !== null);
+        const validRows: UploadedRow[] = [];
+        const skippedRows: { row: any, reason: string }[] = [];
 
-        if (validData.length === 0) {
-            toast({ variant: "destructive", title: "Invalid File", description: "The uploaded file contains no valid data to process." });
+        jsonData.forEach((row, index) => {
+            const groupCode = row.GroupID ? String(row.GroupID).trim().toLowerCase() : '';
+            if (!groupCode || (Number(row.Deposit) === 0 && Number(row.Withdraw) === 0)) {
+                return; // Skip empty rows
+            }
+            
+            const formattedCode = formatGroupCode(groupCode);
+            if (!groupCodeMap.has(formattedCode)) {
+                skippedRows.push({ row, reason: `Group with code "${row.GroupID}" not found.` });
+                return;
+            }
+
+            const groupId = groupCodeMap.get(formattedCode)!;
+
+            if (existingEntries.has(groupId)) {
+                skippedRows.push({ row, reason: `An entry for this group on ${uploadDate} already exists.` });
+                return;
+            }
+
+            if (processedInFile.has(groupId)) {
+                skippedRows.push({ row, reason: `Duplicate entry for this group within the file.` });
+                return;
+            }
+
+            processedInFile.add(groupId);
+            validRows.push({
+                GroupID: groupId,
+                GroupName: String(row.GroupName || userVisibleGroups.find(g => g.id === groupId)?.name || 'Unknown'),
+                Deposit: Number(row.Deposit) || 0,
+                Withdraw: Number(row.Withdraw) || 0,
+                Notes: String(row.Notes || ''),
+            });
+        });
+
+        if (validRows.length === 0 && skippedRows.length === 0) {
+            toast({ variant: "destructive", title: "No Data Found", description: "The uploaded file contains no valid data." });
             return;
         }
 
-        setUploadedData(validData);
+        setUploadedData(validRows);
+        setSkippedData(skippedRows);
         setIsConfirmDialogOpen(true);
 
       } catch (error) {
@@ -190,22 +233,16 @@ export default function SavingsBalancePage() {
   };
   
   const handleConfirmUpload = () => {
-    if (!uploadDate) {
-        toast({ variant: "destructive", title: "Date required", description: "Please select a date for the bulk upload." });
-        return;
-    }
     let transactionsCount = 0;
     uploadedData.forEach(row => {
-        if (row.Deposit > 0 || row.Withdraw > 0) {
-            addSavingsTransaction({
-                date: uploadDate,
-                groupId: row.GroupID,
-                deposit: row.Deposit,
-                withdraw: row.Withdraw,
-                notes: `Bulk upload: ${row.Notes || ''}`.trim(),
-            });
-            transactionsCount++;
-        }
+        addSavingsTransaction({
+            date: uploadDate,
+            groupId: row.GroupID,
+            deposit: row.Deposit,
+            withdraw: row.Withdraw,
+            notes: `Bulk upload: ${row.Notes || ''}`.trim(),
+        });
+        transactionsCount++;
     });
 
     toast({ title: "Bulk Upload Successful", description: `${transactionsCount} savings transactions have been recorded for ${uploadDate}.` });
@@ -213,6 +250,7 @@ export default function SavingsBalancePage() {
     // Reset state
     setIsConfirmDialogOpen(false);
     setUploadedData([]);
+    setSkippedData([]);
     setFile(null);
     const fileInput = document.getElementById('bulk-upload-savings') as HTMLInputElement;
     if (fileInput) {
@@ -341,6 +379,10 @@ export default function SavingsBalancePage() {
                 <Download className="mr-2 h-4 w-4" />
                 {groupsLoading ? "Loading..." : "Download Template"}
             </Button>
+             <div className="space-y-2">
+              <Label htmlFor="bulk-upload-date">Date for Upload</Label>
+              <Input id="bulk-upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="bulk-upload-savings">Upload Filled Template</Label>
               <Input id="bulk-upload-savings" type="file" accept=".xlsx, .xls" onChange={handleFileChange} />
@@ -348,7 +390,7 @@ export default function SavingsBalancePage() {
                 File must be the downloaded template with your data filled in.
               </p>
             </div>
-            <Button onClick={handleProcessUpload} className="w-full" disabled={!file || groupsLoading}>
+            <Button onClick={handleProcessUpload} className="w-full" disabled={!file || !uploadDate || groupsLoading}>
               <Upload className="mr-2 h-4 w-4" />
               {groupsLoading ? "Loading..." : "Upload and Preview"}
             </Button>
@@ -405,19 +447,26 @@ export default function SavingsBalancePage() {
       </Card>
 
       <Dialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Confirm Bulk Savings Upload</DialogTitle>
+            <DialogTitle>Confirm Bulk Upload</DialogTitle>
             <DialogDescription>
-              Review the savings transactions below. Select a date for these changes and click "Confirm" to save.
+              Review the transactions below. {skippedData.length > 0 ? "Some rows were skipped." : ""} Click "Confirm" to save.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-             <div className="space-y-2">
-              <Label htmlFor="upload-date">Date for Transactions</Label>
-              <Input id="upload-date" type="date" value={uploadDate} onChange={(e) => setUploadDate(e.target.value)} />
+          {skippedData.length > 0 && (
+            <div className="my-4">
+              <h3 className="font-semibold text-destructive">Skipped Rows</h3>
+              <ScrollArea className="h-24 mt-2 rounded-md border p-2">
+                <ul className="list-disc pl-5 text-sm text-destructive">
+                  {skippedData.map((item, i) => <li key={i}>{item.reason} (Row: {JSON.stringify(item.row)})</li>)}
+                </ul>
+              </ScrollArea>
             </div>
-            <ScrollArea className="h-64">
+          )}
+          <div className="my-4">
+             <h3 className="font-semibold text-primary">Valid Rows to be Imported</h3>
+            <ScrollArea className="h-48 mt-2">
                 <Table>
                     <TableHeader>
                         <TableRow>
@@ -440,7 +489,7 @@ export default function SavingsBalancePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsConfirmDialogOpen(false)}>Cancel</Button>
-            <Button onClick={handleConfirmUpload}>Confirm & Save</Button>
+            <Button onClick={handleConfirmUpload} disabled={uploadedData.length === 0}>Confirm & Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -477,5 +526,3 @@ export default function SavingsBalancePage() {
     </div>
   );
 }
-
-    

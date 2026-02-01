@@ -72,10 +72,10 @@ const formatGroupCode = (rawCode: string | number): string => {
 export default function RawDataEntryPage() {
     const { toast } = useToast();
     const { currentUser } = useAuth();
-    const { addSavingsTransaction } = useSavings();
-    const { addLoanDisbursement, addLoanCollection } = useLoan();
+    const { addSavingsTransaction, savingsTransactions } = useSavings();
+    const { addLoanDisbursement, addLoanCollection, loanDisbursements, loanCollections } = useLoan();
     const { addBulkOthersData } = useOthersData();
-    const { addMemberChange } = useMember();
+    const { addMemberChange, memberChanges } = useMember();
 
     const [file, setFile] = useState<File | null>(null);
     const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
@@ -98,17 +98,8 @@ export default function RawDataEntryPage() {
 
     const userBranch = useMemo(() => {
         if (!branchesData || !currentUser || currentUser.role !== 'Branch User') return null;
-        return branchesData.find(b => b.name === currentUser.assignment);
+        return branchesData.find(b => b.id === currentUser.assignment);
     }, [branchesData, currentUser]);
-    
-    const userVisibleGroups = useMemo(() => {
-        if (!groupsData || !currentUser) return [];
-        if (currentUser.role === 'Branch User') {
-            if (!userBranch) return [];
-            return groupsData.filter(g => g.branchId === userBranch.id);
-        }
-        return groupsData;
-    }, [groupsData, currentUser, userBranch]);
     
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -191,26 +182,22 @@ export default function RawDataEntryPage() {
                         continue;
                     }
 
-                    // Hint 1: Ignore rows that are likely subtotals or grand totals
                     const fieldWorkerIdCell = String(row[0] || '').trim().toLowerCase();
                     const summaryTerms = ['officer total', 'grand total', 'savings grand total'];
                     if (summaryTerms.some(term => fieldWorkerIdCell.includes(term))) {
-                        continue; // Skip this summary row
+                        continue;
                     }
 
-                    // Hint 2: The 'Component' column MUST have a value. If it's blank, it's a summary row.
                     const componentCell = String(row[4] || '').trim();
                     if (componentCell === '') {
-                        continue; // Skip rows without a component.
+                        continue;
                     }
                     
-                    // This is the "fill-down" logic for merged cells, which you approved.
                     if (row[0] !== null && String(row[0]).trim() !== '') lastFieldWorkerId = String(row[0]).trim();
                     if (row[1] !== null && String(row[1]).trim() !== '') lastFieldWorkerName = String(row[1]).trim();
                     if (row[2] !== null && String(row[2]).trim() !== '') lastSamityId = String(row[2]).trim();
                     if (row[3] !== null && String(row[3]).trim() !== '') lastSamityName = String(row[3]).trim();
                     
-                    // If we reach here, it's a valid transaction row.
                     const newTransaction: UploadedRow = {
                         'Field Worker ID': lastFieldWorkerId,
                         'Field Worker Name': lastFieldWorkerName,
@@ -270,13 +257,7 @@ export default function RawDataEntryPage() {
             return;
         }
         
-        const fileExtension = file.name.split('.').pop()?.toLowerCase();
-
-        if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-            setIsProcessing(true);
-        } else {
-            toast({ variant: 'destructive', title: 'Unsupported File Type', description: 'Please upload an Excel file (.xlsx, .xls).' });
-        }
+        processExcel(file);
     };
 
     const handleConfirmUpload = () => {
@@ -292,9 +273,11 @@ export default function RawDataEntryPage() {
         const groupMap = new Map(groupsData.map(g => [String(g.code).trim().toLowerCase(), g]));
         const branchMap = new Map(branchesData.map(b => [b.id, b]));
         const othersEntriesToAdd: Omit<OtherDataEntry, 'id'>[] = [];
-        let skippedRowCount = 0;
+        
         let processedRowCount = 0;
-
+        const processedGroupIdsInFile = new Set<string>();
+        const skippedRowsInfo: { samityId: string; reason: string }[] = [];
+        
         const userBranchId = (currentUser?.role === 'Branch User' && userBranch) ? userBranch.id : null;
 
         uploadedData.forEach(row => {
@@ -302,88 +285,67 @@ export default function RawDataEntryPage() {
             const group = groupMap.get(normalizedSamityId);
 
             if (!group) {
-                skippedRowCount++;
+                skippedRowsInfo.push({ samityId: row['Samity ID'], reason: 'Group code not found.' });
                 return;
             }
             
             if (userBranchId && group.branchId !== userBranchId) {
-                skippedRowCount++;
+                skippedRowsInfo.push({ samityId: row['Samity ID'], reason: 'Group does not belong to your assigned branch.' });
                 return;
             }
 
             const branch = branchMap.get(group.branchId);
             if (!branch) {
-                skippedRowCount++;
+                skippedRowsInfo.push({ samityId: row['Samity ID'], reason: 'Branch not found for group.' });
                 return;
             };
 
+            const isAlreadyProcessed = 
+                memberChanges.some(c => c.date === uploadDate && c.groupId === group.id) ||
+                savingsTransactions.some(t => t.date === uploadDate && t.groupId === group.id) ||
+                loanDisbursements.some(d => d.date === uploadDate && d.groupId === group.id) ||
+                loanCollections.some(c => c.date === uploadDate && c.groupId === group.id);
+    
+            if (isAlreadyProcessed) {
+                skippedRowsInfo.push({ samityId: row['Samity ID'], reason: `An entry for this group on ${uploadDate} already exists.` });
+                return;
+            }
+    
+            if (processedGroupIdsInFile.has(group.id)) {
+                skippedRowsInfo.push({ samityId: row['Samity ID'], reason: 'Duplicate entry for this group found within the file.' });
+                return;
+            }
+
+            processedGroupIdsInFile.add(group.id);
             processedRowCount++;
             const notes = `Raw data upload for ${group.name}`;
 
-            // Savings
             if (row['Savings Collection'] > 0 || row['Savings Refund'] > 0) {
-                addSavingsTransaction({
-                    date: uploadDate,
-                    groupId: group.id,
-                    deposit: row['Savings Collection'],
-                    withdraw: row['Savings Refund'],
-                    notes
-                });
+                addSavingsTransaction({ date: uploadDate, groupId: group.id, deposit: row['Savings Collection'], withdraw: row['Savings Refund'], notes });
             }
-            
-            // Loan Disbursement
             if (row['Disbursement Amount'] > 0) {
-                addLoanDisbursement({
-                    date: uploadDate,
-                    groupId: group.id,
-                    amount: row['Disbursement Amount'],
-                    notes
-                });
+                addLoanDisbursement({ date: uploadDate, groupId: group.id, amount: row['Disbursement Amount'], notes });
             }
-            
-            // Loan Collection
             if (row['Loan Collection Total'] > 0) {
-                addLoanCollection({
-                    date: uploadDate,
-                    groupId: group.id,
-                    amount: row['Loan Collection Total'],
-                    notes: `Regular: ${row['Loan Collection Regular']}, Due: ${row['Loan Collection Due']}, Advance: ${row['Loan Collection Advance']}`
-                });
+                addLoanCollection({ date: uploadDate, groupId: group.id, amount: row['Loan Collection Total'], notes: `Regular: ${row['Loan Collection Regular']}, Due: ${row['Loan Collection Due']}, Advance: ${row['Loan Collection Advance']}` });
             }
-
-            // Member Additions from Admission Fees
             const admissionFeesAmount = row['Admission fees'];
             if (admissionFeesAmount > 0) {
                 const membersAdded = admissionFeesAmount / 10;
                 if (membersAdded > 0) {
-                     addMemberChange({
-                        date: uploadDate,
-                        groupId: group.id,
-                        added: membersAdded,
-                        dropped: 0,
-                        notes: `From raw data upload.`
-                    });
+                     addMemberChange({ date: uploadDate, groupId: group.id, added: membersAdded, dropped: 0, notes: `From raw data upload.` });
                 }
             }
             
-            // Others Data
             const otherDataMapping: { [key: string]: OtherDataEntry['type'] } = {
-                'Risk fund': 'Risk Fund',
-                'Processing Fees / Form fees': 'Processing Fee',
-                'Passbook fees': 'Passbook Fee',
-                'Admission fees': 'Admission Fee'
+                'Risk fund': 'Risk Fund', 'Processing Fees / Form fees': 'Processing Fee',
+                'Passbook fees': 'Passbook Fee', 'Admission fees': 'Admission Fee'
             };
 
             for (const [key, type] of Object.entries(otherDataMapping)) {
                 const amount = row[key as keyof UploadedRow] as number;
                 if (amount > 0) {
-                    othersEntriesToAdd.push({
-                        date: uploadDate,
-                        branch: branch.name,
-                        type: type,
-                        amount: amount,
-                        notes
-                    });
+                    othersEntriesToAdd.push({ date: uploadDate, branch: branch.name, type: type, amount: amount, notes });
                 }
             }
         });
@@ -392,16 +354,19 @@ export default function RawDataEntryPage() {
             addBulkOthersData(othersEntriesToAdd);
         }
 
-        if (skippedRowCount > 0) {
+        if (skippedRowsInfo.length > 0) {
             toast({
                 variant: 'destructive',
-                title: 'Some rows were skipped',
-                description: `${skippedRowCount} rows were skipped because the group code was invalid or did not belong to your branch.`,
+                title: `${skippedRowsInfo.length} rows were skipped`,
+                description: `Duplicate or invalid entries were found.`,
                 duration: 7000,
             });
         }
-
-        toast({ title: "Upload Confirmed", description: `${processedRowCount} transaction rows processed successfully.` });
+        if (processedRowCount > 0) {
+            toast({ title: "Upload Confirmed", description: `${processedRowCount} transaction rows processed successfully.` });
+        } else {
+             toast({ title: "No New Data", description: "No new transactions were imported." });
+        }
         
         setIsConfirmDialogOpen(false);
         setUploadedData([]);
@@ -455,9 +420,6 @@ export default function RawDataEntryPage() {
             <ProcessingAnimation
                 open={isProcessing}
                 onFinished={() => {
-                    if (file) {
-                        processExcel(file);
-                    }
                     setIsProcessing(false);
                 }}
             />
@@ -1073,5 +1035,3 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
         </Dialog>
     );
 };
-
-    
