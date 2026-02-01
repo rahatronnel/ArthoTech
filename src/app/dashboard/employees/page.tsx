@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 
 // --- Constants and Types ---
 const ROLES: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office', 'Super Admin'];
@@ -363,7 +363,6 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<Employee['role'] | ''>('');
     const [assignment, setAssignment] = useState('');
-    const auth = getAuth();
 
     useEffect(() => {
         if (isOpen) {
@@ -376,19 +375,6 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
             setAssignment(employee?.assignment || '');
         }
     }, [employee, isOpen]);
-
-    const handlePasswordReset = async () => {
-        if (!employee || !employee.email) {
-            toast({ variant: "destructive", title: "Cannot reset password", description: "Employee email not found." });
-            return;
-        }
-        try {
-            await sendPasswordResetEmail(auth, employee.email);
-            toast({ title: "Password Reset Email Sent", description: `An email has been sent to ${employee.email}.` });
-        } catch (error: any) {
-            toast({ variant: "destructive", title: "Failed to send email", description: error.message });
-        }
-    };
 
     const handleSubmit = async () => {
         if (!name || !code || !role || !assignment || !email) {
@@ -476,15 +462,6 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
                         <SelectTrigger><SelectValue placeholder="Select assignment" /></SelectTrigger>
                         <SelectContent>{assignments.map((a: string) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
                     </Select>
-                     {employee && (
-                        <div className="space-y-2 rounded-lg border border-dashed p-3 mt-4">
-                            <h4 className="font-medium">Manage Password</h4>
-                            <p className="text-sm text-muted-foreground">
-                                For security, you cannot set another user's password directly. You can send them a link to reset it themselves.
-                            </p>
-                            <Button type="button" variant="outline" onClick={handlePasswordReset}>Send Password Reset Email</Button>
-                        </div>
-                    )}
                 </div>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>Cancel</Button>
