@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useAuth } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -356,6 +356,7 @@ export default function EmployeesPage() {
 
 function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, existingUsers }: any) {
     const { toast } = useToast();
+    const auth = useAuth();
     const [name, setName] = useState('');
     const [bengaliName, setBengaliName] = useState('');
     const [code, setCode] = useState('');
@@ -387,7 +388,6 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
           return;
       }
       setIsSendingReset(true);
-      const auth = getAuth();
       try {
           await sendPasswordResetEmail(auth, email);
           toast({
