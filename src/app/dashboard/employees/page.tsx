@@ -150,8 +150,8 @@ export default function EmployeesPage() {
     const validateUploadData = (jsonData: any[]) => {
         const errors: string[] = [];
         const validEmployees: any[] = [];
-        const existingCodes = new Set(employeesData?.map(e => e.code.toLowerCase()));
-        const existingEmails = new Set(employeesData?.map(e => e.email.toLowerCase()));
+        const existingCodes = new Set(employeesData?.filter(e => e.code).map(e => e.code.toLowerCase()));
+        const existingEmails = new Set(employeesData?.filter(e => e.email).map(e => e.email.toLowerCase()));
         const fileCodes = new Set<string>();
         const fileEmails = new Set<string>();
         const validAssignments = new Set(assignments);
@@ -392,11 +392,11 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
                 toast({ variant: "destructive", title: "Validation Error", description: "Password must be at least 6 characters long." });
                 return;
             }
-            if (existingUsers.some((u: Employee) => u.email.toLowerCase() === email.toLowerCase())) {
+            if (existingUsers.some((u: Employee) => u.email && u.email.toLowerCase() === email.toLowerCase())) {
                 toast({ variant: "destructive", title: "Email exists", description: "This email is already in use." });
                 return;
             }
-             if (existingUsers.some((u: Employee) => u.code.toLowerCase() === code.toLowerCase())) {
+             if (existingUsers.some((u: Employee) => u.code && u.code.toLowerCase() === code.toLowerCase())) {
                 toast({ variant: "destructive", title: "Employee Code exists", description: "This code is already in use." });
                 return;
             }
