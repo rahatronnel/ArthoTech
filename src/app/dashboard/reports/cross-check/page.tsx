@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -9,7 +10,7 @@ import { useOthersData } from '@/context/OthersDataContext';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useCollection, useFirestore, useMemoFirebase, useAuth } from '@/firebase';
 import { collectionGroup, query, collection } from 'firebase/firestore';
-import type { Group, Branch } from '@/lib/data';
+import type { Group, Branch, Area, Zone, Region } from '@/lib/data';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -67,34 +68,74 @@ export default function CrossCheckReportPage() {
   const { loanDisbursements, loanCollections } = useLoan();
   const { othersData } = useOthersData();
 
+  const regionsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'regions') : null, [firestore]);
+  const { data: regionsData, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
+
+  const zonesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'zones')) : null, [firestore]);
+  const { data: zonesData, isLoading: zonesLoading } = useCollection<Zone>(zonesQuery);
+
+  const areasQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'areas')) : null, [firestore]);
+  const { data: areasData, isLoading: areasLoading } = useCollection<Area>(areasQuery);
+  
   const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
   const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
 
   const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
   const { data: branchesData, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
 
-  // Determine if the user is a non-admin assigned to a specific branch.
-  const isBranchAssignedUser = useMemo(() => {
-    if (!currentUser) return false;
-    // Only Super Admin can see all branches.
-    return currentUser.role !== 'Super Admin';
-  }, [currentUser]);
-
-  // Find the user's specific branch object if they are assigned to one.
-  const userBranch = useMemo(() => {
-    if (!branchesData || !isBranchAssignedUser || !currentUser || currentUser.assignment === 'Head Office') return null;
-    return branchesData.find(b => b.name === currentUser.assignment);
-  }, [branchesData, currentUser, isBranchAssignedUser]);
   
-  // Effect to automatically set the branch filter for branch-assigned users.
-  useEffect(() => {
-    if (isBranchAssignedUser && userBranch) {
-      setFilterBranchId(userBranch.id);
-    } else {
-      // Default for Super Admin
-      setFilterBranchId('all');
+  const { visibleBranchIds, branchesForFilter } = useMemo(() => {
+    if (!currentUser || !branchesData || !areasData || !zonesData || !regionsData) {
+      return { visibleBranchIds: new Set<string>(), branchesForFilter: [] };
     }
-  }, [currentUser, userBranch, isBranchAssignedUser]);
+
+    const { role, assignment } = currentUser;
+
+    if (role === 'Super Admin' || role === 'Head Office') {
+      return { 
+        visibleBranchIds: new Set(branchesData.map(b => b.id)), 
+        branchesForFilter: branchesData 
+      };
+    }
+
+    let ownedBranchIds = new Set<string>();
+    let branchesToDisplay: Branch[] = [];
+
+    if (role === 'Branch User') {
+      const branch = branchesData.find(b => b.id === assignment);
+      if (branch) {
+        ownedBranchIds.add(branch.id);
+        branchesToDisplay.push(branch);
+      }
+    } else if (role === 'Area User') {
+      branchesToDisplay = branchesData.filter(b => b.areaId === assignment);
+      ownedBranchIds = new Set(branchesToDisplay.map(b => b.id));
+    } else if (role === 'Zonal User') {
+      const childAreaIds = new Set(areasData.filter(a => a.zoneId === assignment).map(a => a.id));
+      branchesToDisplay = branchesData.filter(b => childAreaIds.has(b.areaId));
+      ownedBranchIds = new Set(branchesToDisplay.map(b => b.id));
+    } else if (role === 'Regional User') {
+      const childZoneIds = new Set(zonesData.filter(z => z.regionId === assignment).map(z => z.id));
+      const childAreaIds = new Set(areasData.filter(a => childZoneIds.has(a.zoneId)).map(a => a.id));
+      branchesToDisplay = branchesData.filter(b => childAreaIds.has(b.areaId));
+      ownedBranchIds = new Set(branchesToDisplay.map(b => b.id));
+    }
+
+    return { visibleBranchIds: ownedBranchIds, branchesForFilter: branchesToDisplay };
+
+  }, [currentUser, branchesData, areasData, zonesData, regionsData]);
+
+
+  useEffect(() => {
+    if (branchesForFilter.length === 1) {
+      setFilterBranchId(branchesForFilter[0].id);
+    } else if (currentUser?.role === 'Super Admin' || currentUser?.role === 'Head Office') {
+       setFilterBranchId('all');
+    } else if (branchesForFilter.length > 1) {
+       setFilterBranchId('all');
+    }
+  }, [branchesForFilter, currentUser]);
+
 
   const handleGenerateReport = () => {
     if (!date || !groupsData || !branchesData) return;
@@ -102,11 +143,12 @@ export default function CrossCheckReportPage() {
     const selectedDateStr = format(date, 'yyyy-MM-dd');
     const selectedDateObj = parseISO(selectedDateStr);
 
-    // Filter groups based on selected branch
-    const groupsForReport = filterBranchId === 'all'
-      ? groupsData
-      : groupsData.filter(g => g.branchId === filterBranchId);
+    let finalVisibleBranchIds = visibleBranchIds;
+    if (filterBranchId !== 'all') {
+      finalVisibleBranchIds = new Set([filterBranchId]);
+    }
     
+    const groupsForReport = groupsData.filter(g => finalVisibleBranchIds.has(g.branchId));
     const visibleGroupIds = new Set(groupsForReport.map(g => g.id));
 
     // --- Member Calculation ---
@@ -138,7 +180,7 @@ export default function CrossCheckReportPage() {
     // --- Other Collections ---
     const branchNameForFilter = branchesData.find(b => b.id === filterBranchId)?.name;
     const todayOthersData = filterBranchId === 'all'
-      ? othersData.filter(d => d.date === selectedDateStr)
+      ? othersData.filter(d => d.date === selectedDateStr && Array.from(visibleBranchIds).includes(d.branch))
       : othersData.filter(d => d.date === selectedDateStr && d.branch === branchNameForFilter);
       
     const admissionFees = todayOthersData.filter(d => d.type === 'Admission Fee').reduce((sum, d) => sum + d.amount, 0);
@@ -182,8 +224,13 @@ export default function CrossCheckReportPage() {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
   
-  const isLoading = groupsLoading || branchesLoading;
-  const reportTitleBranch = filterBranchId === 'all' ? 'All Branches' : branchesData?.find(b => b.id === filterBranchId)?.name || '';
+  const isLoading = groupsLoading || branchesLoading || areasLoading || zonesLoading || regionsLoading;
+  
+  const reportTitleBranch = filterBranchId === 'all' 
+    ? 'All Assigned Branches' 
+    : branchesData?.find(b => b.id === filterBranchId)?.name || '';
+
+  const isFilterDisabled = branchesForFilter.length <= 1 && currentUser?.role !== 'Super Admin';
 
   return (
     <div className="print:p-8">
@@ -229,34 +276,26 @@ export default function CrossCheckReportPage() {
                 </PopoverContent>
               </Popover>
             </div>
-             {isBranchAssignedUser ? (
-                <div className="grid gap-2">
-                    <Label>Branch</Label>
-                    <Input 
-                        value={currentUser?.assignment || ''} 
-                        disabled 
-                        className="w-[240px]"
-                    />
-                </div>
-            ) : (
-                <div className="grid gap-2">
-                <Label>Branch</Label>
-                <Select
-                    value={filterBranchId}
-                    onValueChange={setFilterBranchId}
-                >
-                    <SelectTrigger className="w-[240px]">
-                    <SelectValue placeholder="Select a branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">All Branches</SelectItem>
-                        {branchesData?.map(b => (
-                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                </div>
-            )}
+            
+            <div className="grid gap-2">
+            <Label>Branch</Label>
+            <Select
+                value={filterBranchId}
+                onValueChange={setFilterBranchId}
+                disabled={isFilterDisabled}
+            >
+                <SelectTrigger className="w-[240px]">
+                <SelectValue placeholder="Select a branch" />
+                </SelectTrigger>
+                <SelectContent>
+                    {(currentUser?.role === 'Super Admin' || branchesForFilter.length > 1) && <SelectItem value="all">All Assigned Branches</SelectItem>}
+                    {branchesForFilter?.map(b => (
+                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+            </div>
+
             <Button onClick={handleGenerateReport} disabled={isLoading || !date}>
                 {isLoading ? "Loading data..." : "Generate Report"}
             </Button>

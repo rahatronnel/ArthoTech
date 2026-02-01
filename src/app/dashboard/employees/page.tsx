@@ -2,11 +2,11 @@
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from 'react';
-import type { Employee, Branch } from '@/lib/data';
+import type { Employee, Branch, Area, Zone, Region } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Edit, FileDown, FileUp, Trash2 } from 'lucide-react';
+import { PlusCircle, Edit, FileDown, FileUp, Trash2, Mail } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 
 // --- Constants and Types ---
 const ROLES: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office', 'Super Admin'];
@@ -36,11 +36,20 @@ export default function EmployeesPage() {
     const employeesQuery = useMemoFirebase(() => collection(firestore, 'employees'), [firestore]);
     const { data: employeesData, isLoading: employeesLoading } = useCollection<Employee>(employeesQuery);
     
+    const regionsQuery = useMemoFirebase(() => collection(firestore, 'regions'), [firestore]);
+    const { data: regionsData, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
+
+    const zonesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'zones')) : null, [firestore]);
+    const { data: zonesData, isLoading: zonesLoading } = useCollection<Zone>(zonesQuery);
+    
+    const areasQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'areas')) : null, [firestore]);
+    const { data: areasData, isLoading: areasLoading } = useCollection<Area>(areasQuery);
+
     const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
     const { data: branchesData, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
+    
 
     const employees = useMemo(() => employeesData?.filter(e => e.role !== 'Super Admin') || [], [employeesData]);
-    const assignments = useMemo(() => ['Head Office', ...(branchesData?.map(b => b.name) || [])], [branchesData]);
     
     // --- State Management ---
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -56,7 +65,29 @@ export default function EmployeesPage() {
         progress: number;
     }>({ status: 'idle', data: [], errors: [], progress: 0 });
 
-    const isLoading = employeesLoading || branchesLoading;
+    const isLoading = employeesLoading || branchesLoading || areasLoading || zonesLoading || regionsLoading;
+
+     const assignmentMaps = useMemo(() => {
+        return {
+            regions: new Map(regionsData?.map(r => [r.id, r.name])),
+            zones: new Map(zonesData?.map(z => [z.id, z.name])),
+            areas: new Map(areasData?.map(a => [a.id, a.name])),
+            branches: new Map(branchesData?.map(b => [b.id, b.name])),
+        };
+    }, [regionsData, zonesData, areasData, branchesData]);
+
+    const getAssignmentName = (employee: Employee): string => {
+        if (employee.assignment === 'Head Office') return 'Head Office';
+        if (!employee.assignment) return 'N/A';
+
+        switch (employee.role) {
+            case 'Regional User': return assignmentMaps.regions.get(employee.assignment) || 'Unknown';
+            case 'Zonal User': return assignmentMaps.zones.get(employee.assignment) || 'Unknown';
+            case 'Area User': return assignmentMaps.areas.get(employee.assignment) || 'Unknown';
+            case 'Branch User': return assignmentMaps.branches.get(employee.assignment) || 'Unknown';
+            default: return 'N/A';
+        }
+    };
     
     // --- Core Functions ---
     const handleAddNew = () => {
@@ -76,8 +107,6 @@ export default function EmployeesPage() {
     const confirmDelete = async () => {
         if (!employeeToDelete) return;
         try {
-            // Note: This only deletes the Firestore record. The Firebase Auth user is not deleted.
-            // Deleting auth users requires admin privileges not available in the client SDK.
             await deleteDoc(doc(firestore, "employees", employeeToDelete.id));
             toast({ title: "Employee Record Deleted", description: `"${employeeToDelete.name}" has been removed. Their login has not been disabled.` });
         } catch (error: any) {
@@ -111,7 +140,7 @@ export default function EmployeesPage() {
         const templateData = [{
             "Name": "", "Bengali Name": "", "Code": "", "Email": "", "Password": "",
             "Role": "Branch User | Area User | Zonal User | Regional User | Head Office",
-            "Assignment (Branch Name or 'Head Office')": "",
+            "Assignment Name": "Name of the Region/Zone/Area/Branch",
         }];
         const ws = XLSX.utils.json_to_sheet(templateData);
         const wb = XLSX.utils.book_new();
@@ -154,13 +183,19 @@ export default function EmployeesPage() {
         const existingEmails = new Set(employeesData?.filter(e => e.email).map(e => e.email.toLowerCase()));
         const fileCodes = new Set<string>();
         const fileEmails = new Set<string>();
-        const validAssignments = new Set(assignments);
+        
+        const assignmentNameMaps = {
+            'Regional User': new Map(regionsData?.map(r => [r.name.toLowerCase(), r.id])),
+            'Zonal User': new Map(zonesData?.map(z => [z.name.toLowerCase(), z.id])),
+            'Area User': new Map(areasData?.map(a => [a.name.toLowerCase(), a.id])),
+            'Branch User': new Map(branchesData?.map(b => [b.name.toLowerCase(), b.id])),
+        };
 
         jsonData.forEach((row, index) => {
-            const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Email': email, 'Password': password, 'Role': role, 'Assignment (Branch Name or \'Head Office\')': assignment } = row;
+            const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Email': email, 'Password': password, 'Role': role, 'Assignment Name': assignmentName } = row;
             const rowIndex = index + 2;
 
-            if (!name || !code || !role || !assignment || !email || !password) {
+            if (!name || !code || !role || !assignmentName || !email || !password) {
                 errors.push(`Row ${rowIndex}: Missing required fields.`);
                 return;
             }
@@ -168,9 +203,22 @@ export default function EmployeesPage() {
                 errors.push(`Row ${rowIndex}: Invalid role "${role}".`);
                 return;
             }
-            if (!validAssignments.has(assignment)) {
-                errors.push(`Row ${rowIndex}: Invalid assignment "${assignment}".`);
-                return;
+
+            let assignmentId: string | undefined = undefined;
+            if (role === 'Head Office' || role === 'Super Admin') {
+                if (assignmentName.toLowerCase() === 'head office') {
+                    assignmentId = 'Head Office';
+                }
+            } else {
+                const nameMap = assignmentNameMaps[role as keyof typeof assignmentNameMaps];
+                if (nameMap) {
+                    assignmentId = nameMap.get(String(assignmentName).toLowerCase().trim());
+                }
+            }
+
+            if (!assignmentId) {
+                 errors.push(`Row ${rowIndex}: Invalid assignment "${assignmentName}" for role "${role}".`);
+                 return;
             }
 
             const normalizedCode = String(code).toLowerCase().trim();
@@ -187,7 +235,7 @@ export default function EmployeesPage() {
             
             fileCodes.add(normalizedCode);
             fileEmails.add(normalizedEmail);
-            validEmployees.push({ name, bengaliName: bengaliName || '', code: String(code).trim(), email, password, role, assignment });
+            validEmployees.push({ name, bengaliName: bengaliName || '', code: String(code).trim(), email, password, role, assignment: assignmentId });
         });
 
         return { validEmployees, errors };
@@ -280,7 +328,7 @@ export default function EmployeesPage() {
                                         <TableCell className="text-muted-foreground">{emp.email}</TableCell>
                                         <TableCell>{emp.code}</TableCell>
                                         <TableCell>{emp.role}</TableCell>
-                                        <TableCell>{emp.assignment}</TableCell>
+                                        <TableCell>{getAssignmentName(emp)}</TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex items-center justify-end gap-2">
                                                 <Button variant="ghost" size="icon" onClick={() => handleEdit(emp)}>
@@ -307,9 +355,12 @@ export default function EmployeesPage() {
                 onClose={() => setIsFormOpen(false)}
                 employee={editingEmployee}
                 roles={ROLES}
-                assignments={assignments}
                 firestore={firestore}
                 existingUsers={employeesData || []}
+                regions={regionsData || []}
+                zones={zonesData || []}
+                areas={areasData || []}
+                branches={branchesData || []}
               />
             )}
             
@@ -354,7 +405,7 @@ export default function EmployeesPage() {
 
 // --- Sub-components ---
 
-function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, existingUsers }: any) {
+function FormDialog({ isOpen, onClose, employee, roles, firestore, existingUsers, regions, zones, areas, branches }: any) {
     const { toast } = useToast();
     const [name, setName] = useState('');
     const [bengaliName, setBengaliName] = useState('');
@@ -363,6 +414,8 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<Employee['role'] | ''>('');
     const [assignment, setAssignment] = useState('');
+    const [showPasswordReset, setShowPasswordReset] = useState(false);
+    const [isSendingReset, setIsSendingReset] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -376,14 +429,47 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
         }
     }, [employee, isOpen]);
     
+     useEffect(() => {
+        if (employee?.role !== role) {
+            setAssignment(''); // Reset assignment if role changes
+        }
+     }, [role, employee]);
+
+    const handleSendPasswordReset = async () => {
+        if (!email) return;
+        setIsSendingReset(true);
+        const auth = getAuth();
+        try {
+            await sendPasswordResetEmail(auth, email);
+            toast({
+                title: "Password Reset Email Sent",
+                description: `An email has been sent to ${email} with instructions.`
+            });
+            setShowPasswordReset(false);
+        } catch (error: any) {
+             toast({
+                variant: "destructive",
+                title: "Failed to Send Email",
+                description: error.message
+            });
+        } finally {
+            setIsSendingReset(false);
+        }
+    };
+
     const handleSubmit = async () => {
-        if (!name || !code || !role || !assignment || !email) {
-            toast({ variant: "destructive", title: "Validation Error", description: "Please fill all fields." });
+        let finalAssignment = assignment;
+        if (role === 'Head Office' || role === 'Super Admin') {
+            finalAssignment = 'Head Office';
+        }
+
+        if (!name || !code || !role || !finalAssignment || !email) {
+            toast({ variant: "destructive", title: "Validation Error", description: "Please fill all required fields." });
             return;
         }
 
         if (employee) { // Update existing employee
-            const updatedData: Partial<Employee> = { name, bengaliName, code, role: role as Employee['role'], assignment, email };
+            const updatedData: Partial<Employee> = { name, bengaliName, code, role: role as Employee['role'], assignment: finalAssignment, email };
             await setDoc(doc(firestore, 'employees', employee.id), updatedData, { merge: true });
             toast({ title: "Employee updated" });
             onClose();
@@ -392,7 +478,7 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
                 toast({ variant: "destructive", title: "Validation Error", description: "Password must be at least 6 characters long." });
                 return;
             }
-            if (existingUsers.some((u: Employee) => u.email && u.email.toLowerCase() === email.toLowerCase())) {
+             if (existingUsers.some((u: Employee) => u.email && u.email.toLowerCase() === email.toLowerCase())) {
                 toast({ variant: "destructive", title: "Email exists", description: "This email is already in use." });
                 return;
             }
@@ -419,7 +505,7 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
                     bengaliName,
                     code,
                     role: role as Employee['role'],
-                    assignment,
+                    assignment: finalAssignment,
                 };
                 await setDoc(newDocRef, newEmployee);
                 toast({ title: "Employee created successfully" });
@@ -431,6 +517,30 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
             }
         }
     };
+    
+    const renderAssignmentDropdown = () => {
+        const commonProps = {
+            onValueChange: setAssignment,
+            value: assignment
+        };
+
+        switch(role) {
+            case 'Regional User':
+                return <Select {...commonProps}><SelectTrigger><SelectValue placeholder="Select a region"/></SelectTrigger><SelectContent>{regions.map((r: Region) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent></Select>
+            case 'Zonal User':
+                 return <Select {...commonProps}><SelectTrigger><SelectValue placeholder="Select a zone"/></SelectTrigger><SelectContent>{zones.map((z: Zone) => <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>)}</SelectContent></Select>
+            case 'Area User':
+                 return <Select {...commonProps}><SelectTrigger><SelectValue placeholder="Select an area"/></SelectTrigger><SelectContent>{areas.map((a: Area) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select>
+            case 'Branch User':
+                 return <Select {...commonProps}><SelectTrigger><SelectValue placeholder="Select a branch"/></SelectTrigger><SelectContent>{branches.map((b: Branch) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent></Select>
+            case 'Head Office':
+            case 'Super Admin':
+                return <Input value="Head Office" disabled />
+            default:
+                return <Input value="Select a role first" disabled />
+        }
+    }
+
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -441,18 +551,8 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
                 <div className="grid gap-3 py-4">
                     <Label>Name (English)</Label><Input value={name} onChange={(e) => setName(e.target.value)} />
                     <Label>Name (Bengali)</Label><Input value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} />
-                     <div className="space-y-1">
-                        <Label>Email (Login ID)</Label>
-                        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                         {employee && (
-                            <p className="text-xs text-muted-foreground pt-1">
-                                Updating this email does not change the user's login. This is for contact purposes only.
-                            </p>
-                        )}
-                    </div>
-                    
+                    <Label>Email (Login ID)</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!!employee} />
                     {!employee && (<><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></>)}
-
                     <Label>Employee Code</Label><Input value={code} onChange={(e) => setCode(e.target.value)} />
                     <Label>Role</Label>
                     <Select onValueChange={(v) => setRole(v as Employee['role'])} value={role}>
@@ -460,15 +560,40 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
                         <SelectContent>{roles.map((r: string) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
                     </Select>
                     <Label>Assignment</Label>
-                    <Select onValueChange={setAssignment} value={assignment}>
-                        <SelectTrigger><SelectValue placeholder="Select assignment" /></SelectTrigger>
-                        <SelectContent>{assignments.map((a: string) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-                    </Select>
+                    {renderAssignmentDropdown()}
                 </div>
+
+                {employee && (
+                    <div className="border-t pt-4">
+                        <p className="text-sm font-medium">Manage Password</p>
+                        <p className="text-xs text-muted-foreground pb-2">You cannot directly change a user's password. You can send them a password reset link to their email address ({employee.email}).</p>
+                        <Button variant="outline" size="sm" onClick={() => setShowPasswordReset(true)}><Mail className="mr-2 h-4 w-4"/>Send Password Reset Email</Button>
+                    </div>
+                )}
+                
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>Cancel</Button>
                     <Button onClick={handleSubmit}>Save</Button>
                 </DialogFooter>
+
+                 <AlertDialog open={showPasswordReset} onOpenChange={setShowPasswordReset}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Confirm Password Reset</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This will send a password reset link to <span className="font-semibold">{employee?.email}</span>. The employee must click the link in the email to set a new password.
+                                <br/><br/>
+                                Please advise the employee to check their spam/junk folder if they do not receive it.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel disabled={isSendingReset}>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleSendPasswordReset} disabled={isSendingReset}>
+                                {isSendingReset ? 'Sending...' : 'Send Email'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </DialogContent>
         </Dialog>
     );
@@ -503,7 +628,7 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
                 ) : (
                     <ScrollArea className="h-64">
                         <Table>
-                            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Code</TableHead><TableHead>Role</TableHead><TableHead>Assignment</TableHead></TableRow></TableHeader>
+                            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Code</TableHead><TableHead>Role</TableHead><TableHead>Assignment ID</TableHead></TableRow></TableHeader>
                             <TableBody>{state.data.map((emp: any, index: number) => (<TableRow key={index}><TableCell>{emp.name}</TableCell><TableCell>{emp.email}</TableCell><TableCell>{emp.code}</TableCell><TableCell>{emp.role}</TableCell><TableCell>{emp.assignment}</TableCell></TableRow>))}</TableBody>
                         </Table>
                     </ScrollArea>
