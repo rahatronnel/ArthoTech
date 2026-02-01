@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import type { Employee, Branch } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -299,17 +299,15 @@ export default function EmployeesPage() {
                 </CardContent>
             </Card>
 
-            {isFormOpen && (
-                <FormDialog
-                    isOpen={isFormOpen}
-                    setIsOpen={setIsFormOpen}
-                    employee={editingEmployee}
-                    roles={ROLES}
-                    assignments={assignments}
-                    firestore={firestore}
-                    existingUsers={employeesData || []}
-                />
-            )}
+            <FormDialog
+                isOpen={isFormOpen}
+                setIsOpen={setIsFormOpen}
+                employee={editingEmployee}
+                roles={ROLES}
+                assignments={assignments}
+                firestore={firestore}
+                existingUsers={employeesData || []}
+            />
             
             {isUploadDialogOpen && (
                 <UploadDialog
@@ -354,13 +352,25 @@ export default function EmployeesPage() {
 
 function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore, existingUsers }: any) {
     const { toast } = useToast();
-    const [name, setName] = useState(employee?.name || '');
-    const [bengaliName, setBengaliName] = useState(employee?.bengaliName || '');
-    const [code, setCode] = useState(employee?.code || '');
-    const [email, setEmail] = useState(employee?.email || '');
+    const [name, setName] = useState('');
+    const [bengaliName, setBengaliName] = useState('');
+    const [code, setCode] = useState('');
+    const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [role, setRole] = useState<Employee['role'] | ''>(employee?.role || '');
-    const [assignment, setAssignment] = useState(employee?.assignment || '');
+    const [role, setRole] = useState<Employee['role'] | ''>('');
+    const [assignment, setAssignment] = useState('');
+
+    useEffect(() => {
+        if (isOpen) {
+            setName(employee?.name || '');
+            setBengaliName(employee?.bengaliName || '');
+            setCode(employee?.code || '');
+            setEmail(employee?.email || '');
+            setPassword('');
+            setRole(employee?.role || '');
+            setAssignment(employee?.assignment || '');
+        }
+    }, [employee, isOpen]);
 
     const handleSubmit = async () => {
         if (!name || !code || !role || !assignment || !email) {
@@ -493,6 +503,8 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
         </Dialog>
     );
 }
+
+    
 
     
 
