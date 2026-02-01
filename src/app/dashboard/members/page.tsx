@@ -19,7 +19,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useAuth } from '@/context/AuthContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collectionGroup, query } from 'firebase/firestore';
-import type { Group } from '@/lib/data';
+import type { Group, Branch } from '@/lib/data';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -62,19 +62,30 @@ export default function MembersPage() {
   const { currentUser } = useAuth();
   const firestore = useFirestore();
 
+  const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
+  const { data: branchesData, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
+
   const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
   const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
 
+  const userBranch = useMemo(() => {
+    if (!branchesData || !currentUser || currentUser.role !== 'Branch User') return null;
+    return branchesData.find(b => b.name === currentUser.assignment);
+  }, [branchesData, currentUser]);
+  
   const userVisibleGroups = useMemo(() => {
-    if (!groupsData) return [];
-    if (currentUser?.role === 'Super Admin') {
+      if (!groupsData) return [];
+      if (currentUser?.role === 'Branch User') {
+          if (!userBranch) return [];
+          return groupsData.filter(g => g.branchId === userBranch.id);
+      }
       return groupsData;
-    }
-    return groupsData.filter(g => g.responsibleEmployeeId === currentUser?.id);
-  }, [groupsData, currentUser]);
+  }, [groupsData, currentUser, userBranch]);
+
 
   // State for the entry form
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [entryBranchId, setEntryBranchId] = useState(userBranch?.id || '');
   const [groupId, setGroupId] = useState('');
   const [added, setAdded] = useState(0);
   const [dropped, setDropped] = useState(0);
@@ -88,11 +99,17 @@ export default function MembersPage() {
 
   // State for the report
   const [searchDate, setSearchDate] = useState('');
+  const [filterBranchId, setFilterBranchId] = useState(userBranch?.id || 'all');
   const [reportData, setReportData] = useState<ReportRow[] | null>(null);
   
   // State for deletion
   const [isDeleteByDateOpen, setIsDeleteByDateOpen] = useState(false);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+  
+  const formGroups = useMemo(() => {
+      if (!entryBranchId) return [];
+      return groupsData?.filter(g => g.branchId === entryBranchId) || [];
+  }, [entryBranchId, groupsData]);
 
   const handleAddChange = () => {
     if (!date || !groupId || (added === 0 && dropped === 0)) {
@@ -109,6 +126,7 @@ export default function MembersPage() {
       description: `Member change for ${groupsData?.find(g => g.id === groupId)?.name} on ${date} has been saved.`
     });
     // Reset form
+    if (currentUser?.role === 'Super Admin') setEntryBranchId('');
     setGroupId('');
     setAdded(0);
     setDropped(0);
@@ -170,7 +188,7 @@ export default function MembersPage() {
           .filter((row): row is UploadedRow => row !== null);
 
         if (validData.length === 0) {
-            toast({ variant: "destructive", title: "Invalid File", description: "The uploaded file contains no valid data to process." });
+            toast({ variant: "destructive", title: "Invalid File", description: "The uploaded file contains no valid data for your assigned branch." });
             return;
         }
 
@@ -228,7 +246,11 @@ export default function MembersPage() {
     }
     const targetDate = parseISO(searchDate);
 
-    const report = userVisibleGroups.map(group => {
+    const groupsForReport = filterBranchId === 'all' 
+        ? userVisibleGroups
+        : userVisibleGroups.filter(g => g.branchId === filterBranchId);
+
+    const report = groupsForReport.map(group => {
         const openingBalance = group.initialMembers + memberChanges
             .filter(c => c.groupId === group.id && isBefore(parseISO(c.date), targetDate))
             .reduce((acc, c) => acc + c.added - c.dropped, 0);
@@ -270,6 +292,7 @@ export default function MembersPage() {
     setReportData(null); // Refresh report view
   };
 
+  const isLoading = groupsLoading || branchesLoading;
 
   return (
     <div className="flex flex-col gap-6">
@@ -297,13 +320,26 @@ export default function MembersPage() {
               <Input id="change-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="group">Group</Label>
-              <Select onValueChange={setGroupId} value={groupId} disabled={groupsLoading}>
+              <Label htmlFor="entry-branch">Branch</Label>
+              <Select onValueChange={(val) => { setEntryBranchId(val); setGroupId(''); }} value={entryBranchId} disabled={currentUser?.role === 'Branch User'}>
                 <SelectTrigger>
-                  <SelectValue placeholder={groupsLoading ? "Loading groups..." : "Select a group"} />
+                  <SelectValue placeholder="Select a branch" />
                 </SelectTrigger>
                 <SelectContent>
-                  {userVisibleGroups.map(g => (
+                  {branchesData?.map(b => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="group">Group</Label>
+              <Select onValueChange={setGroupId} value={groupId} disabled={!entryBranchId}>
+                <SelectTrigger>
+                  <SelectValue placeholder={!entryBranchId ? "Select a branch first" : "Select a group"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {formGroups.map(g => (
                     <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>
                   ))}
                 </SelectContent>
@@ -323,7 +359,7 @@ export default function MembersPage() {
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea id="notes" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Optional notes..."/>
             </div>
-            <Button onClick={handleAddChange} className="w-full" disabled={groupsLoading}>Save Change</Button>
+            <Button onClick={handleAddChange} className="w-full" disabled={isLoading}>Save Change</Button>
           </CardContent>
         </Card>
 
@@ -333,9 +369,9 @@ export default function MembersPage() {
             <CardDescription>Download the template, fill it out, and upload it here.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-             <Button onClick={handleDownloadTemplate} variant="outline" className="w-full" disabled={groupsLoading}>
+             <Button onClick={handleDownloadTemplate} variant="outline" className="w-full" disabled={isLoading}>
                 <Download className="mr-2 h-4 w-4" />
-                {groupsLoading ? "Loading..." : "Download Template"}
+                {isLoading ? "Loading..." : "Download Template"}
             </Button>
             <div className="space-y-2">
               <Label htmlFor="bulk-upload">Upload Filled Template</Label>
@@ -344,9 +380,9 @@ export default function MembersPage() {
                 File must be the downloaded template with your data filled in.
               </p>
             </div>
-            <Button onClick={handleProcessUpload} className="w-full" disabled={!file || groupsLoading}>
+            <Button onClick={handleProcessUpload} className="w-full" disabled={!file || isLoading}>
               <Upload className="mr-2 h-4 w-4" />
-              {groupsLoading ? "Loading..." : "Upload and Preview"}
+              {isLoading ? "Loading..." : "Upload and Preview"}
             </Button>
           </CardContent>
         </Card>
@@ -355,20 +391,34 @@ export default function MembersPage() {
       <Card>
         <CardHeader>
           <CardTitle>Member Balance Report</CardTitle>
-          <CardDescription>Select a date to see the member balance for each group.</CardDescription>
+          <CardDescription>Select a date and branch to see the member balance for each group.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <div className="space-y-2 flex-grow">
+                <Label htmlFor="report-branch">Branch</Label>
+                <Select onValueChange={setFilterBranchId} value={filterBranchId} disabled={currentUser?.role === 'Branch User'}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select a branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {currentUser?.role === 'Super Admin' && <SelectItem value="all">All Branches</SelectItem>}
+                        {branchesData?.filter(b => currentUser?.role === 'Super Admin' || b.name === currentUser?.assignment).map(b => (
+                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className="space-y-2 flex-grow">
               <Label htmlFor="search-date">Report Date</Label>
               <Input id="search-date" type="date" value={searchDate} onChange={(e) => setSearchDate(e.target.value)} />
             </div>
-            <Button onClick={handleSearch} className="w-full sm:w-auto" disabled={groupsLoading}>Search</Button>
+            <Button onClick={handleSearch} className="w-full sm:w-auto" disabled={isLoading}>Search</Button>
              {searchDate && <Button variant="destructive" onClick={() => setIsDeleteByDateOpen(true)} className="w-full sm:w-auto gap-1"><Trash2 className="h-4 w-4" />Delete Data for {searchDate}</Button>}
           </div>
           
           <div className="mt-6">
-              {groupsLoading ? (
+              {isLoading ? (
                  <div className="space-y-2">
                     <Skeleton className="h-8 w-full" />
                     <Skeleton className="h-8 w-full" />
@@ -399,7 +449,7 @@ export default function MembersPage() {
                   </Table>
               ) : (
                   <div className="text-center py-10 text-muted-foreground">
-                      <p>Please select a date and click "Search" to view the report.</p>
+                      <p>Please select a date and branch, then click "Search" to view the report.</p>
                   </div>
               )}
           </div>
@@ -479,5 +529,7 @@ export default function MembersPage() {
     </div>
   );
 }
+
+    
 
     

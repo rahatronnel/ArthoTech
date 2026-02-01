@@ -96,13 +96,19 @@ export default function RawDataEntryPage() {
     const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
     const { data: branchesData, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
 
+    const userBranch = useMemo(() => {
+        if (!branchesData || !currentUser || currentUser.role !== 'Branch User') return null;
+        return branchesData.find(b => b.name === currentUser.assignment);
+    }, [branchesData, currentUser]);
+    
     const userVisibleGroups = useMemo(() => {
         if (!groupsData || !currentUser) return [];
-        if (currentUser.role === 'Super Admin') {
-            return groupsData;
+        if (currentUser.role === 'Branch User') {
+            if (!userBranch) return [];
+            return groupsData.filter(g => g.branchId === userBranch.id);
         }
-        return groupsData.filter(g => g.responsibleEmployeeId === currentUser.id);
-    }, [groupsData, currentUser]);
+        return groupsData;
+    }, [groupsData, currentUser, userBranch]);
     
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -286,15 +292,32 @@ export default function RawDataEntryPage() {
         const groupMap = new Map(groupsData.map(g => [String(g.code).trim().toLowerCase(), g]));
         const branchMap = new Map(branchesData.map(b => [b.id, b]));
         const othersEntriesToAdd: Omit<OtherDataEntry, 'id'>[] = [];
+        let skippedRowCount = 0;
+        let processedRowCount = 0;
+
+        const userBranchId = (currentUser?.role === 'Branch User' && userBranch) ? userBranch.id : null;
 
         uploadedData.forEach(row => {
             const normalizedSamityId = String(row['Samity ID']).trim().toLowerCase();
             const group = groupMap.get(normalizedSamityId);
-            if (!group) return;
+
+            if (!group) {
+                skippedRowCount++;
+                return;
+            }
+            
+            if (userBranchId && group.branchId !== userBranchId) {
+                skippedRowCount++;
+                return;
+            }
 
             const branch = branchMap.get(group.branchId);
-            if (!branch) return;
+            if (!branch) {
+                skippedRowCount++;
+                return;
+            };
 
+            processedRowCount++;
             const notes = `Raw data upload for ${group.name}`;
 
             // Savings
@@ -369,7 +392,16 @@ export default function RawDataEntryPage() {
             addBulkOthersData(othersEntriesToAdd);
         }
 
-        toast({ title: "Upload Confirmed", description: `${uploadedData.length} transaction rows processed successfully.` });
+        if (skippedRowCount > 0) {
+            toast({
+                variant: 'destructive',
+                title: 'Some rows were skipped',
+                description: `${skippedRowCount} rows were skipped because the group code was invalid or did not belong to your branch.`,
+                duration: 7000,
+            });
+        }
+
+        toast({ title: "Upload Confirmed", description: `${processedRowCount} transaction rows processed successfully.` });
         
         setIsConfirmDialogOpen(false);
         setUploadedData([]);
@@ -1041,3 +1073,5 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
         </Dialog>
     );
 };
+
+    
