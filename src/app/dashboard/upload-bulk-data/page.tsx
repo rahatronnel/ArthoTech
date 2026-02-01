@@ -14,10 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from '@/hooks/use-toast';
-import { Upload, Download, MoreHorizontal, Trash2, Edit, PlusCircle } from 'lucide-react';
+import { Upload, Download, Trash2, Edit, PlusCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collectionGroup, query } from 'firebase/firestore';
 
@@ -506,17 +505,16 @@ export default function OthersDataPage() {
                                     <TableCell>{entry.notes}</TableCell>
                                     <TableCell className="text-right">{formatCurrency(entry.amount)}</TableCell>
                                     <TableCell className="text-right">
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button aria-haspopup="true" size="icon" variant="ghost">
-                                                    <MoreHorizontal className="h-4 w-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onSelect={() => handleEditClick(entry)}><Edit className="mr-2 h-4 w-4"/>Edit</DropdownMenuItem>
-                                                <DropdownMenuItem onSelect={() => handleDeleteClick(entry)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4"/>Delete</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        <div className="flex items-center justify-end gap-2">
+                                            <Button variant="ghost" size="icon" onClick={() => handleEditClick(entry)}>
+                                                <Edit className="h-4 w-4" />
+                                                <span className="sr-only">Edit</span>
+                                            </Button>
+                                            <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(entry)} className="text-destructive hover:text-destructive">
+                                                <Trash2 className="h-4 w-4" />
+                                                <span className="sr-only">Delete</span>
+                                            </Button>
+                                        </div>
                                     </TableCell>
                                 </TableRow>
                             ))}
@@ -621,3 +619,4 @@ export default function OthersDataPage() {
         </div>
     );
 }
+
