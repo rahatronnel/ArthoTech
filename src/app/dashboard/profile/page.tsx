@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -88,51 +89,51 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
       
-      <Card>
-        <CardHeader>
-          <CardTitle>Change Password</CardTitle>
-          <CardDescription>Update your login password.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
-             <div className="space-y-2">
-              <Label htmlFor="current-password">Current Password</Label>
-              <Input
-                id="current-password"
-                type="password"
-                required
-                value={currentPassword}
-                onChange={(e) => setCurrentPassword(e.target.value)}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
-              <Input
-                id="new-password"
-                type="password"
-                required
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-              />
-            </div>
-             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm New Password</Label>
-              <Input
-                id="confirm-password"
-                type="password"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-            </div>
-             <Button type="submit" disabled={isLoading}>
-              {isLoading ? 'Updating...' : 'Update Password'}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      {currentUser?.role === 'Super Admin' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Change Password</CardTitle>
+            <CardDescription>Update your login password.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
+              <div className="space-y-2">
+                <Label htmlFor="current-password">Current Password</Label>
+                <Input
+                  id="current-password"
+                  type="password"
+                  required
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm New Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+              <Button type="submit" disabled={isLoading}>
+                {isLoading ? 'Updating...' : 'Update Password'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
-
-    
