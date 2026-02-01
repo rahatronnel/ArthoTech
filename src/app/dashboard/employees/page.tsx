@@ -20,7 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 
 // --- Constants and Types ---
 const ROLES: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office', 'Super Admin'];
@@ -363,6 +363,7 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<Employee['role'] | ''>('');
     const [assignment, setAssignment] = useState('');
+    const [isSendingReset, setIsSendingReset] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -375,6 +376,34 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
             setAssignment(employee?.assignment || '');
         }
     }, [employee, isOpen]);
+    
+    const handlePasswordReset = async () => {
+      if (!email) {
+          toast({
+              variant: "destructive",
+              title: "Email Address Required",
+              description: "Cannot send a password reset without an email address.",
+          });
+          return;
+      }
+      setIsSendingReset(true);
+      const auth = getAuth();
+      try {
+          await sendPasswordResetEmail(auth, email);
+          toast({
+              title: "Password Reset Email Sent",
+              description: `A password reset link has been sent to ${email}.`,
+          });
+      } catch (error: any) {
+          toast({
+              variant: "destructive",
+              title: "Error Sending Email",
+              description: error.message,
+          });
+      } finally {
+          setIsSendingReset(false);
+      }
+    };
 
     const handleSubmit = async () => {
         if (!name || !code || !role || !assignment || !email) {
@@ -441,16 +470,37 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
                 <div className="grid gap-3 py-4">
                     <Label>Name (English)</Label><Input value={name} onChange={(e) => setName(e.target.value)} />
                     <Label>Name (Bengali)</Label><Input value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} />
-                    <div className="space-y-1">
+                     <div className="space-y-1">
                         <Label>Email (Login ID)</Label>
                         <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                          {employee && (
                             <p className="text-xs text-muted-foreground pt-1">
-                                Changing this does not change the login email. The user must be deleted and re-created to change their login credential.
+                                To change a user's login, you must delete and re-create their account. This only updates their contact email.
                             </p>
                         )}
                     </div>
+                    
                     {!employee && (<><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></>)}
+
+                    {employee && (
+                      <div className="space-y-2 rounded-lg border bg-background/50 p-3 mt-2">
+                        <h4 className="font-semibold text-sm text-foreground">Manage Password</h4>
+                        <p className="text-xs text-muted-foreground">
+                            For security, you cannot directly change a user's password. You can send them a secure link to reset it themselves.
+                        </p>
+                        <Button
+                            variant="secondary"
+                            className="mt-2"
+                            size="sm"
+                            type="button"
+                            onClick={handlePasswordReset}
+                            disabled={isSendingReset}
+                        >
+                            {isSendingReset ? 'Sending Email...' : 'Send Password Reset Email'}
+                        </Button>
+                      </div>
+                    )}
+
                     <Label>Employee Code</Label><Input value={code} onChange={(e) => setCode(e.target.value)} />
                     <Label>Role</Label>
                     <Select onValueChange={(v) => setRole(v as Employee['role'])} value={role}>
@@ -515,5 +565,7 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
         </Dialog>
     );
 }
+
+    
 
     
