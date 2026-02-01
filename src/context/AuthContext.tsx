@@ -5,8 +5,10 @@ import { useRouter } from 'next/navigation';
 import type { Employee } from '@/lib/data';
 import type { User } from 'firebase/auth';
 import { useFirebase } from '@/firebase/provider';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { collection, query, where, getDocs, doc, setDoc } from 'firebase/firestore';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { firebaseConfig } from '@/firebase/config';
 
 
 type AuthContextType = {
@@ -32,6 +34,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
     };
     
+    const ensureSuperAdminExists = async () => {
+      const q = query(collection(firestore, "employees"), where("email", "==", "superadmin@example.com"));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        console.log("Super Admin not found in Firestore, attempting to create...");
+        const tempApp = initializeApp(firebaseConfig, `superadmin-creation-${Date.now()}`);
+        const tempAuth = getAuth(tempApp);
+        try {
+          const userCredential = await createUserWithEmailAndPassword(tempAuth, "superadmin@example.com", "abc123");
+          const uid = userCredential.user.uid;
+          
+          const newDocRef = doc(collection(firestore, "employees"));
+          const newEmployee: Employee = {
+              id: newDocRef.id,
+              uid: uid,
+              email: "superadmin@example.com",
+              name: "Super Admin",
+              bengaliName: "সুপার অ্যাডমিন",
+              code: "S_ADMIN",
+              role: 'Super Admin',
+              assignment: 'Head Office',
+          };
+          await setDoc(newDocRef, newEmployee);
+          console.log("Super Admin user created successfully.");
+        } catch (error: any) {
+          if (error.code === 'auth/email-already-in-use') {
+            console.log("Super Admin auth user already exists but Firestore record was missing. This is an inconsistent state and may require manual resolution if login fails.");
+          } else {
+            console.error("Failed to create Super Admin user:", error);
+          }
+        } finally {
+          await deleteApp(tempApp);
+        }
+      }
+    };
+
+    ensureSuperAdminExists();
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setFirebaseUser(user);
       if (user) {
@@ -92,5 +133,3 @@ export function useAuth() {
   }
   return context;
 }
-
-    
