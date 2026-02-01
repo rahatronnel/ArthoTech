@@ -1,3 +1,4 @@
+
 "use client";
 
 import { usePathname } from "next/navigation";
@@ -60,6 +61,7 @@ export function Header() {
               <DropdownMenuLabel>
                 <p className="font-medium">{currentUser?.name}</p>
                 <p className="text-xs text-muted-foreground font-normal">{currentUser?.email}</p>
+                <p className="text-xs text-muted-foreground pt-1">Assignment: <span className="font-semibold">{currentUser?.assignment}</span></p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>

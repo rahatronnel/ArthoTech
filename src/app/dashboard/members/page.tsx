@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -85,7 +85,7 @@ export default function MembersPage() {
 
   // State for the entry form
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [entryBranchId, setEntryBranchId] = useState(userBranch?.id || '');
+  const [entryBranchId, setEntryBranchId] = useState('');
   const [groupId, setGroupId] = useState('');
   const [added, setAdded] = useState(0);
   const [dropped, setDropped] = useState(0);
@@ -99,12 +99,19 @@ export default function MembersPage() {
 
   // State for the report
   const [searchDate, setSearchDate] = useState('');
-  const [filterBranchId, setFilterBranchId] = useState(userBranch?.id || 'all');
+  const [filterBranchId, setFilterBranchId] = useState('all');
   const [reportData, setReportData] = useState<ReportRow[] | null>(null);
   
   // State for deletion
   const [isDeleteByDateOpen, setIsDeleteByDateOpen] = useState(false);
   const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
+
+  useEffect(() => {
+    if (currentUser?.role === 'Branch User' && userBranch) {
+      setEntryBranchId(userBranch.id);
+      setFilterBranchId(userBranch.id);
+    }
+  }, [currentUser, userBranch]);
   
   const formGroups = useMemo(() => {
       if (!entryBranchId) return [];
