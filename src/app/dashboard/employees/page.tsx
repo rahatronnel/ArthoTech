@@ -48,9 +48,6 @@ export default function EmployeesPage() {
     const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
     const { data: branchesData, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
     
-
-    const employees = useMemo(() => employeesData?.filter(e => e.role !== 'Super Admin') || [], [employeesData]);
-    
     // --- State Management ---
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -65,6 +62,9 @@ export default function EmployeesPage() {
         progress: number;
     }>({ status: 'idle', data: [], errors: [], progress: 0 });
 
+    const [filterBranchId, setFilterBranchId] = useState<string>('all');
+    const [filterCode, setFilterCode] = useState<string>('');
+
     const isLoading = employeesLoading || branchesLoading || areasLoading || zonesLoading || regionsLoading;
 
      const assignmentMaps = useMemo(() => {
@@ -75,6 +75,42 @@ export default function EmployeesPage() {
             branches: new Map(branchesData?.map(b => [b.id, b.name])),
         };
     }, [regionsData, zonesData, areasData, branchesData]);
+    
+    const employees = useMemo(() => employeesData?.filter(e => e.role !== 'Super Admin') || [], [employeesData]);
+
+    const filteredEmployees = useMemo(() => {
+        let employeesToFilter = employees;
+
+        // Filter by branch hierarchy
+        if (filterBranchId !== 'all' && branchesData) {
+            const selectedBranch = branchesData.find(b => b.id === filterBranchId);
+            if (selectedBranch) {
+                const relevantIds = {
+                    branch: selectedBranch.id,
+                    area: selectedBranch.areaId,
+                    zone: selectedBranch.zoneId,
+                    region: selectedBranch.regionId
+                };
+                employeesToFilter = employeesToFilter.filter(e => {
+                    return (e.role === 'Branch User' && e.assignment === relevantIds.branch) ||
+                           (e.role === 'Area User' && e.assignment === relevantIds.area) ||
+                           (e.role === 'Zonal User' && e.assignment === relevantIds.zone) ||
+                           (e.role === 'Regional User' && e.assignment === relevantIds.region);
+                });
+            }
+        }
+
+        // Filter by employee code
+        if (filterCode) {
+            employeesToFilter = employeesToFilter.filter(e => 
+                e.code.toLowerCase().includes(filterCode.toLowerCase())
+            );
+        }
+        
+        return employeesToFilter;
+
+    }, [employees, branchesData, filterBranchId, filterCode]);
+
 
     const getAssignmentName = (employee: Employee): string => {
         if (employee.assignment === 'Head Office') return 'Head Office';
@@ -309,6 +345,32 @@ export default function EmployeesPage() {
                     </div>
                 </CardHeader>
                 <CardContent>
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="branch-filter">Filter by Branch</Label>
+                            <Select value={filterBranchId} onValueChange={setFilterBranchId}>
+                                <SelectTrigger id="branch-filter" className="w-[250px]">
+                                    <SelectValue placeholder="Select a branch" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Branches</SelectItem>
+                                    {branchesData?.map(branch => (
+                                        <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="code-filter">Filter by Code</Label>
+                            <Input
+                                id="code-filter"
+                                placeholder="Enter employee code"
+                                value={filterCode}
+                                onChange={e => setFilterCode(e.target.value)}
+                                className="w-[250px]"
+                            />
+                        </div>
+                    </div>
                     {isLoading ? <p>Loading employees...</p> : (
                         <Table>
                             <TableHeader>
@@ -322,7 +384,7 @@ export default function EmployeesPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {employees.map((emp) => (
+                                {filteredEmployees.map((emp) => (
                                     <TableRow key={emp.id}>
                                         <TableCell className="font-medium">{emp.name}</TableCell>
                                         <TableCell className="text-muted-foreground">{emp.email}</TableCell>
@@ -642,3 +704,5 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
         </Dialog>
     );
 }
+
+    
