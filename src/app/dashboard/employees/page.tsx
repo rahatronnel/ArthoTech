@@ -13,14 +13,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { useCollection, useFirestore, useMemoFirebase, useAuth } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, deleteApp } from 'firebase/app';
-import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 
 // --- Constants and Types ---
 const ROLES: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office', 'Super Admin'];
@@ -254,10 +254,10 @@ export default function EmployeesPage() {
                         <CardDescription>Manage staff, their roles, and their login credentials.</CardDescription>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                        <Button size="sm" variant="outline" onClick={handleDownloadTemplate}><FileDown />Download</Button>
-                        <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploadState.status === 'validating'}><FileUp />{uploadState.status === 'validating' ? 'Processing...' : 'Upload'}</Button>
-                        <Button size="sm" variant="destructive" onClick={() => setIsDeleteAllOpen(true)}><Trash2 />Delete All</Button>
-                        <Button size="sm" onClick={handleAddNew}><PlusCircle />New Employee</Button>
+                        <Button size="sm" variant="outline" className="gap-1" onClick={handleDownloadTemplate}><FileDown />Download</Button>
+                        <Button size="sm" variant="outline" className="gap-1" onClick={() => fileInputRef.current?.click()} disabled={uploadState.status === 'validating'}><FileUp />{uploadState.status === 'validating' ? 'Processing...' : 'Upload'}</Button>
+                        <Button size="sm" variant="destructive" className="gap-1" onClick={() => setIsDeleteAllOpen(true)}><Trash2 />Delete All</Button>
+                        <Button size="sm" className="gap-1" onClick={handleAddNew}><PlusCircle />New Employee</Button>
                     </div>
                 </CardHeader>
                 <CardContent>
@@ -356,7 +356,6 @@ export default function EmployeesPage() {
 
 function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, existingUsers }: any) {
     const { toast } = useToast();
-    const auth = useAuth();
     const [name, setName] = useState('');
     const [bengaliName, setBengaliName] = useState('');
     const [code, setCode] = useState('');
@@ -364,8 +363,6 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
     const [password, setPassword] = useState('');
     const [role, setRole] = useState<Employee['role'] | ''>('');
     const [assignment, setAssignment] = useState('');
-    const [isSendingReset, setIsSendingReset] = useState(false);
-    const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -379,28 +376,6 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
         }
     }, [employee, isOpen]);
     
-    const confirmPasswordReset = async () => {
-      setIsResetConfirmOpen(false);
-      if (!email) return;
-
-      setIsSendingReset(true);
-      try {
-          await sendPasswordResetEmail(auth, email);
-          toast({
-              title: "Password Reset Email Sent",
-              description: `A password reset link has been sent to ${email}.`,
-          });
-      } catch (error: any) {
-          toast({
-              variant: "destructive",
-              title: "Error Sending Email",
-              description: error.message || 'Could not send reset email. Please check the email address and your Firebase project settings.',
-          });
-      } finally {
-          setIsSendingReset(false);
-      }
-    };
-
     const handleSubmit = async () => {
         if (!name || !code || !role || !assignment || !email) {
             toast({ variant: "destructive", title: "Validation Error", description: "Please fill all fields." });
@@ -458,87 +433,44 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
     };
 
     return (
-        <>
-            <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle>{employee ? 'Edit Employee' : 'Create New Employee'}</DialogTitle>
-                    </DialogHeader>
-                    <div className="grid gap-3 py-4">
-                        <Label>Name (English)</Label><Input value={name} onChange={(e) => setName(e.target.value)} />
-                        <Label>Name (Bengali)</Label><Input value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} />
-                         <div className="space-y-1">
-                            <Label>Email (Login ID)</Label>
-                            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!!employee} />
-                             {employee && (
-                                <p className="text-xs text-muted-foreground pt-1">
-                                    A user's login email cannot be changed after creation.
-                                </p>
-                            )}
-                        </div>
-                        
-                        {!employee && (<><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></>)}
-
-                        {employee && (
-                          <div className="space-y-2 rounded-lg border bg-background/50 p-3 mt-2">
-                            <h4 className="font-semibold text-sm text-foreground">Manage Password</h4>
-                            <p className="text-xs text-muted-foreground">
-                                For security, you cannot directly change a user's password. You can send them a secure link to reset it themselves.
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>{employee ? 'Edit Employee' : 'Create New Employee'}</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-3 py-4">
+                    <Label>Name (English)</Label><Input value={name} onChange={(e) => setName(e.target.value)} />
+                    <Label>Name (Bengali)</Label><Input value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} />
+                     <div className="space-y-1">
+                        <Label>Email (Login ID)</Label>
+                        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                         {employee && (
+                            <p className="text-xs text-muted-foreground pt-1">
+                                Updating this email does not change the user's login. This is for contact purposes only.
                             </p>
-                            <Button
-                                variant="secondary"
-                                className="mt-2"
-                                size="sm"
-                                type="button"
-                                onClick={() => {
-                                  if (!email) {
-                                      toast({ variant: "destructive", title: "Email Required", description: "Employee must have an email to send a reset link." });
-                                      return;
-                                  }
-                                  setIsResetConfirmOpen(true);
-                                }}
-                                disabled={isSendingReset}
-                            >
-                                {isSendingReset ? 'Sending Email...' : 'Send Password Reset Email'}
-                            </Button>
-                          </div>
                         )}
-
-                        <Label>Employee Code</Label><Input value={code} onChange={(e) => setCode(e.target.value)} />
-                        <Label>Role</Label>
-                        <Select onValueChange={(v) => setRole(v as Employee['role'])} value={role}>
-                            <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
-                            <SelectContent>{roles.map((r: string) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                        </Select>
-                        <Label>Assignment</Label>
-                        <Select onValueChange={setAssignment} value={assignment}>
-                            <SelectTrigger><SelectValue placeholder="Select assignment" /></SelectTrigger>
-                            <SelectContent>{assignments.map((a: string) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-                        </Select>
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={onClose}>Cancel</Button>
-                        <Button onClick={handleSubmit}>Save</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-            <AlertDialog open={isResetConfirmOpen} onOpenChange={setIsResetConfirmOpen}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Confirm Password Reset</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    An email with a secure link to reset the password will be sent to <span className="font-medium text-foreground">{email}</span>.
-                    <br/><br/>
-                    Please advise the employee to check their spam or junk folder if it doesn't arrive within a few minutes.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={confirmPasswordReset}>Send Reset Email</AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-        </>
+                    
+                    {!employee && (<><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></>)}
+
+                    <Label>Employee Code</Label><Input value={code} onChange={(e) => setCode(e.target.value)} />
+                    <Label>Role</Label>
+                    <Select onValueChange={(v) => setRole(v as Employee['role'])} value={role}>
+                        <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
+                        <SelectContent>{roles.map((r: string) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                    </Select>
+                    <Label>Assignment</Label>
+                    <Select onValueChange={setAssignment} value={assignment}>
+                        <SelectTrigger><SelectValue placeholder="Select assignment" /></SelectTrigger>
+                        <SelectContent>{assignments.map((a: string) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                    </Select>
+                </div>
+                <DialogFooter>
+                    <Button variant="outline" onClick={onClose}>Cancel</Button>
+                    <Button onClick={handleSubmit}>Save</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 }
 
@@ -585,7 +517,3 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
         </Dialog>
     );
 }
-
-    
-
-    
