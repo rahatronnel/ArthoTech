@@ -1,37 +1,81 @@
-
 "use client";
 
-import { createContext, useState, useContext, ReactNode } from 'react';
+import { createContext, useState, useContext, ReactNode, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import type { Employee } from '@/lib/data';
 import type { User } from 'firebase/auth';
+import { useFirebase } from '@/firebase/provider';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
-// Mock Super Admin user
-const mockSuperAdmin: Employee = {
-  id: 'superadmin-001',
-  code: 'SUPERADMIN',
-  name: 'Super Admin',
-  bengaliName: 'সুপার অ্যাডমিন',
-  role: 'Super Admin',
-  assignment: 'Head Office',
-};
 
 type AuthContextType = {
   currentUser: Employee | null;
-  firebaseUser: User | null; // This will be null
+  firebaseUser: User | null;
   loading: boolean;
+  logout: () => void;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Always return the mock user and set loading to false.
-  const [currentUser] = useState<Employee | null>(mockSuperAdmin);
-  const [loading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<Employee | null>(null);
+  const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  const { auth, firestore } = useFirebase();
+
+  useEffect(() => {
+    if (!auth || !firestore) {
+        setLoading(false);
+        return;
+    };
+    
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      setFirebaseUser(user);
+      if (user) {
+        // User is signed in, find their employee data.
+        const q = query(collection(firestore, "employees"), where("uid", "==", user.uid));
+        try {
+          const querySnapshot = await getDocs(q);
+          if (!querySnapshot.empty) {
+            const employeeDoc = querySnapshot.docs[0];
+            setCurrentUser({ id: employeeDoc.id, ...employeeDoc.data() } as Employee);
+          } else {
+            console.warn(`No employee document found for authenticated user ${user.uid}`);
+            setCurrentUser(null);
+            await signOut(auth); // Log out user if no employee profile
+          }
+        } catch (error) {
+           console.error("Error fetching employee document:", error);
+           setCurrentUser(null);
+           await signOut(auth);
+        }
+      } else {
+        // User is signed out.
+        setCurrentUser(null);
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [auth, firestore]);
+  
+  const logout = async () => {
+    if (auth) {
+        await signOut(auth);
+        setCurrentUser(null);
+        setFirebaseUser(null);
+        router.push('/login');
+    }
+  };
 
   const value: AuthContextType = {
     currentUser,
-    firebaseUser: null, // No real Firebase user
+    firebaseUser,
     loading,
+    logout,
   };
 
   return (
@@ -48,3 +92,5 @@ export function useAuth() {
   }
   return context;
 }
+
+    

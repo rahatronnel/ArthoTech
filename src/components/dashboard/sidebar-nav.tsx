@@ -28,6 +28,7 @@ import {
   Landmark,
   HandCoins,
   Database,
+  UserCircle,
 } from "lucide-react";
 import { useOrganization } from '@/context/OrganizationContext';
 
@@ -46,6 +47,10 @@ const navItems = [
   { href: "/dashboard/loan-collection", icon: HandCoins, label: "Loan Collection" },
   { href: "/dashboard/upload-bulk-data", icon: Archive, label: "Others Data" },
   { href: "/dashboard/raw-data-entry", icon: Database, label: "Raw Data Entry" },
+];
+
+const settingsNavItems = [
+  { href: "/dashboard/profile", icon: UserCircle, label: "Profile" },
   { href: "/dashboard/roles", icon: ShieldCheck, label: "Roles" },
   { href: "/dashboard/configuration", icon: Settings, label: "Configuration" },
 ];
@@ -91,6 +96,26 @@ export function SidebarNav() {
           ))}
         </SidebarMenu>
       </SidebarContent>
+       <SidebarContent className="p-2 mt-auto border-t border-sidebar-border">
+        <SidebarMenu>
+           {settingsNavItems.map((item) => (
+            <SidebarMenuItem key={item.href}>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname.startsWith(item.href)}
+                tooltip={item.label}
+              >
+                <Link href={item.href}>
+                  <item.icon />
+                  <span>{item.label}</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          ))}
+        </SidebarMenu>
+      </SidebarContent>
     </>
   );
 }
+
+    

@@ -19,9 +19,12 @@ import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGrou
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
+import { firebaseConfig } from '@/firebase/config';
+import { initializeApp, deleteApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 
 // --- Constants and Types ---
-const ROLES: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office'];
+const ROLES: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office', 'Super Admin'];
 
 
 export default function EmployeesPage() {
@@ -74,8 +77,10 @@ export default function EmployeesPage() {
     const confirmDelete = async () => {
         if (!employeeToDelete) return;
         try {
+            // Note: This only deletes the Firestore record. The Firebase Auth user is not deleted.
+            // Deleting auth users requires admin privileges not available in the client SDK.
             await deleteDoc(doc(firestore, "employees", employeeToDelete.id));
-            toast({ title: "Employee Record Deleted", description: `"${employeeToDelete.name}" has been removed.` });
+            toast({ title: "Employee Record Deleted", description: `"${employeeToDelete.name}" has been removed. Their login has not been disabled.` });
         } catch (error: any) {
             toast({ variant: "destructive", title: "Deletion Failed", description: error.message });
         } finally {
@@ -95,7 +100,7 @@ export default function EmployeesPage() {
             const batch = writeBatch(firestore);
             employeesToDelete.forEach(emp => batch.delete(doc(firestore, "employees", emp.id)));
             await batch.commit();
-            toast({ title: `All ${employeesToDelete.length} employee records deleted.` });
+            toast({ title: `All ${employeesToDelete.length} employee records deleted. Their logins have not been disabled.` });
         } catch (error: any) {
             toast({ variant: "destructive", title: "Error Deleting Employees", description: error.message });
         } finally {
@@ -105,7 +110,7 @@ export default function EmployeesPage() {
 
     const handleDownloadTemplate = () => {
         const templateData = [{
-            "Name": "", "Bengali Name": "", "Code": "",
+            "Name": "", "Bengali Name": "", "Code": "", "Email": "", "Password": "",
             "Role": "Branch User | Area User | Zonal User | Regional User | Head Office",
             "Assignment (Branch Name or 'Head Office')": "",
         }];
@@ -147,14 +152,16 @@ export default function EmployeesPage() {
         const errors: string[] = [];
         const validEmployees: any[] = [];
         const existingCodes = new Set(employeesData?.map(e => e.code.toLowerCase()));
+        const existingEmails = new Set(employeesData?.map(e => e.email.toLowerCase()));
         const fileCodes = new Set<string>();
+        const fileEmails = new Set<string>();
         const validAssignments = new Set(assignments);
 
         jsonData.forEach((row, index) => {
-            const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Role': role, 'Assignment (Branch Name or \'Head Office\')': assignment } = row;
+            const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Email': email, 'Password': password, 'Role': role, 'Assignment (Branch Name or \'Head Office\')': assignment } = row;
             const rowIndex = index + 2;
 
-            if (!name || !code || !role || !assignment ) {
+            if (!name || !code || !role || !assignment || !email || !password) {
                 errors.push(`Row ${rowIndex}: Missing required fields.`);
                 return;
             }
@@ -168,17 +175,20 @@ export default function EmployeesPage() {
             }
 
             const normalizedCode = String(code).toLowerCase().trim();
-            if (existingCodes.has(normalizedCode)) {
-                errors.push(`Row ${rowIndex}: Employee Code "${code}" already exists in the database.`);
+            if (existingCodes.has(normalizedCode) || fileCodes.has(normalizedCode)) {
+                errors.push(`Row ${rowIndex}: Employee Code "${code}" already exists.`);
                 return;
             }
-            if (fileCodes.has(normalizedCode)) {
-                errors.push(`Row ${rowIndex}: Duplicate Employee Code "${code}" found in the file.`);
+            
+            const normalizedEmail = String(email).toLowerCase().trim();
+            if (existingEmails.has(normalizedEmail) || fileEmails.has(normalizedEmail)) {
+                 errors.push(`Row ${rowIndex}: Email "${email}" already exists.`);
                 return;
             }
             
             fileCodes.add(normalizedCode);
-            validEmployees.push({ name, bengaliName: bengaliName || '', code: String(code).trim(), role, assignment });
+            fileEmails.add(normalizedEmail);
+            validEmployees.push({ name, bengaliName: bengaliName || '', code: String(code).trim(), email, password, role, assignment });
         });
 
         return { validEmployees, errors };
@@ -190,32 +200,48 @@ export default function EmployeesPage() {
             return;
         }
 
-        setUploadState(s => ({ ...s, status: 'uploading' }));
-        const batch = writeBatch(firestore);
-        
-        uploadState.data.forEach((empData, i) => {
-            setUploadState(s => ({ ...s, progress: ((i + 1) / s.data.length) * 100 }));
-            const newDocRef = doc(collection(firestore, "employees"));
-            const newEmployee: Employee = {
-                id: newDocRef.id,
-                name: empData.name,
-                bengaliName: empData.bengaliName,
-                code: empData.code,
-                role: empData.role,
-                assignment: empData.assignment,
-            };
-            batch.set(newDocRef, newEmployee);
-        });
+        setUploadState(s => ({ ...s, status: 'uploading', progress: 0 }));
 
-        try {
-            await batch.commit();
-            toast({ title: 'Upload Successful', description: `${uploadState.data.length} employees created.` });
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
-        } finally {
-            setIsUploadDialogOpen(false);
-            setUploadState({ status: 'idle', data: [], errors: [], progress: 0 });
+        for (let i = 0; i < uploadState.data.length; i++) {
+            const empData = uploadState.data[i];
+            const tempApp = initializeApp(firebaseConfig, `temp-user-creation-${Date.now()}`);
+            const tempAuth = getAuth(tempApp);
+            
+            try {
+                // Create auth user
+                const userCredential = await createUserWithEmailAndPassword(tempAuth, empData.email, empData.password);
+                const uid = userCredential.user.uid;
+
+                // Create Firestore doc
+                const newDocRef = doc(collection(firestore, "employees"));
+                const newEmployee: Employee = {
+                    id: newDocRef.id,
+                    uid: uid,
+                    email: empData.email,
+                    name: empData.name,
+                    bengaliName: empData.bengaliName,
+                    code: empData.code,
+                    role: empData.role,
+                    assignment: empData.assignment,
+                };
+                await setDoc(newDocRef, newEmployee);
+                
+                setUploadState(s => ({ ...s, progress: ((i + 1) / s.data.length) * 100 }));
+
+            } catch (error: any) {
+                toast({ variant: 'destructive', title: `Error on row ${i+2}`, description: error.message });
+                // Stop the upload on first error
+                setUploadState(s => ({ ...s, status: 'preview' }));
+                await deleteApp(tempApp);
+                return;
+            } finally {
+                await deleteApp(tempApp);
+            }
         }
+        
+        toast({ title: 'Upload Successful', description: `${uploadState.data.length} employees created.` });
+        setIsUploadDialogOpen(false);
+        setUploadState({ status: 'idle', data: [], errors: [], progress: 0 });
     };
     
     // --- Render ---
@@ -226,7 +252,7 @@ export default function EmployeesPage() {
                 <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <CardTitle>Employees</CardTitle>
-                        <CardDescription>Manage staff and their roles.</CardDescription>
+                        <CardDescription>Manage staff, their roles, and their login credentials.</CardDescription>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
                         <Button size="sm" variant="outline" onClick={handleDownloadTemplate}><FileDown />Download</Button>
@@ -241,7 +267,7 @@ export default function EmployeesPage() {
                             <TableHeader>
                                 <TableRow>
                                     <TableHead>Name</TableHead>
-                                    <TableHead>Bengali Name</TableHead>
+                                    <TableHead>Email</TableHead>
                                     <TableHead>Code</TableHead>
                                     <TableHead>Role</TableHead>
                                     <TableHead>Assignment</TableHead>
@@ -252,7 +278,7 @@ export default function EmployeesPage() {
                                 {employees.map((emp) => (
                                     <TableRow key={emp.id}>
                                         <TableCell className="font-medium">{emp.name}</TableCell>
-                                        <TableCell>{emp.bengaliName}</TableCell>
+                                        <TableCell className="text-muted-foreground">{emp.email}</TableCell>
                                         <TableCell>{emp.code}</TableCell>
                                         <TableCell>{emp.role}</TableCell>
                                         <TableCell>{emp.assignment}</TableCell>
@@ -281,7 +307,7 @@ export default function EmployeesPage() {
                     roles={ROLES}
                     assignments={assignments}
                     firestore={firestore}
-                    existingCodes={new Set(employeesData?.map(e => e.code.toLowerCase()))}
+                    existingUsers={employeesData || []}
                 />
             )}
             
@@ -299,7 +325,7 @@ export default function EmployeesPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will delete the employee record for "{employeeToDelete?.name}". 
+                            This will delete the employee record for "{employeeToDelete?.name}". This action does not disable their login. 
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete Record</AlertDialogAction></AlertDialogFooter>
@@ -311,7 +337,7 @@ export default function EmployeesPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will permanently delete all employee records from the database, except for Super Admins. This action cannot be undone.
+                            This will permanently delete all employee records from the database, except for Super Admins. This action cannot be undone and does not disable their logins.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -326,35 +352,54 @@ export default function EmployeesPage() {
 
 // --- Sub-components ---
 
-function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore, existingCodes }: any) {
+function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore, existingUsers }: any) {
     const { toast } = useToast();
     const [name, setName] = useState(employee?.name || '');
     const [bengaliName, setBengaliName] = useState(employee?.bengaliName || '');
     const [code, setCode] = useState(employee?.code || '');
+    const [email, setEmail] = useState(employee?.email || '');
+    const [password, setPassword] = useState('');
     const [role, setRole] = useState<Employee['role'] | ''>(employee?.role || '');
     const [assignment, setAssignment] = useState(employee?.assignment || '');
 
     const handleSubmit = async () => {
-        if (!name || !code || !role || !assignment) {
+        if (!name || !code || !role || !assignment || !email) {
             toast({ variant: "destructive", title: "Validation Error", description: "Please fill all fields." });
             return;
         }
-        
-        const normalizedCode = code.toLowerCase().trim();
-        if (!employee && existingCodes.has(normalizedCode)) {
-            toast({ variant: "destructive", title: "Employee Code exists", description: "This Employee Code is already in use. Please choose another." });
-            return;
-        }
 
-        try {
-            if (employee) { // Update
-                const updatedData: Partial<Employee> = { name, bengaliName, code, role: role as Employee['role'], assignment };
-                await setDoc(doc(firestore, 'employees', employee.id), updatedData, { merge: true });
-                toast({ title: "Employee updated" });
-            } else { // Create
+        if (employee) { // Update existing employee
+            const updatedData: Partial<Employee> = { name, bengaliName, code, role: role as Employee['role'], assignment };
+            await setDoc(doc(firestore, 'employees', employee.id), updatedData, { merge: true });
+            toast({ title: "Employee updated" });
+        } else { // Create new employee
+            if (!password || password.length < 6) {
+                toast({ variant: "destructive", title: "Validation Error", description: "Password must be at least 6 characters long." });
+                return;
+            }
+            if (existingUsers.some((u: Employee) => u.email.toLowerCase() === email.toLowerCase())) {
+                toast({ variant: "destructive", title: "Email exists", description: "This email is already in use." });
+                return;
+            }
+             if (existingUsers.some((u: Employee) => u.code.toLowerCase() === code.toLowerCase())) {
+                toast({ variant: "destructive", title: "Employee Code exists", description: "This code is already in use." });
+                return;
+            }
+
+            const tempApp = initializeApp(firebaseConfig, `temp-user-creation-${Date.now()}`);
+            const tempAuth = getAuth(tempApp);
+
+            try {
+                // 1. Create Auth user
+                const userCredential = await createUserWithEmailAndPassword(tempAuth, email, password);
+                const uid = userCredential.user.uid;
+
+                // 2. Create Firestore document
                 const newDocRef = doc(collection(firestore, "employees"));
                 const newEmployee: Employee = {
                     id: newDocRef.id,
+                    uid,
+                    email,
                     name,
                     bengaliName,
                     code,
@@ -362,11 +407,13 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
                     assignment,
                 };
                 await setDoc(newDocRef, newEmployee);
-                toast({ title: "Employee created" });
+                toast({ title: "Employee created successfully" });
+                setIsOpen(false);
+            } catch (error: any) {
+                toast({ variant: "destructive", title: "Creation Failed", description: error.message });
+            } finally {
+                await deleteApp(tempApp);
             }
-            setIsOpen(false);
-        } catch (error: any) {
-            toast({ variant: "destructive", title: "An error occurred", description: error.message });
         }
     };
 
@@ -379,6 +426,8 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
                 <div className="grid gap-3 py-4">
                     <Label>Name (English)</Label><Input value={name} onChange={(e) => setName(e.target.value)} />
                     <Label>Name (Bengali)</Label><Input value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} />
+                    <Label>Email (Login ID)</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!!employee} />
+                    {!employee && (<><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></>)}
                     <Label>Employee Code</Label><Input value={code} onChange={(e) => setCode(e.target.value)} />
                     <Label>Role</Label>
                     <Select onValueChange={(v) => setRole(v as Employee['role'])} value={role}>
@@ -429,8 +478,8 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
                 ) : (
                     <ScrollArea className="h-64">
                         <Table>
-                            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Code</TableHead><TableHead>Role</TableHead><TableHead>Assignment</TableHead></TableRow></TableHeader>
-                            <TableBody>{state.data.map((emp: any, index: number) => (<TableRow key={index}><TableCell>{emp.name}</TableCell><TableCell>{emp.code}</TableCell><TableCell>{emp.role}</TableCell><TableCell>{emp.assignment}</TableCell></TableRow>))}</TableBody>
+                            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Email</TableHead><TableHead>Code</TableHead><TableHead>Role</TableHead><TableHead>Assignment</TableHead></TableRow></TableHeader>
+                            <TableBody>{state.data.map((emp: any, index: number) => (<TableRow key={index}><TableCell>{emp.name}</TableCell><TableCell>{emp.email}</TableCell><TableCell>{emp.code}</TableCell><TableCell>{emp.role}</TableCell><TableCell>{emp.assignment}</TableCell></TableRow>))}</TableBody>
                         </Table>
                     </ScrollArea>
                 )}
@@ -443,5 +492,7 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
         </Dialog>
     );
 }
+
+    
 
     

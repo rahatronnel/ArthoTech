@@ -109,46 +109,58 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Employee",
       "type": "object",
-      "description": "Represents an employee of the microfinance organization.",
+      "description": "Represents an employee of the microfinance organization, linked to a Firebase Auth user.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the Employee entity."
+          "description": "Unique identifier for the Employee Firestore document."
         },
-        "firstName": {
+        "uid": {
           "type": "string",
-          "description": "First name of the employee."
+          "description": "The UID of the corresponding Firebase Authentication user."
         },
-        "lastName": {
+        "name": {
           "type": "string",
-          "description": "Last name of the employee."
+          "description": "Full name of the employee."
         },
-        "roleId": {
+        "bengaliName": {
           "type": "string",
-          "description": "Reference to UserRole. (Relationship: UserRole 1:N Employee)"
+          "description": "Full name of the employee in Bengali."
         },
-        "branchId": {
+        "email": {
           "type": "string",
-          "description": "Reference to Branch. (Relationship: Branch 1:N Employee). Nullable if the employee is assigned to head office."
+          "format": "email",
+          "description": "The login email for the employee. Must be unique."
         },
-        "areaId": {
+        "code": {
           "type": "string",
-          "description": "Reference to Area. (Relationship: Area 1:N Employee). Nullable if the employee is not assigned to an area."
+          "description": "The employee's unique code."
         },
-        "zoneId": {
+        "role": {
           "type": "string",
-          "description": "Reference to Zone. (Relationship: Zone 1:N Employee). Nullable if the employee is not assigned to a zone."
+          "enum": [
+            "Branch User",
+            "Area User",
+            "Zonal User",
+            "Regional User",
+            "Head Office",
+            "Super Admin"
+          ],
+          "description": "The assigned role of the employee."
         },
-        "regionId": {
+        "assignment": {
           "type": "string",
-          "description": "Reference to Region. (Relationship: Region 1:N Employee). Nullable if the employee is not assigned to a region."
+          "description": "The name of the Branch or 'Head Office' the employee is assigned to."
         }
       },
       "required": [
         "id",
-        "firstName",
-        "lastName",
-        "roleId"
+        "uid",
+        "name",
+        "email",
+        "code",
+        "role",
+        "assignment"
       ]
     },
     "UserRole": {
@@ -306,8 +318,7 @@
   },
   "auth": {
     "providers": [
-      "password",
-      "anonymous"
+      "password"
     ]
   },
   "firestore": {
@@ -423,11 +434,11 @@
           "schema": {
             "$ref": "#/backend/entities/Employee"
           },
-          "description": "Stores employee data. Employee IDs are auto-generated.",
+          "description": "Stores employee data, linking a Firebase Auth user to their role and assignments in the app. Employee IDs are auto-generated.",
           "params": [
             {
               "name": "employeeId",
-              "description": "Unique identifier for the employee."
+              "description": "Unique identifier for the employee document."
             }
           ]
         }
@@ -528,3 +539,4 @@
     "reasoning": "The Firestore structure is designed to ensure a permanent and well-organized storage for the LendEasy application. It is structured to support the core features of branch, employee, user role, and group/center management while prioritizing security and scalability. The design focuses on path-based ownership for private user data and collaborative membership maps for group-related data.  Each collection is segregated based on security requirements. Crucially, authorization independence is achieved by denormalizing relevant authorization data into subcollections.  This avoids `get()` calls in security rules. The structure is optimized for efficient `list` operations with clear ownership and role-based access control."
   }
 }
+    

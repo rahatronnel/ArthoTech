@@ -38,7 +38,9 @@ export type Branch = {
 };
 
 export type Employee = {
-  id: string;
+  id: string; // Firestore document ID
+  uid: string; // Firebase Auth User ID
+  email: string;
   code: string;
   name: string;
   bengaliName: string;
@@ -123,3 +125,5 @@ export const roles: Role[] = [
     { name: 'Head Office', description: 'Has full administrative access to the entire system. Manages system settings, user roles, and overall organization data.' },
     { name: 'Super Admin', description: 'Has complete control over the application, including deleting all data.' },
 ];
+
+    
