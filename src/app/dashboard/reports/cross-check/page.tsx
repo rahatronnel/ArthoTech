@@ -1,15 +1,16 @@
+
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format, parseISO, isBefore } from 'date-fns';
 import { useMember } from '@/context/MemberContext';
 import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
 import { useOthersData } from '@/context/OthersDataContext';
 import { useOrganization } from '@/context/OrganizationContext';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collectionGroup, query } from 'firebase/firestore';
-import type { Group } from '@/lib/data';
+import { useCollection, useFirestore, useMemoFirebase, useAuth } from '@/firebase';
+import { collectionGroup, query, collection } from 'firebase/firestore';
+import type { Group, Branch } from '@/lib/data';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar as CalendarIcon, Printer, ChevronLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
@@ -54,9 +56,11 @@ interface ReportData {
 export default function CrossCheckReportPage() {
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [filterBranchId, setFilterBranchId] = useState<string>('all');
 
   const { orgInfo } = useOrganization();
   const firestore = useFirestore();
+  const { currentUser } = useAuth();
 
   const { memberChanges } = useMember();
   const { savingsTransactions } = useSavings();
@@ -65,41 +69,68 @@ export default function CrossCheckReportPage() {
 
   const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
   const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
+
+  const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
+  const { data: branchesData, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
+
+  const userBranch = useMemo(() => {
+    if (!branchesData || !currentUser || currentUser.role !== 'Branch User') return null;
+    return branchesData.find(b => b.name === currentUser.assignment);
+  }, [branchesData, currentUser]);
   
+  useEffect(() => {
+    if (currentUser?.role === 'Branch User' && userBranch) {
+      setFilterBranchId(userBranch.id);
+    } else {
+      setFilterBranchId('all');
+    }
+  }, [currentUser, userBranch]);
+
   const handleGenerateReport = () => {
-    if (!date || !groupsData) return;
+    if (!date || !groupsData || !branchesData) return;
 
     const selectedDateStr = format(date, 'yyyy-MM-dd');
     const selectedDateObj = parseISO(selectedDateStr);
 
+    // Filter groups based on selected branch
+    const groupsForReport = filterBranchId === 'all'
+      ? groupsData
+      : groupsData.filter(g => g.branchId === filterBranchId);
+    
+    const visibleGroupIds = new Set(groupsForReport.map(g => g.id));
+
     // --- Member Calculation ---
-    const initialMembers = groupsData.reduce((sum, g) => sum + g.initialMembers, 0);
-    const prevMemberChanges = memberChanges.filter(c => isBefore(parseISO(c.date), selectedDateObj));
+    const initialMembers = groupsForReport.reduce((sum, g) => sum + g.initialMembers, 0);
+    const prevMemberChanges = memberChanges.filter(c => visibleGroupIds.has(c.groupId) && isBefore(parseISO(c.date), selectedDateObj));
     const openingMembers = initialMembers + prevMemberChanges.reduce((sum, c) => sum + c.added - c.dropped, 0);
-    const todayMemberChanges = memberChanges.filter(c => c.date === selectedDateStr);
+    const todayMemberChanges = memberChanges.filter(c => visibleGroupIds.has(c.groupId) && c.date === selectedDateStr);
     const addedToday = todayMemberChanges.reduce((sum, c) => sum + c.added, 0);
     const droppedToday = todayMemberChanges.reduce((sum, c) => sum + c.dropped, 0);
 
     // --- Savings Calculation ---
-    const initialSavings = groupsData.reduce((sum, g) => sum + g.initialSavings, 0);
-    const prevSavingsTx = savingsTransactions.filter(t => isBefore(parseISO(t.date), selectedDateObj));
+    const initialSavings = groupsForReport.reduce((sum, g) => sum + g.initialSavings, 0);
+    const prevSavingsTx = savingsTransactions.filter(t => visibleGroupIds.has(t.groupId) && isBefore(parseISO(t.date), selectedDateObj));
     const openingSavings = initialSavings + prevSavingsTx.reduce((sum, t) => sum + t.deposit - t.withdraw, 0);
-    const todaySavingsTx = savingsTransactions.filter(t => t.date === selectedDateStr);
+    const todaySavingsTx = savingsTransactions.filter(t => visibleGroupIds.has(t.groupId) && t.date === selectedDateStr);
     const depositedToday = todaySavingsTx.reduce((sum, t) => sum + t.deposit, 0);
     const withdrawnToday = todaySavingsTx.reduce((sum, t) => sum + t.withdraw, 0);
 
     // --- Loan Calculation ---
-    const initialLoans = groupsData.reduce((sum, g) => sum + g.totalLoans, 0);
-    const prevDisbursements = loanDisbursements.filter(d => isBefore(parseISO(d.date), selectedDateObj));
-    const prevCollections = loanCollections.filter(c => isBefore(parseISO(c.date), selectedDateObj));
+    const initialLoans = groupsForReport.reduce((sum, g) => sum + g.totalLoans, 0);
+    const prevDisbursements = loanDisbursements.filter(d => visibleGroupIds.has(d.groupId) && isBefore(parseISO(d.date), selectedDateObj));
+    const prevCollections = loanCollections.filter(c => visibleGroupIds.has(c.groupId) && isBefore(parseISO(c.date), selectedDateObj));
     const openingLoans = initialLoans 
         + prevDisbursements.reduce((sum, d) => sum + d.amount, 0)
         - prevCollections.reduce((sum, c) => sum + c.amount, 0);
-    const disbursedToday = loanDisbursements.filter(d => d.date === selectedDateStr).reduce((sum, d) => sum + d.amount, 0);
-    const collectedToday = loanCollections.filter(c => c.date === selectedDateStr).reduce((sum, c) => sum + c.amount, 0);
+    const disbursedToday = loanDisbursements.filter(d => visibleGroupIds.has(d.groupId) && d.date === selectedDateStr).reduce((sum, d) => sum + d.amount, 0);
+    const collectedToday = loanCollections.filter(c => visibleGroupIds.has(c.groupId) && c.date === selectedDateStr).reduce((sum, c) => sum + c.amount, 0);
 
     // --- Other Collections ---
-    const todayOthersData = othersData.filter(d => d.date === selectedDateStr);
+    const branchNameForFilter = branchesData.find(b => b.id === filterBranchId)?.name;
+    const todayOthersData = filterBranchId === 'all'
+      ? othersData.filter(d => d.date === selectedDateStr)
+      : othersData.filter(d => d.date === selectedDateStr && d.branch === branchNameForFilter);
+      
     const admissionFees = todayOthersData.filter(d => d.type === 'Admission Fee').reduce((sum, d) => sum + d.amount, 0);
     const passbookFees = todayOthersData.filter(d => d.type === 'Passbook Fee').reduce((sum, d) => sum + d.amount, 0);
     const formFees = todayOthersData.filter(d => d.type === 'Processing Fee').reduce((sum, d) => sum + d.amount, 0);
@@ -141,6 +172,9 @@ export default function CrossCheckReportPage() {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
   
+  const isLoading = groupsLoading || branchesLoading;
+  const reportTitleBranch = filterBranchId === 'all' ? 'All Branches' : branchesData?.find(b => b.id === filterBranchId)?.name || '';
+
   return (
     <div className="print:p-8">
       <div className="flex items-center gap-4 mb-6 print:hidden">
@@ -156,7 +190,7 @@ export default function CrossCheckReportPage() {
       <Card>
         <CardHeader className="print:hidden">
           <CardTitle>Generate Report</CardTitle>
-          <CardDescription>Select a date to generate the cross-check report for all organizational activities.</CardDescription>
+          <CardDescription>Select filters to generate the cross-check report.</CardDescription>
         </CardHeader>
         <CardContent className="print:hidden">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
@@ -167,7 +201,7 @@ export default function CrossCheckReportPage() {
                   <Button
                     variant={"outline"}
                     className={cn(
-                      "w-[280px] justify-start text-left font-normal",
+                      "w-[240px] justify-start text-left font-normal",
                       !date && "text-muted-foreground"
                     )}
                   >
@@ -185,14 +219,32 @@ export default function CrossCheckReportPage() {
                 </PopoverContent>
               </Popover>
             </div>
-            <Button onClick={handleGenerateReport} disabled={groupsLoading || !date}>
-                {groupsLoading ? "Loading data..." : "Generate Report"}
+            <div className="grid gap-2">
+              <Label>Branch</Label>
+              <Select
+                value={filterBranchId}
+                onValueChange={setFilterBranchId}
+                disabled={currentUser?.role === 'Branch User'}
+              >
+                <SelectTrigger className="w-[240px]">
+                  <SelectValue placeholder="Select a branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  {currentUser?.role !== 'Branch User' && <SelectItem value="all">All Branches</SelectItem>}
+                  {(currentUser?.role === 'Branch User' ? branchesData?.filter(b => b.id === userBranch?.id) : branchesData)?.map(b => (
+                    <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button onClick={handleGenerateReport} disabled={isLoading || !date}>
+                {isLoading ? "Loading data..." : "Generate Report"}
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {groupsLoading && !reportData && (
+      {isLoading && !reportData && (
           <Card className="mt-6">
               <CardContent className="p-6">
                   <Skeleton className="h-8 w-1/2 mb-4" />
@@ -206,7 +258,7 @@ export default function CrossCheckReportPage() {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Cross Check Report for {date ? format(date, 'PPP') : ''}</CardTitle>
-              <CardDescription>A summary of activities for the selected day.</CardDescription>
+              <CardDescription>Displaying report for: <span className="font-semibold">{reportTitleBranch}</span></CardDescription>
             </div>
             <Button size="sm" className="gap-1 print:hidden" onClick={handlePrint}>
                 <Printer className="h-4 w-4" />
@@ -220,6 +272,7 @@ export default function CrossCheckReportPage() {
                 <p className="text-sm text-muted-foreground">{orgInfo.bengaliName}</p>
                 <p className="text-xs text-muted-foreground">{orgInfo.address}</p>
                 <h2 className="text-xl font-semibold mt-6 underline decoration-double">Cross Check Report for {date ? format(date, 'PPP') : ''}</h2>
+                <p className="text-md font-medium">Branch: {reportTitleBranch}</p>
             </div>
             <Table className="border">
               <TableHeader>
