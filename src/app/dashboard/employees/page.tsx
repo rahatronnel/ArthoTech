@@ -301,15 +301,17 @@ export default function EmployeesPage() {
                 </CardContent>
             </Card>
 
-            <FormDialog
+            {isFormOpen && (
+              <FormDialog
                 isOpen={isFormOpen}
-                setIsOpen={setIsFormOpen}
+                onClose={() => setIsFormOpen(false)}
                 employee={editingEmployee}
                 roles={ROLES}
                 assignments={assignments}
                 firestore={firestore}
                 existingUsers={employeesData || []}
-            />
+              />
+            )}
             
             {isUploadDialogOpen && (
                 <UploadDialog
@@ -352,7 +354,7 @@ export default function EmployeesPage() {
 
 // --- Sub-components ---
 
-function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore, existingUsers }: any) {
+function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, existingUsers }: any) {
     const { toast } = useToast();
     const [name, setName] = useState('');
     const [bengaliName, setBengaliName] = useState('');
@@ -398,7 +400,7 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
             const updatedData: Partial<Employee> = { name, bengaliName, code, role: role as Employee['role'], assignment, email };
             await setDoc(doc(firestore, 'employees', employee.id), updatedData, { merge: true });
             toast({ title: "Employee updated" });
-            setIsOpen(false);
+            onClose();
         } else { // Create new employee
             if (!password || password.length < 6) {
                 toast({ variant: "destructive", title: "Validation Error", description: "Password must be at least 6 characters long." });
@@ -435,7 +437,7 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
                 };
                 await setDoc(newDocRef, newEmployee);
                 toast({ title: "Employee created successfully" });
-                setIsOpen(false);
+                onClose();
             } catch (error: any) {
                 toast({ variant: "destructive", title: "Creation Failed", description: error.message });
             } finally {
@@ -445,7 +447,7 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                     <DialogTitle>{employee ? 'Edit Employee' : 'Create New Employee'}</DialogTitle>
@@ -485,7 +487,7 @@ function FormDialog({ isOpen, setIsOpen, employee, roles, assignments, firestore
                     )}
                 </div>
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+                    <Button variant="outline" onClick={onClose}>Cancel</Button>
                     <Button onClick={handleSubmit}>Save</Button>
                 </DialogFooter>
             </DialogContent>
