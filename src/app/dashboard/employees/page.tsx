@@ -365,6 +365,7 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
     const [role, setRole] = useState<Employee['role'] | ''>('');
     const [assignment, setAssignment] = useState('');
     const [isSendingReset, setIsSendingReset] = useState(false);
+    const [isResetConfirmOpen, setIsResetConfirmOpen] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -378,15 +379,10 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
         }
     }, [employee, isOpen]);
     
-    const handlePasswordReset = async () => {
-      if (!email) {
-          toast({
-              variant: "destructive",
-              title: "Email Address Required",
-              description: "Cannot send a password reset without an email address.",
-          });
-          return;
-      }
+    const confirmPasswordReset = async () => {
+      setIsResetConfirmOpen(false);
+      if (!email) return;
+
       setIsSendingReset(true);
       try {
           await sendPasswordResetEmail(auth, email);
@@ -398,7 +394,7 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
           toast({
               variant: "destructive",
               title: "Error Sending Email",
-              description: error.message,
+              description: error.message || 'Could not send reset email. Please check the email address and your Firebase project settings.',
           });
       } finally {
           setIsSendingReset(false);
@@ -462,63 +458,87 @@ function FormDialog({ isOpen, onClose, employee, roles, assignments, firestore, 
     };
 
     return (
-        <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                    <DialogTitle>{employee ? 'Edit Employee' : 'Create New Employee'}</DialogTitle>
-                </DialogHeader>
-                <div className="grid gap-3 py-4">
-                    <Label>Name (English)</Label><Input value={name} onChange={(e) => setName(e.target.value)} />
-                    <Label>Name (Bengali)</Label><Input value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} />
-                     <div className="space-y-1">
-                        <Label>Email (Login ID)</Label>
-                        <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-                         {employee && (
-                            <p className="text-xs text-muted-foreground pt-1">
-                                To change a user's login, you must delete and re-create their account. This only updates their contact email.
+        <>
+            <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{employee ? 'Edit Employee' : 'Create New Employee'}</DialogTitle>
+                    </DialogHeader>
+                    <div className="grid gap-3 py-4">
+                        <Label>Name (English)</Label><Input value={name} onChange={(e) => setName(e.target.value)} />
+                        <Label>Name (Bengali)</Label><Input value={bengaliName} onChange={(e) => setBengaliName(e.target.value)} />
+                         <div className="space-y-1">
+                            <Label>Email (Login ID)</Label>
+                            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} disabled={!!employee} />
+                             {employee && (
+                                <p className="text-xs text-muted-foreground pt-1">
+                                    A user's login email cannot be changed after creation.
+                                </p>
+                            )}
+                        </div>
+                        
+                        {!employee && (<><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></>)}
+
+                        {employee && (
+                          <div className="space-y-2 rounded-lg border bg-background/50 p-3 mt-2">
+                            <h4 className="font-semibold text-sm text-foreground">Manage Password</h4>
+                            <p className="text-xs text-muted-foreground">
+                                For security, you cannot directly change a user's password. You can send them a secure link to reset it themselves.
                             </p>
+                            <Button
+                                variant="secondary"
+                                className="mt-2"
+                                size="sm"
+                                type="button"
+                                onClick={() => {
+                                  if (!email) {
+                                      toast({ variant: "destructive", title: "Email Required", description: "Employee must have an email to send a reset link." });
+                                      return;
+                                  }
+                                  setIsResetConfirmOpen(true);
+                                }}
+                                disabled={isSendingReset}
+                            >
+                                {isSendingReset ? 'Sending Email...' : 'Send Password Reset Email'}
+                            </Button>
+                          </div>
                         )}
+
+                        <Label>Employee Code</Label><Input value={code} onChange={(e) => setCode(e.target.value)} />
+                        <Label>Role</Label>
+                        <Select onValueChange={(v) => setRole(v as Employee['role'])} value={role}>
+                            <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
+                            <SelectContent>{roles.map((r: string) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
+                        </Select>
+                        <Label>Assignment</Label>
+                        <Select onValueChange={setAssignment} value={assignment}>
+                            <SelectTrigger><SelectValue placeholder="Select assignment" /></SelectTrigger>
+                            <SelectContent>{assignments.map((a: string) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
+                        </Select>
                     </div>
-                    
-                    {!employee && (<><Label>Password</Label><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></>)}
-
-                    {employee && (
-                      <div className="space-y-2 rounded-lg border bg-background/50 p-3 mt-2">
-                        <h4 className="font-semibold text-sm text-foreground">Manage Password</h4>
-                        <p className="text-xs text-muted-foreground">
-                            For security, you cannot directly change a user's password. You can send them a secure link to reset it themselves.
-                        </p>
-                        <Button
-                            variant="secondary"
-                            className="mt-2"
-                            size="sm"
-                            type="button"
-                            onClick={handlePasswordReset}
-                            disabled={isSendingReset}
-                        >
-                            {isSendingReset ? 'Sending Email...' : 'Send Password Reset Email'}
-                        </Button>
-                      </div>
-                    )}
-
-                    <Label>Employee Code</Label><Input value={code} onChange={(e) => setCode(e.target.value)} />
-                    <Label>Role</Label>
-                    <Select onValueChange={(v) => setRole(v as Employee['role'])} value={role}>
-                        <SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger>
-                        <SelectContent>{roles.map((r: string) => <SelectItem key={r} value={r}>{r}</SelectItem>)}</SelectContent>
-                    </Select>
-                    <Label>Assignment</Label>
-                    <Select onValueChange={setAssignment} value={assignment}>
-                        <SelectTrigger><SelectValue placeholder="Select assignment" /></SelectTrigger>
-                        <SelectContent>{assignments.map((a: string) => <SelectItem key={a} value={a}>{a}</SelectItem>)}</SelectContent>
-                    </Select>
-                </div>
-                <DialogFooter>
-                    <Button variant="outline" onClick={onClose}>Cancel</Button>
-                    <Button onClick={handleSubmit}>Save</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={onClose}>Cancel</Button>
+                        <Button onClick={handleSubmit}>Save</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <AlertDialog open={isResetConfirmOpen} onOpenChange={setIsResetConfirmOpen}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Confirm Password Reset</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    An email with a secure link to reset the password will be sent to <span className="font-medium text-foreground">{email}</span>.
+                    <br/><br/>
+                    Please advise the employee to check their spam or junk folder if it doesn't arrive within a few minutes.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmPasswordReset}>Send Reset Email</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+        </>
     );
 }
 
