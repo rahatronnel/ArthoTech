@@ -73,18 +73,28 @@ export default function CrossCheckReportPage() {
   const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
   const { data: branchesData, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
 
+  // Determine if the user is a non-admin assigned to a specific branch.
+  const isBranchAssignedUser = useMemo(() => {
+    if (!currentUser) return false;
+    // Only Super Admin can see all branches.
+    return currentUser.role !== 'Super Admin';
+  }, [currentUser]);
+
+  // Find the user's specific branch object if they are assigned to one.
   const userBranch = useMemo(() => {
-    if (!branchesData || !currentUser || currentUser.role !== 'Branch User') return null;
+    if (!branchesData || !isBranchAssignedUser || !currentUser || currentUser.assignment === 'Head Office') return null;
     return branchesData.find(b => b.name === currentUser.assignment);
-  }, [branchesData, currentUser]);
+  }, [branchesData, currentUser, isBranchAssignedUser]);
   
+  // Effect to automatically set the branch filter for branch-assigned users.
   useEffect(() => {
-    if (currentUser?.role === 'Branch User' && userBranch) {
+    if (isBranchAssignedUser && userBranch) {
       setFilterBranchId(userBranch.id);
     } else {
+      // Default for Super Admin
       setFilterBranchId('all');
     }
-  }, [currentUser, userBranch]);
+  }, [currentUser, userBranch, isBranchAssignedUser]);
 
   const handleGenerateReport = () => {
     if (!date || !groupsData || !branchesData) return;
@@ -219,11 +229,11 @@ export default function CrossCheckReportPage() {
                 </PopoverContent>
               </Popover>
             </div>
-            {currentUser?.role === 'Branch User' ? (
+             {isBranchAssignedUser ? (
                 <div className="grid gap-2">
                     <Label>Branch</Label>
                     <Input 
-                        value={userBranch?.name || ''} 
+                        value={currentUser?.assignment || ''} 
                         disabled 
                         className="w-[240px]"
                     />
