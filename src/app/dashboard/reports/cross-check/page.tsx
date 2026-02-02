@@ -22,6 +22,7 @@ import { Printer, ChevronLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useToast } from '@/hooks/use-toast';
 
 
 interface ReportData {
@@ -54,11 +55,12 @@ interface ReportData {
 export default function CrossCheckReportPage() {
   const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
-  const [filterBranchId, setFilterBranchId] = useState<string>('all');
+  const [filterBranchId, setFilterBranchId] = useState<string>('');
 
   const { orgInfo } = useOrganization();
   const firestore = useFirestore();
-  const { currentUser } = useAuth();
+  const { currentUser, loading: userLoading } = useAuth();
+  const { toast } = useToast();
   
   const { memberChanges, isLoading: membersLoading } = useMember();
   const { savingsTransactions, isLoading: savingsLoading } = useSavings();
@@ -123,18 +125,27 @@ export default function CrossCheckReportPage() {
 
 
   useEffect(() => {
-    if (branchesForFilter.length === 1) {
-      setFilterBranchId(branchesForFilter[0].id);
-    } else if (currentUser?.role === 'Super Admin' || currentUser?.role === 'Head Office') {
-       setFilterBranchId('all');
-    } else if (branchesForFilter.length > 1) {
-       setFilterBranchId('all');
+    if (userLoading) return; // Wait until we know who the user is
+    
+    if (currentUser?.role === 'Branch User') {
+      setFilterBranchId(currentUser.assignment || '');
+    } else if (branchesForFilter.length > 0) {
+      // For admins or managers, default to 'all'
+      setFilterBranchId('all');
     }
-  }, [branchesForFilter, currentUser]);
+  }, [currentUser, userLoading, branchesForFilter]);
 
 
   const handleGenerateReport = () => {
-    if (!date || !groupsData || !branchesData) return;
+    if (!date) {
+      toast({ variant: 'destructive', title: 'Date Required', description: 'Please select a date to generate the report.' });
+      return;
+    }
+     if (!filterBranchId) {
+      toast({ variant: 'destructive', title: 'Branch Required', description: 'Please select a branch to generate the report.' });
+      return;
+    }
+    if (!groupsData || !branchesData) return;
 
     const selectedDateStr = date;
     const selectedDateObj = parseISO(selectedDateStr);
@@ -222,13 +233,60 @@ export default function CrossCheckReportPage() {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
   
-  const isLoading = groupsLoading || branchesLoading || areasLoading || zonesLoading || regionsLoading || membersLoading || savingsLoading || loansLoading || othersLoading;
+  const isLoading = userLoading || groupsLoading || branchesLoading || areasLoading || zonesLoading || regionsLoading || membersLoading || savingsLoading || loansLoading || othersLoading;
   
   const reportTitleBranch = filterBranchId === 'all' 
     ? 'All Assigned Branches' 
     : branchesData?.find(b => b.id === filterBranchId)?.name || '';
 
-  const isFilterDisabled = branchesForFilter.length <= 1 && currentUser?.role !== 'Super Admin' && currentUser?.role !== 'Head Office' ;
+  const renderBranchFilter = () => {
+      if (isLoading) {
+        return (
+            <div className="grid gap-2">
+                <Label>Branch</Label>
+                <Skeleton className="h-10 w-[240px]" />
+            </div>
+        );
+      }
+
+      const isFilterDisabled = currentUser && currentUser.role !== 'Super Admin' && currentUser.role !== 'Head Office';
+      const isSingleBranchUser = isFilterDisabled && branchesForFilter.length <= 1;
+
+      if (isSingleBranchUser) {
+        return (
+          <div className="grid gap-2">
+            <Label>Branch</Label>
+            <Input
+              value={branchesForFilter[0]?.name || 'No Branch Assigned'}
+              disabled
+              className="w-full sm:w-[240px]"
+            />
+          </div>
+        );
+      }
+
+      // For Admins, HO, and Managers with multiple branches
+      return (
+        <div className="grid gap-2">
+          <Label>Branch</Label>
+          <Select
+              value={filterBranchId}
+              onValueChange={setFilterBranchId}
+              disabled={isLoading}
+          >
+              <SelectTrigger className="w-full sm:w-[240px]">
+                <SelectValue placeholder="Select a branch" />
+              </SelectTrigger>
+              <SelectContent>
+                  <SelectItem value="all">All Assigned Branches</SelectItem>
+                  {branchesForFilter?.map(b => (
+                      <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                  ))}
+              </SelectContent>
+          </Select>
+        </div>
+      );
+    };
 
   return (
     <div className="print:p-8">
@@ -259,30 +317,10 @@ export default function CrossCheckReportPage() {
               />
             </div>
             
-            <div className="grid gap-2">
-            <Label>Branch</Label>
-             {isFilterDisabled ? (
-                <Input value={branchesForFilter[0]?.name || 'No branch assigned'} disabled className="w-full sm:w-[240px]" />
-              ) : (
-                <Select
-                    value={filterBranchId}
-                    onValueChange={setFilterBranchId}
-                >
-                    <SelectTrigger className="w-full sm:w-[240px]">
-                    <SelectValue placeholder="Select a branch" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {(currentUser?.role === 'Super Admin' || currentUser?.role === 'Head Office' || branchesForFilter.length > 1) && <SelectItem value="all">All Assigned Branches</SelectItem>}
-                        {branchesForFilter?.map(b => (
-                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-              )}
-            </div>
+            {renderBranchFilter()}
 
-            <Button onClick={handleGenerateReport} disabled={isLoading || !date}>
-                {isLoading ? "Loading data..." : "Generate Report"}
+            <Button onClick={handleGenerateReport} disabled={isLoading || !date || !filterBranchId}>
+                {isLoading ? "Loading..." : "Generate Report"}
             </Button>
           </div>
         </CardContent>
