@@ -174,63 +174,79 @@ export default function RawDataEntryPage() {
                 const allTransactions: UploadedRow[] = [];
                 let lastFieldWorkerId = '';
                 let lastFieldWorkerName = '';
-                let lastSamityId = '';
-                let lastSamityName = '';
-
+    
                 for (const row of dataRows) {
                     if (!row || row.length === 0 || row.every(cell => cell === null || cell === '')) {
                         continue;
                     }
-
+    
                     const fieldWorkerIdCell = String(row[0] || '').trim().toLowerCase();
                     const summaryTerms = ['officer total', 'grand total', 'savings grand total'];
                     if (summaryTerms.some(term => fieldWorkerIdCell.includes(term))) {
                         continue;
                     }
-
+                    
+                    if (String(row[0] || '').trim() !== '') lastFieldWorkerId = String(row[0]).trim();
+                    if (String(row[1] || '').trim() !== '') lastFieldWorkerName = String(row[1]).trim();
+                    
                     const componentCell = String(row[4] || '').trim();
-                    if (componentCell === '') {
+                    const hasTransactionData = [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22].some(i => row[i] && Number(row[i]) > 0);
+    
+                    if (!componentCell && !hasTransactionData) {
                         continue;
                     }
+    
+                    const currentSamityId = String(row[2] || '').trim();
+    
+                    const numericFields: { key: keyof UploadedRow; index: number }[] = [
+                        { key: 'Savings Collection', index: 5 },
+                        { key: 'Interest On Savings', index: 6 },
+                        { key: 'Savings Refund', index: 7 },
+                        { key: 'Additional Fees Collection', index: 8 },
+                        { key: 'Disbursement Amount', index: 9 },
+                        { key: 'Regular Recovarable', index: 10 },
+                        { key: 'Loan Collection Regular', index: 11 },
+                        { key: 'Loan Collection Due', index: 12 },
+                        { key: 'Loan Collection Advance', index: 13 },
+                        { key: 'Loan Collection Rebate', index: 14 },
+                        { key: 'Loan Received (principle)', index: 15 },
+                        { key: 'Loan Received (Service Charge)', index: 16 },
+                        { key: 'Loan Collection Total', index: 17 },
+                        { key: 'Risk fund', index: 18 },
+                        { key: 'Processing Fees / Form fees', index: 19 },
+                        { key: 'Passbook fees', index: 20 },
+                        { key: 'Admission fees', index: 21 },
+                        { key: 'Total Collection', index: 22 },
+                    ];
                     
-                    if (row[0] !== null && String(row[0]).trim() !== '') lastFieldWorkerId = String(row[0]).trim();
-                    if (row[1] !== null && String(row[1]).trim() !== '') lastFieldWorkerName = String(row[1]).trim();
-                    if (row[2] !== null && String(row[2]).trim() !== '') lastSamityId = String(row[2]).trim();
-                    if (row[3] !== null && String(row[3]).trim() !== '') lastSamityName = String(row[3]).trim();
-                    
-                    const newTransaction: UploadedRow = {
-                        'Field Worker ID': lastFieldWorkerId,
-                        'Field Worker Name': lastFieldWorkerName,
-                        'Samity ID': formatGroupCode(lastSamityId),
-                        'Samity Name': lastSamityName,
-                        'Component': componentCell,
-                        'Savings Collection': Number(row[5]) || 0,
-                        'Interest On Savings': Number(row[6]) || 0,
-                        'Savings Refund': Number(row[7]) || 0,
-                        'Additional Fees Collection': Number(row[8]) || 0,
-                        'Disbursement Amount': Number(row[9]) || 0,
-                        'Regular Recovarable': Number(row[10]) || 0,
-                        'Loan Collection Regular': Number(row[11]) || 0,
-                        'Loan Collection Due': Number(row[12]) || 0,
-                        'Loan Collection Advance': Number(row[13]) || 0,
-                        'Loan Collection Rebate': Number(row[14]) || 0,
-                        'Loan Received (principle)': Number(row[15]) || 0,
-                        'Loan Received (Service Charge)': Number(row[16]) || 0,
-                        'Loan Collection Total': Number(row[17]) || 0,
-                        'Risk fund': Number(row[18]) || 0,
-                        'Processing Fees / Form fees': Number(row[19]) || 0,
-                        'Passbook fees': Number(row[20]) || 0,
-                        'Admission fees': Number(row[21]) || 0,
-                        'Total Collection': Number(row[22]) || 0,
-                    };
-                    allTransactions.push(newTransaction);
+                    if (currentSamityId) {
+                        const newTransaction: UploadedRow = {
+                            'Field Worker ID': lastFieldWorkerId,
+                            'Field Worker Name': lastFieldWorkerName,
+                            'Samity ID': formatGroupCode(currentSamityId),
+                            'Samity Name': String(row[3] || '').trim(),
+                            'Component': componentCell,
+                            'Savings Collection': 0, 'Interest On Savings': 0, 'Savings Refund': 0, 'Additional Fees Collection': 0, 'Disbursement Amount': 0, 'Regular Recovarable': 0, 'Loan Collection Regular': 0, 'Loan Collection Due': 0, 'Loan Collection Advance': 0, 'Loan Collection Rebate': 0, 'Loan Received (principle)': 0, 'Loan Received (Service Charge)': 0, 'Loan Collection Total': 0, 'Risk fund': 0, 'Processing Fees / Form fees': 0, 'Passbook fees': 0, 'Admission fees': 0, 'Total Collection': 0,
+                        };
+                        numericFields.forEach(field => {
+                            (newTransaction[field.key] as number) = Number(row[field.index]) || 0;
+                        });
+                        allTransactions.push(newTransaction);
+                    } else if (hasTransactionData) {
+                        const lastTransaction = allTransactions[allTransactions.length - 1];
+                        if (lastTransaction) {
+                             numericFields.forEach(field => {
+                                (lastTransaction[field.key] as number) += Number(row[field.index]) || 0;
+                            });
+                        }
+                    }
                 }
                 
                 if (allTransactions.length === 0) {
                     toast({ 
                         variant: "destructive", 
                         title: "No Valid Data", 
-                        description: "No processable transaction rows found in the file. Please ensure some rows have a 'Component' value." 
+                        description: "No processable transaction rows found in the file. Please ensure some rows have a 'Component' or transaction data." 
                     });
                     return;
                 }
