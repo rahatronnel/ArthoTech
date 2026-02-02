@@ -1,71 +1,97 @@
-
 "use client";
 
-import { createContext, useState, useContext, ReactNode } from 'react';
-import { 
-    LoanDisbursement, 
-    LoanCollection 
-} from '@/lib/data';
+import { createContext, useContext, ReactNode } from 'react';
+import { LoanDisbursement, LoanCollection } from '@/lib/data';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, addDoc, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 type LoanContextType = {
   loanDisbursements: LoanDisbursement[];
   loanCollections: LoanCollection[];
-  addLoanDisbursement: (disbursement: Omit<LoanDisbursement, 'id'>) => void;
-  addLoanCollection: (collection: Omit<LoanCollection, 'id'>) => void;
-  deleteDisbursementsByDate: (date: string) => void;
-  deleteAllDisbursements: () => void;
-  deleteCollectionsByDate: (date: string) => void;
-  deleteAllCollections: () => void;
+  isLoading: boolean;
+  addLoanDisbursement: (disbursement: Omit<LoanDisbursement, 'id'>) => Promise<void>;
+  addLoanCollection: (collection: Omit<LoanCollection, 'id'>) => Promise<void>;
+  deleteDisbursementsByDate: (date: string) => Promise<void>;
+  deleteAllDisbursements: () => Promise<void>;
+  deleteCollectionsByDate: (date: string) => Promise<void>;
+  deleteAllCollections: () => Promise<void>;
 };
 
 const LoanContext = createContext<LoanContextType | undefined>(undefined);
 
 export function LoanProvider({ children }: { children: ReactNode }) {
-  const [loanDisbursements, setLoanDisbursements] = useState<LoanDisbursement[]>([]);
-  const [loanCollections, setLoanCollections] = useState<LoanCollection[]>([]);
+  const firestore = useFirestore();
+  const { toast } = useToast();
 
-  const addLoanDisbursement = (disbursement: Omit<LoanDisbursement, 'id'>) => {
-    const newDisbursement: LoanDisbursement = {
-        id: `LD-${Date.now()}-${Math.random()}`,
-        ...disbursement
-    };
-    setLoanDisbursements(prev => [...prev, newDisbursement]);
+  const disbursementsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loan_disbursements') : null, [firestore]);
+  const { data: disbursementsData, isLoading: disbursementsLoading } = useCollection<LoanDisbursement>(disbursementsQuery);
+  const loanDisbursements = disbursementsData || [];
+  
+  const collectionsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'loan_collections') : null, [firestore]);
+  const { data: collectionsData, isLoading: collectionsLoading } = useCollection<LoanCollection>(collectionsQuery);
+  const loanCollections = collectionsData || [];
+
+  const isLoading = disbursementsLoading || collectionsLoading;
+
+  const addLoanDisbursement = async (disbursement: Omit<LoanDisbursement, 'id'>) => {
+    if (!firestore) return;
+    await addDoc(collection(firestore, 'loan_disbursements'), disbursement);
   };
 
-  const addLoanCollection = (collection: Omit<LoanCollection, 'id'>) => {
-    const newCollection: LoanCollection = {
-        id: `LC-${Date.now()}-${Math.random()}`,
-        ...collection
-    };
-    setLoanCollections(prev => [...prev, newCollection]);
+  const addLoanCollection = async (collectionData: Omit<LoanCollection, 'id'>) => {
+    if (!firestore) return;
+    await addDoc(collection(firestore, 'loan_collections'), collectionData);
   };
 
-  const deleteDisbursementsByDate = (date: string) => {
-    setLoanDisbursements(prev => prev.filter(d => d.date !== date));
+  const deleteByDate = async (collectionName: string, date: string, title: string) => {
+    if (!firestore) return;
+    const q = query(collection(firestore, collectionName), where('date', '==', date));
+    try {
+      const snapshot = await getDocs(q);
+      if(snapshot.empty) {
+        toast({ title: `No ${title} to delete.` });
+        return;
+      }
+      const batch = writeBatch(firestore);
+      snapshot.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      toast({ title: `Deleted ${title} for ${date}` });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: `Error deleting ${title}`, description: error.message });
+    }
   };
 
-  const deleteAllDisbursements = () => {
-    setLoanDisbursements([]);
+  const deleteAll = async (collectionName: string, title: string) => {
+     if (!firestore) return;
+    const q = collection(firestore, collectionName);
+    try {
+      const snapshot = await getDocs(q);
+      if(snapshot.empty) {
+        toast({ title: `No ${title} to delete.` });
+        return;
+      }
+      const batch = writeBatch(firestore);
+      snapshot.forEach(doc => batch.delete(doc.ref));
+      await batch.commit();
+      toast({ title: `All ${title} deleted` });
+    } catch (error: any) {
+      toast({ variant: 'destructive', title: `Error deleting all ${title}`, description: error.message });
+    }
   };
 
-  const deleteCollectionsByDate = (date: string) => {
-    setLoanCollections(prev => prev.filter(c => c.date !== date));
-  };
-
-  const deleteAllCollections = () => {
-    setLoanCollections([]);
-  };
 
   return (
     <LoanContext.Provider value={{ 
       loanDisbursements, 
-      loanCollections, 
+      loanCollections,
+      isLoading, 
       addLoanDisbursement, 
       addLoanCollection, 
-      deleteDisbursementsByDate,
-      deleteAllDisbursements,
-      deleteCollectionsByDate,
-      deleteAllCollections
+      deleteDisbursementsByDate: (date) => deleteByDate('loan_disbursements', date, 'disbursements'),
+      deleteAllDisbursements: () => deleteAll('loan_disbursements', 'disbursements'),
+      deleteCollectionsByDate: (date) => deleteByDate('loan_collections', date, 'collections'),
+      deleteAllCollections: () => deleteAll('loan_collections', 'collections'),
     }}>
       {children}
     </LoanContext.Provider>

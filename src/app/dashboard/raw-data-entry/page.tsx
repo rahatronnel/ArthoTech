@@ -337,19 +337,19 @@ export default function RawDataEntryPage() {
             const notes = `Raw data upload for ${group.name}`;
 
             if (row['Savings Collection'] > 0 || row['Savings Refund'] > 0) {
-                addSavingsTransaction({ date: uploadDate, groupId: group.id, deposit: row['Savings Collection'], withdraw: row['Savings Refund'], notes });
+                addSavingsTransaction({ date: uploadDate, groupId: group.id, branchId: group.branchId, deposit: row['Savings Collection'], withdraw: row['Savings Refund'], notes });
             }
             if (row['Disbursement Amount'] > 0) {
-                addLoanDisbursement({ date: uploadDate, groupId: group.id, amount: row['Disbursement Amount'], notes });
+                addLoanDisbursement({ date: uploadDate, groupId: group.id, branchId: group.branchId, amount: row['Disbursement Amount'], notes });
             }
             if (row['Loan Collection Total'] > 0) {
-                addLoanCollection({ date: uploadDate, groupId: group.id, amount: row['Loan Collection Total'], notes: `Regular: ${row['Loan Collection Regular']}, Due: ${row['Loan Collection Due']}, Advance: ${row['Loan Collection Advance']}` });
+                addLoanCollection({ date: uploadDate, groupId: group.id, branchId: group.branchId, amount: row['Loan Collection Total'], notes: `Regular: ${row['Loan Collection Regular']}, Due: ${row['Loan Collection Due']}, Advance: ${row['Loan Collection Advance']}` });
             }
             const admissionFeesAmount = row['Admission fees'];
             if (admissionFeesAmount > 0) {
                 const membersAdded = admissionFeesAmount / 10;
                 if (membersAdded > 0) {
-                     addMemberChange({ date: uploadDate, groupId: group.id, added: membersAdded, dropped: 0, notes: `From raw data upload.` });
+                     addMemberChange({ date: uploadDate, groupId: group.id, branchId: group.branchId, added: membersAdded, dropped: 0, notes: `From raw data upload.` });
                 }
             }
             
@@ -361,7 +361,7 @@ export default function RawDataEntryPage() {
             for (const [key, type] of Object.entries(otherDataMapping)) {
                 const amount = row[key as keyof UploadedRow] as number;
                 if (amount > 0) {
-                    othersEntriesToAdd.push({ date: uploadDate, branch: branch.name, type: type, amount: amount, notes });
+                    othersEntriesToAdd.push({ date: uploadDate, branch: branch.name, branchId: branch.id, type: type, amount: amount, notes });
                 }
             }
         });

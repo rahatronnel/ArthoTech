@@ -6,34 +6,13 @@
       "type": "object",
       "description": "Represents a branch of the microfinance organization.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Branch entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the branch."
-        },
-        "areaId": {
-          "type": "string",
-          "description": "Reference to Area. (Relationship: Area 1:N Branch)"
-        },
-        "address": {
-          "type": "string",
-          "description": "Physical address of the branch."
-        },
-        "contactNumber": {
-          "type": "string",
-          "description": "Contact phone number of the branch."
-        }
+        "id": { "type": "string", "description": "Unique identifier for the Branch entity." },
+        "name": { "type": "string", "description": "Name of the branch." },
+        "areaId": { "type": "string", "description": "Reference to Area. (Relationship: Area 1:N Branch)" },
+        "address": { "type": "string", "description": "Physical address of the branch." },
+        "contactNumber": { "type": "string", "description": "Contact phone number of the branch." }
       },
-      "required": [
-        "id",
-        "name",
-        "areaId",
-        "address",
-        "contactNumber"
-      ]
+      "required": ["id", "name", "areaId", "address", "contactNumber"]
     },
     "Area": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -41,24 +20,11 @@
       "type": "object",
       "description": "Represents an area within the microfinance organization's hierarchy.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Area entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the area."
-        },
-        "zoneId": {
-          "type": "string",
-          "description": "Reference to Zone. (Relationship: Zone 1:N Area)"
-        }
+        "id": { "type": "string", "description": "Unique identifier for the Area entity." },
+        "name": { "type": "string", "description": "Name of the area." },
+        "zoneId": { "type": "string", "description": "Reference to Zone. (Relationship: Zone 1:N Area)" }
       },
-      "required": [
-        "id",
-        "name",
-        "zoneId"
-      ]
+      "required": ["id", "name", "zoneId"]
     },
     "Zone": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -66,24 +32,11 @@
       "type": "object",
       "description": "Represents a zone within the microfinance organization's hierarchy.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Zone entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the zone."
-        },
-        "regionId": {
-          "type": "string",
-          "description": "Reference to Region. (Relationship: Region 1:N Zone)"
-        }
+        "id": { "type": "string", "description": "Unique identifier for the Zone entity." },
+        "name": { "type": "string", "description": "Name of the zone." },
+        "regionId": { "type": "string", "description": "Reference to Region. (Relationship: Region 1:N Zone)" }
       },
-      "required": [
-        "id",
-        "name",
-        "regionId"
-      ]
+      "required": ["id", "name", "regionId"]
     },
     "Region": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -91,19 +44,10 @@
       "type": "object",
       "description": "Represents a region within the microfinance organization's hierarchy.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Region entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the region."
-        }
+        "id": { "type": "string", "description": "Unique identifier for the Region entity." },
+        "name": { "type": "string", "description": "Name of the region." }
       },
-      "required": [
-        "id",
-        "name"
-      ]
+      "required": ["id", "name"]
     },
     "Employee": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -111,82 +55,16 @@
       "type": "object",
       "description": "Represents an employee of the microfinance organization, linked to a Firebase Auth user.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Employee Firestore document."
-        },
-        "uid": {
-          "type": "string",
-          "description": "The UID of the corresponding Firebase Authentication user."
-        },
-        "name": {
-          "type": "string",
-          "description": "Full name of the employee."
-        },
-        "bengaliName": {
-          "type": "string",
-          "description": "Full name of the employee in Bengali."
-        },
-        "email": {
-          "type": "string",
-          "format": "email",
-          "description": "The login email for the employee. Must be unique."
-        },
-        "code": {
-          "type": "string",
-          "description": "The employee's unique code."
-        },
-        "role": {
-          "type": "string",
-          "enum": [
-            "Branch User",
-            "Area User",
-            "Zonal User",
-            "Regional User",
-            "Head Office",
-            "Super Admin"
-          ],
-          "description": "The assigned role of the employee."
-        },
-        "assignment": {
-          "type": "string",
-          "description": "The ID of the Region, Zone, Area, or Branch the employee is assigned to. For Head Office/Super Admin, this is 'Head Office'."
-        }
+        "id": { "type": "string", "description": "Unique identifier for the Employee Firestore document." },
+        "uid": { "type": "string", "description": "The UID of the corresponding Firebase Authentication user." },
+        "name": { "type": "string", "description": "Full name of the employee." },
+        "bengaliName": { "type": "string", "description": "Full name of the employee in Bengali." },
+        "email": { "type": "string", "format": "email", "description": "The login email for the employee. Must be unique." },
+        "code": { "type": "string", "description": "The employee's unique code." },
+        "role": { "type": "string", "enum": ["Branch User", "Area User", "Zonal User", "Regional User", "Head Office", "Super Admin"], "description": "The assigned role of the employee." },
+        "assignment": { "type": "string", "description": "The ID of the Region, Zone, Area, or Branch the employee is assigned to. For Head Office/Super Admin, this is 'Head Office'." }
       },
-      "required": [
-        "id",
-        "uid",
-        "name",
-        "email",
-        "code",
-        "role",
-        "assignment"
-      ]
-    },
-    "UserRole": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "UserRole",
-      "type": "object",
-      "description": "Represents a user role within the application.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the UserRole entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the user role (e.g., branch user, area user)."
-        },
-        "description": {
-          "type": "string",
-          "description": "Description of the user role."
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "description"
-      ]
+      "required": ["id", "uid", "name", "email", "code", "role", "assignment"]
     },
     "Group": {
       "$schema": "http://json-schema.org/draft-07/schema#",
@@ -194,126 +72,89 @@
       "type": "object",
       "description": "Represents a group or center of members.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Group entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "Name of the group."
-        },
-        "branchId": {
-          "type": "string",
-          "description": "Reference to Branch. (Relationship: Branch 1:N Group)"
-        }
+        "id": { "type": "string", "description": "Unique identifier for the Group entity." },
+        "name": { "type": "string", "description": "Name of the group." },
+        "branchId": { "type": "string", "description": "Reference to Branch. (Relationship: Branch 1:N Group)" }
       },
-      "required": [
-        "id",
-        "name",
-        "branchId"
-      ]
+      "required": ["id", "name", "branchId"]
     },
-    "Member": {
+    "GroupMemberChange": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Member",
+      "title": "GroupMemberChange",
       "type": "object",
-      "description": "Represents a member of a group.",
+      "description": "Represents a record of members added or dropped from a group on a specific date.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Member entity."
-        },
-        "groupId": {
-          "type": "string",
-          "description": "Reference to Group. (Relationship: Group 1:N Member)"
-        },
-        "firstName": {
-          "type": "string",
-          "description": "First name of the member."
-        },
-        "lastName": {
-          "type": "string",
-          "description": "Last name of the member."
-        },
-        "contactNumber": {
-          "type": "string",
-          "description": "Contact phone number of the member."
-        }
+        "id": { "type": "string", "description": "Unique identifier for the transaction." },
+        "date": { "type": "string", "format": "date", "description": "The date of the change." },
+        "groupId": { "type": "string", "description": "The ID of the affected group." },
+        "branchId": { "type": "string", "description": "The ID of the group's branch, for easier querying." },
+        "added": { "type": "number", "description": "Number of members added." },
+        "dropped": { "type": "number", "description": "Number of members dropped." },
+        "notes": { "type": "string", "description": "Optional notes." }
       },
-      "required": [
-        "id",
-        "groupId",
-        "firstName",
-        "lastName",
-        "contactNumber"
-      ]
+      "required": ["id", "date", "groupId", "branchId", "added", "dropped"]
     },
-    "Loan": {
+    "SavingsTransaction": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Loan",
+      "title": "SavingsTransaction",
       "type": "object",
-      "description": "Represents a loan given to a group or member.",
+      "description": "Represents a savings deposit or withdrawal for a group.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Loan entity."
-        },
-        "groupId": {
-          "type": "string",
-          "description": "Reference to Group. (Relationship: Group 1:N Loan)"
-        },
-        "amount": {
-          "type": "number",
-          "description": "Amount of the loan."
-        },
-        "interestRate": {
-          "type": "number",
-          "description": "Interest rate for the loan."
-        },
-        "loanDate": {
-          "type": "string",
-          "description": "Date when the loan was given.",
-          "format": "date-time"
-        }
+        "id": { "type": "string", "description": "Unique identifier for the transaction." },
+        "date": { "type": "string", "format": "date", "description": "The date of the transaction." },
+        "groupId": { "type": "string", "description": "The ID of the affected group." },
+        "branchId": { "type": "string", "description": "The ID of the group's branch, for easier querying." },
+        "deposit": { "type": "number", "description": "Amount deposited." },
+        "withdraw": { "type": "number", "description": "Amount withdrawn." },
+        "notes": { "type": "string", "description": "Optional notes." }
       },
-      "required": [
-        "id",
-        "groupId",
-        "amount",
-        "interestRate",
-        "loanDate"
-      ]
+      "required": ["id", "date", "groupId", "branchId", "deposit", "withdraw"]
     },
-    "Savings": {
+    "LoanDisbursement": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Savings",
+      "title": "LoanDisbursement",
       "type": "object",
-      "description": "Represents savings of a group or member.",
+      "description": "Represents a loan amount given to a group.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Savings entity."
-        },
-        "groupId": {
-          "type": "string",
-          "description": "Reference to Group. (Relationship: Group 1:N Savings)"
-        },
-        "amount": {
-          "type": "number",
-          "description": "Amount of savings."
-        },
-        "savingsDate": {
-          "type": "string",
-          "description": "Date when the savings were recorded.",
-          "format": "date-time"
-        }
+        "id": { "type": "string", "description": "Unique identifier for the transaction." },
+        "date": { "type": "string", "format": "date", "description": "The date of the disbursement." },
+        "groupId": { "type": "string", "description": "The ID of the affected group." },
+        "branchId": { "type": "string", "description": "The ID of the group's branch, for easier querying." },
+        "amount": { "type": "number", "description": "Amount disbursed." },
+        "notes": { "type": "string", "description": "Optional notes." }
       },
-      "required": [
-        "id",
-        "groupId",
-        "amount",
-        "savingsDate"
-      ]
+      "required": ["id", "date", "groupId", "branchId", "amount"]
+    },
+    "LoanCollection": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "LoanCollection",
+      "type": "object",
+      "description": "Represents a loan repayment collected from a group.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the transaction." },
+        "date": { "type": "string", "format": "date", "description": "The date of the collection." },
+        "groupId": { "type": "string", "description": "The ID of the affected group." },
+        "branchId": { "type": "string", "description": "The ID of the group's branch, for easier querying." },
+        "amount": { "type": "number", "description": "Amount collected." },
+        "notes": { "type": "string", "description": "Optional notes." }
+      },
+      "required": ["id", "date", "groupId", "branchId", "amount"]
+    },
+    "OtherDataEntry": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "OtherDataEntry",
+      "type": "object",
+      "description": "Represents miscellaneous financial data for a branch on a given day.",
+      "properties": {
+        "id": { "type": "string", "description": "Unique identifier for the entry." },
+        "date": { "type": "string", "format": "date", "description": "The date of the entry." },
+        "branchId": { "type": "string", "description": "The ID of the branch." },
+        "branch": { "type": "string", "description": "The name of the branch (for display)." },
+        "type": { "type": "string", "enum": ["Others Expenses", "Cash", "Bank", "Afternoon Collection", "Today Total Cash", "Risk Fund", "Processing Fee", "Passbook Fee", "Admission Fee"] },
+        "amount": { "type": "number", "description": "The financial amount." },
+        "notes": { "type": "string", "description": "Optional notes." }
+      },
+      "required": ["id", "date", "branchId", "branch", "type", "amount"]
     }
   },
   "auth": {
@@ -323,220 +164,17 @@
   },
   "firestore": {
     "structure": [
-      {
-        "path": "/regions/{regionId}",
-        "definition": {
-          "entityName": "Region",
-          "schema": {
-            "$ref": "#/backend/entities/Region"
-          },
-          "description": "Stores region data.  Region IDs are auto-generated.",
-          "params": [
-            {
-              "name": "regionId",
-              "description": "Unique identifier for the region."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/regions/{regionId}/zones/{zoneId}",
-        "definition": {
-          "entityName": "Zone",
-          "schema": {
-            "$ref": "#/backend/entities/Zone"
-          },
-          "description": "Stores zone data within a region. Zone IDs are auto-generated.",
-          "params": [
-            {
-              "name": "regionId",
-              "description": "The ID of the parent region."
-            },
-            {
-              "name": "zoneId",
-              "description": "Unique identifier for the zone."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/regions/{regionId}/zones/{zoneId}/areas/{areaId}",
-        "definition": {
-          "entityName": "Area",
-          "schema": {
-            "$ref": "#/backend/entities/Area"
-          },
-          "description": "Stores area data within a zone. Area IDs are auto-generated.",
-          "params": [
-            {
-              "name": "regionId",
-              "description": "The ID of the parent region."
-            },
-            {
-              "name": "zoneId",
-              "description": "The ID of the parent zone."
-            },
-            {
-              "name": "areaId",
-              "description": "Unique identifier for the area."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/regions/{regionId}/zones/{zoneId}/areas/{areaId}/branches/{branchId}",
-        "definition": {
-          "entityName": "Branch",
-          "schema": {
-            "$ref": "#/backend/entities/Branch"
-          },
-          "description": "Stores branch data within an area. Branch IDs are auto-generated.",
-          "params": [
-            {
-              "name": "regionId",
-              "description": "The ID of the parent region."
-            },
-            {
-              "name": "zoneId",
-              "description": "The ID of the parent zone."
-            },
-            {
-              "name": "areaId",
-              "description": "The ID of the parent area."
-            },
-            {
-              "name": "branchId",
-              "description": "Unique identifier for the branch."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/user_roles/{userRoleId}",
-        "definition": {
-          "entityName": "UserRole",
-          "schema": {
-            "$ref": "#/backend/entities/UserRole"
-          },
-          "description": "Stores user role definitions. User Role IDs are auto-generated.",
-          "params": [
-            {
-              "name": "userRoleId",
-              "description": "Unique identifier for the user role."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/employees/{employeeId}",
-        "definition": {
-          "entityName": "Employee",
-          "schema": {
-            "$ref": "#/backend/entities/Employee"
-          },
-          "description": "Stores employee data, linking a Firebase Auth user to their role and assignments in the app. Employee IDs are auto-generated.",
-          "params": [
-            {
-              "name": "employeeId",
-              "description": "Unique identifier for the employee document."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/branches/{branchId}/groups/{groupId}",
-        "definition": {
-          "entityName": "Group",
-          "schema": {
-            "$ref": "#/backend/entities/Group"
-          },
-          "description": "Stores group data within a branch. Group IDs are auto-generated.",
-          "params": [
-            {
-              "name": "branchId",
-              "description": "The ID of the parent branch."
-            },
-            {
-              "name": "groupId",
-              "description": "Unique identifier for the group."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/branches/{branchId}/groups/{groupId}/members/{memberId}",
-        "definition": {
-          "entityName": "Member",
-          "schema": {
-            "$ref": "#/backend/entities/Member"
-          },
-          "description": "Stores member data within a group. Member IDs are auto-generated.",
-          "params": [
-            {
-              "name": "branchId",
-              "description": "The ID of the parent branch."
-            },
-            {
-              "name": "groupId",
-              "description": "The ID of the parent group."
-            },
-            {
-              "name": "memberId",
-              "description": "Unique identifier for the member."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/branches/{branchId}/groups/{groupId}/loans/{loanId}",
-        "definition": {
-          "entityName": "Loan",
-          "schema": {
-            "$ref": "#/backend/entities/Loan"
-          },
-          "description": "Stores loan data for a group. Loan IDs are auto-generated.",
-          "params": [
-            {
-              "name": "branchId",
-              "description": "The ID of the parent branch."
-            },
-            {
-              "name": "groupId",
-              "description": "The ID of the parent group."
-            },
-            {
-              "name": "loanId",
-              "description": "Unique identifier for the loan."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/branches/{branchId}/groups/{groupId}/savings/{savingsId}",
-        "definition": {
-          "entityName": "Savings",
-          "schema": {
-            "$ref": "#/backend/entities/Savings"
-          },
-          "description": "Stores savings data for a group. Savings IDs are auto-generated.",
-          "params": [
-            {
-              "name": "branchId",
-              "description": "The ID of the parent branch."
-            },
-            {
-              "name": "groupId",
-              "description": "The ID of the parent group."
-            },
-            {
-              "name": "savingsId",
-              "description": "Unique identifier for the savings."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed to ensure a permanent and well-organized storage for the LendEasy application. It is structured to support the core features of branch, employee, user role, and group/center management while prioritizing security and scalability. The design focuses on path-based ownership for private user data and collaborative membership maps for group-related data.  Each collection is segregated based on security requirements. Crucially, authorization independence is achieved by denormalizing relevant authorization data into subcollections.  This avoids `get()` calls in security rules. The structure is optimized for efficient `list` operations with clear ownership and role-based access control."
+      { "path": "/regions/{regionId}", "definition": { "entityName": "Region", "schema": { "$ref": "#/entities/Region" }, "description": "Stores region data." } },
+      { "path": "/regions/{regionId}/zones/{zoneId}", "definition": { "entityName": "Zone", "schema": { "$ref": "#/entities/Zone" }, "description": "Stores zone data within a region." } },
+      { "path": "/regions/{regionId}/zones/{zoneId}/areas/{areaId}", "definition": { "entityName": "Area", "schema": { "$ref": "#/entities/Area" }, "description": "Stores area data within a zone." } },
+      { "path": "/regions/{regionId}/zones/{zoneId}/areas/{areaId}/branches/{branchId}", "definition": { "entityName": "Branch", "schema": { "$ref": "#/entities/Branch" }, "description": "Stores branch data within an area." } },
+      { "path": "/regions/{regionId}/zones/{zoneId}/areas/{areaId}/branches/{branchId}/groups/{groupId}", "definition": { "entityName": "Group", "schema": { "$ref": "#/entities/Group" }, "description": "Stores group data within a branch." } },
+      { "path": "/employees/{employeeId}", "definition": { "entityName": "Employee", "schema": { "$ref": "#/entities/Employee" }, "description": "Stores employee data." } },
+      { "path": "/member_changes/{changeId}", "definition": { "entityName": "GroupMemberChange", "schema": { "$ref": "#/entities/GroupMemberChange" }, "description": "Stores daily member changes for all groups." } },
+      { "path": "/savings_transactions/{txId}", "definition": { "entityName": "SavingsTransaction", "schema": { "$ref": "#/entities/SavingsTransaction" }, "description": "Stores daily savings transactions for all groups." } },
+      { "path": "/loan_disbursements/{disbursementId}", "definition": { "entityName": "LoanDisbursement", "schema": { "$ref": "#/entities/LoanDisbursement" }, "description": "Stores loan disbursement records." } },
+      { "path": "/loan_collections/{collectionId}", "definition": { "entityName": "LoanCollection", "schema": { "$ref": "#/entities/LoanCollection" }, "description": "Stores loan collection records." } },
+      { "path": "/others_data/{otherDataId}", "definition": { "entityName": "OtherDataEntry", "schema": { "$ref": "#/entities/OtherDataEntry" }, "description": "Stores other miscellaneous daily data for all branches." } }
+    ]
   }
 }
-    

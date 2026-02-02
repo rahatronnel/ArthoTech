@@ -52,6 +52,7 @@ export type GroupMemberChange = {
   id: string;
   date: string;
   groupId: string;
+  branchId: string;
   added: number;
   dropped: number;
   notes?: string;
@@ -61,6 +62,7 @@ export type SavingsTransaction = {
   id: string;
   date: string;
   groupId: string;
+  branchId: string;
   deposit: number;
   withdraw: number;
   notes?: string;
@@ -70,6 +72,7 @@ export type LoanDisbursement = {
   id: string;
   date: string;
   groupId: string;
+  branchId: string;
   amount: number;
   notes?: string;
 };
@@ -78,6 +81,7 @@ export type LoanCollection = {
   id: string;
   date: string;
   groupId: string;
+  branchId: string;
   amount: number;
   notes?: string;
 };
@@ -85,6 +89,7 @@ export type LoanCollection = {
 export type OtherDataEntry = {
   id: string;
   date: string;
+  branchId: string;
   branch: string;
   type: 'Others Expenses' | 'Cash' | 'Bank' | 'Afternoon Collection' | 'Today Total Cash' | 'Risk Fund' | 'Processing Fee' | 'Passbook Fee' | 'Admission Fee';
   amount: number;
@@ -114,9 +119,6 @@ export type Role = {
   description: string;
 };
 
-// Mock data is no longer needed as all data will come from Firestore.
-// The types above will be used with Firestore data.
-
 export const roles: Role[] = [
     { name: 'Branch User', description: 'Manages operations within a single branch. Can create and manage groups, members, loans, and savings for their branch.' },
     { name: 'Area User', description: 'Oversees multiple branches within a specific area. Has read-only access to all data within their area and can generate reports.' },
@@ -125,5 +127,3 @@ export const roles: Role[] = [
     { name: 'Head Office', description: 'Has full administrative access to the entire system. Manages system settings, user roles, and overall organization data.' },
     { name: 'Super Admin', description: 'Has complete control over the application, including deleting all data.' },
 ];
-
-    

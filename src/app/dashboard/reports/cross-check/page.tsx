@@ -10,7 +10,7 @@ import { useOthersData } from '@/context/OthersDataContext';
 import { useOrganization } from '@/context/OrganizationContext';
 import { useCollection, useFirestore, useMemoFirebase, useAuth } from '@/firebase';
 import { collectionGroup, query, collection } from 'firebase/firestore';
-import type { Group, Branch, Area, Zone, Region } from '@/lib/data';
+import type { Group, Branch, Area, Zone, Region, GroupMemberChange, SavingsTransaction, LoanDisbursement, LoanCollection, OtherDataEntry } from '@/lib/data';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -59,27 +59,26 @@ export default function CrossCheckReportPage() {
   const { orgInfo } = useOrganization();
   const firestore = useFirestore();
   const { currentUser } = useAuth();
-
-  const { memberChanges } = useMember();
-  const { savingsTransactions } = useSavings();
-  const { loanDisbursements, loanCollections } = useLoan();
-  const { othersData } = useOthersData();
-
-  const regionsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'regions') : null, [firestore]);
-  const { data: regionsData, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
-
-  const zonesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'zones')) : null, [firestore]);
-  const { data: zonesData, isLoading: zonesLoading } = useCollection<Zone>(zonesQuery);
-
-  const areasQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'areas')) : null, [firestore]);
-  const { data: areasData, isLoading: areasLoading } = useCollection<Area>(areasQuery);
   
+  const { memberChanges, isLoading: membersLoading } = useMember();
+  const { savingsTransactions, isLoading: savingsLoading } = useSavings();
+  const { loanDisbursements, loanCollections, isLoading: loansLoading } = useLoan();
+  const { othersData, isLoading: othersLoading } = useOthersData();
+
   const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
   const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
 
   const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
   const { data: branchesData, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
+  
+  const areasQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'areas')) : null, [firestore]);
+  const { data: areasData, isLoading: areasLoading } = useCollection<Area>(areasQuery);
+  
+  const zonesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'zones')) : null, [firestore]);
+  const { data: zonesData, isLoading: zonesLoading } = useCollection<Zone>(zonesQuery);
 
+  const regionsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'regions') : null, [firestore]);
+  const { data: regionsData, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
   
   const { visibleBranchIds, branchesForFilter } = useMemo(() => {
     if (!currentUser || !branchesData || !areasData || !zonesData || !regionsData) {
@@ -140,50 +139,52 @@ export default function CrossCheckReportPage() {
     const selectedDateStr = date;
     const selectedDateObj = parseISO(selectedDateStr);
 
-    let finalVisibleBranchIds = visibleBranchIds;
-    if (filterBranchId !== 'all') {
-      finalVisibleBranchIds = new Set([filterBranchId]);
-    }
+    const relevantBranchIds = filterBranchId === 'all' 
+      ? visibleBranchIds 
+      : new Set([filterBranchId]);
+
+    const groupsForReport = groupsData.filter(g => relevantBranchIds.has(g.branchId));
     
-    const groupsForReport = groupsData.filter(g => finalVisibleBranchIds.has(g.branchId));
-    const visibleGroupIds = new Set(groupsForReport.map(g => g.id));
+    // Filter transactions based on relevant branch IDs
+    const dailyMemberChanges = memberChanges.filter(c => c.date === selectedDateStr && relevantBranchIds.has(c.branchId));
+    const pastMemberChanges = memberChanges.filter(c => isBefore(parseISO(c.date), selectedDateObj) && relevantBranchIds.has(c.branchId));
+
+    const dailySavingsTx = savingsTransactions.filter(t => t.date === selectedDateStr && relevantBranchIds.has(t.branchId));
+    const pastSavingsTx = savingsTransactions.filter(t => isBefore(parseISO(t.date), selectedDateObj) && relevantBranchIds.has(t.branchId));
+
+    const dailyDisbursements = loanDisbursements.filter(d => d.date === selectedDateStr && relevantBranchIds.has(d.branchId));
+    const pastDisbursements = loanDisbursements.filter(d => isBefore(parseISO(d.date), selectedDateObj) && relevantBranchIds.has(d.branchId));
+    
+    const dailyCollections = loanCollections.filter(c => c.date === selectedDateStr && relevantBranchIds.has(c.branchId));
+    const pastCollections = loanCollections.filter(c => isBefore(parseISO(c.date), selectedDateObj) && relevantBranchIds.has(c.branchId));
+
+    const dailyOthersData = othersData.filter(d => d.date === selectedDateStr && relevantBranchIds.has(d.branchId));
 
     // --- Member Calculation ---
     const initialMembers = groupsForReport.reduce((sum, g) => sum + g.initialMembers, 0);
-    const prevMemberChanges = memberChanges.filter(c => visibleGroupIds.has(c.groupId) && isBefore(parseISO(c.date), selectedDateObj));
-    const openingMembers = initialMembers + prevMemberChanges.reduce((sum, c) => sum + c.added - c.dropped, 0);
-    const todayMemberChanges = memberChanges.filter(c => visibleGroupIds.has(c.groupId) && c.date === selectedDateStr);
-    const addedToday = todayMemberChanges.reduce((sum, c) => sum + c.added, 0);
-    const droppedToday = todayMemberChanges.reduce((sum, c) => sum + c.dropped, 0);
+    const openingMembers = initialMembers + pastMemberChanges.reduce((sum, c) => sum + c.added - c.dropped, 0);
+    const addedToday = dailyMemberChanges.reduce((sum, c) => sum + c.added, 0);
+    const droppedToday = dailyMemberChanges.reduce((sum, c) => sum + c.dropped, 0);
 
     // --- Savings Calculation ---
     const initialSavings = groupsForReport.reduce((sum, g) => sum + g.initialSavings, 0);
-    const prevSavingsTx = savingsTransactions.filter(t => visibleGroupIds.has(t.groupId) && isBefore(parseISO(t.date), selectedDateObj));
-    const openingSavings = initialSavings + prevSavingsTx.reduce((sum, t) => sum + t.deposit - t.withdraw, 0);
-    const todaySavingsTx = savingsTransactions.filter(t => visibleGroupIds.has(t.groupId) && t.date === selectedDateStr);
-    const depositedToday = todaySavingsTx.reduce((sum, t) => sum + t.deposit, 0);
-    const withdrawnToday = todaySavingsTx.reduce((sum, t) => sum + t.withdraw, 0);
+    const openingSavings = initialSavings + pastSavingsTx.reduce((sum, t) => sum + t.deposit - t.withdraw, 0);
+    const depositedToday = dailySavingsTx.reduce((sum, t) => sum + t.deposit, 0);
+    const withdrawnToday = dailySavingsTx.reduce((sum, t) => sum + t.withdraw, 0);
 
     // --- Loan Calculation ---
     const initialLoans = groupsForReport.reduce((sum, g) => sum + g.totalLoans, 0);
-    const prevDisbursements = loanDisbursements.filter(d => visibleGroupIds.has(d.groupId) && isBefore(parseISO(d.date), selectedDateObj));
-    const prevCollections = loanCollections.filter(c => visibleGroupIds.has(c.groupId) && isBefore(parseISO(c.date), selectedDateObj));
     const openingLoans = initialLoans 
-        + prevDisbursements.reduce((sum, d) => sum + d.amount, 0)
-        - prevCollections.reduce((sum, c) => sum + c.amount, 0);
-    const disbursedToday = loanDisbursements.filter(d => visibleGroupIds.has(d.groupId) && d.date === selectedDateStr).reduce((sum, d) => sum + d.amount, 0);
-    const collectedToday = loanCollections.filter(c => visibleGroupIds.has(c.groupId) && c.date === selectedDateStr).reduce((sum, c) => sum + c.amount, 0);
+        + pastDisbursements.reduce((sum, d) => sum + d.amount, 0)
+        - pastCollections.reduce((sum, c) => sum + c.amount, 0);
+    const disbursedToday = dailyDisbursements.reduce((sum, d) => sum + d.amount, 0);
+    const collectedToday = dailyCollections.reduce((sum, c) => sum + c.amount, 0);
 
     // --- Other Collections ---
-    const branchNameForFilter = branchesData.find(b => b.id === filterBranchId)?.name;
-    const todayOthersData = filterBranchId === 'all'
-      ? othersData.filter(d => d.date === selectedDateStr && Array.from(visibleBranchIds).map(id => branchesData.find(b=>b.id === id)?.name).includes(d.branch))
-      : othersData.filter(d => d.date === selectedDateStr && d.branch === branchNameForFilter);
-      
-    const admissionFees = todayOthersData.filter(d => d.type === 'Admission Fee').reduce((sum, d) => sum + d.amount, 0);
-    const passbookFees = todayOthersData.filter(d => d.type === 'Passbook Fee').reduce((sum, d) => sum + d.amount, 0);
-    const formFees = todayOthersData.filter(d => d.type === 'Processing Fee').reduce((sum, d) => sum + d.amount, 0);
-    const riskFund = todayOthersData.filter(d => d.type === 'Risk Fund').reduce((sum, d) => sum + d.amount, 0);
+    const admissionFees = dailyOthersData.filter(d => d.type === 'Admission Fee').reduce((sum, d) => sum + d.amount, 0);
+    const passbookFees = dailyOthersData.filter(d => d.type === 'Passbook Fee').reduce((sum, d) => sum + d.amount, 0);
+    const formFees = dailyOthersData.filter(d => d.type === 'Processing Fee').reduce((sum, d) => sum + d.amount, 0);
+    const riskFund = dailyOthersData.filter(d => d.type === 'Risk Fund').reduce((sum, d) => sum + d.amount, 0);
     
     setReportData({
       memberInfo: {
@@ -221,7 +222,7 @@ export default function CrossCheckReportPage() {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
   };
   
-  const isLoading = groupsLoading || branchesLoading || areasLoading || zonesLoading || regionsLoading;
+  const isLoading = groupsLoading || branchesLoading || areasLoading || zonesLoading || regionsLoading || membersLoading || savingsLoading || loansLoading || othersLoading;
   
   const reportTitleBranch = filterBranchId === 'all' 
     ? 'All Assigned Branches' 
@@ -254,20 +255,20 @@ export default function CrossCheckReportPage() {
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-[240px]"
+                className="w-full sm:w-[240px]"
               />
             </div>
             
             <div className="grid gap-2">
             <Label>Branch</Label>
              {isFilterDisabled ? (
-                <Input value={branchesForFilter[0]?.name || 'No branch assigned'} disabled className="w-[240px]" />
+                <Input value={branchesForFilter[0]?.name || 'No branch assigned'} disabled className="w-full sm:w-[240px]" />
               ) : (
                 <Select
                     value={filterBranchId}
                     onValueChange={setFilterBranchId}
                 >
-                    <SelectTrigger className="w-[240px]">
+                    <SelectTrigger className="w-full sm:w-[240px]">
                     <SelectValue placeholder="Select a branch" />
                     </SelectTrigger>
                     <SelectContent>
@@ -352,18 +353,18 @@ export default function CrossCheckReportPage() {
                 <TableRow>
                     {/* Member */}
                     <TableCell className="border-r font-medium">{reportData.memberInfo.opening}</TableCell>
-                    <TableCell className="font-medium">{reportData.memberInfo.added}</TableCell>
-                    <TableCell className="font-medium">{reportData.memberInfo.dropped}</TableCell>
+                    <TableCell className="font-medium text-green-600">+{reportData.memberInfo.added}</TableCell>
+                    <TableCell className="font-medium text-red-600">-{reportData.memberInfo.dropped}</TableCell>
                     <TableCell className="border-r font-bold">{reportData.memberInfo.closing}</TableCell>
                     {/* Savings */}
                     <TableCell className="border-r font-medium">{formatCurrency(reportData.savingsInfo.opening)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(reportData.savingsInfo.deposit)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(reportData.savingsInfo.withdraw)}</TableCell>
+                    <TableCell className="font-medium text-green-600">+{formatCurrency(reportData.savingsInfo.deposit)}</TableCell>
+                    <TableCell className="font-medium text-red-600">-{formatCurrency(reportData.savingsInfo.withdraw)}</TableCell>
                     <TableCell className="border-r font-bold">{formatCurrency(reportData.savingsInfo.closing)}</TableCell>
                     {/* Loan */}
                     <TableCell className="border-r font-medium">{formatCurrency(reportData.loanInfo.opening)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(reportData.loanInfo.disbursement)}</TableCell>
-                    <TableCell className="font-medium">{formatCurrency(reportData.loanInfo.collection)}</TableCell>
+                    <TableCell className="font-medium text-blue-600">+{formatCurrency(reportData.loanInfo.disbursement)}</TableCell>
+                    <TableCell className="font-medium text-green-600">-{formatCurrency(reportData.loanInfo.collection)}</TableCell>
                     <TableCell className="border-r font-bold">{formatCurrency(reportData.loanInfo.closing)}</TableCell>
                     {/* Other */}
                     <TableCell className="font-medium">{formatCurrency(reportData.otherCollections.admission)}</TableCell>
