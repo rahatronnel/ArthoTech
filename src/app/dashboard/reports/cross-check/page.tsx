@@ -14,15 +14,12 @@ import type { Group, Branch, Area, Zone, Region } from '@/lib/data';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Calendar as CalendarIcon, Printer, ChevronLeft } from 'lucide-react';
+import { Printer, ChevronLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import Link from 'next/link';
 
@@ -55,7 +52,7 @@ interface ReportData {
 }
 
 export default function CrossCheckReportPage() {
-  const [date, setDate] = useState<Date | undefined>(new Date());
+  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [filterBranchId, setFilterBranchId] = useState<string>('all');
 
@@ -140,7 +137,7 @@ export default function CrossCheckReportPage() {
   const handleGenerateReport = () => {
     if (!date || !groupsData || !branchesData) return;
 
-    const selectedDateStr = format(date, 'yyyy-MM-dd');
+    const selectedDateStr = date;
     const selectedDateObj = parseISO(selectedDateStr);
 
     let finalVisibleBranchIds = visibleBranchIds;
@@ -180,7 +177,7 @@ export default function CrossCheckReportPage() {
     // --- Other Collections ---
     const branchNameForFilter = branchesData.find(b => b.id === filterBranchId)?.name;
     const todayOthersData = filterBranchId === 'all'
-      ? othersData.filter(d => d.date === selectedDateStr && Array.from(visibleBranchIds).includes(d.branch))
+      ? othersData.filter(d => d.date === selectedDateStr && Array.from(visibleBranchIds).map(id => branchesData.find(b=>b.id === id)?.name).includes(d.branch))
       : othersData.filter(d => d.date === selectedDateStr && d.branch === branchNameForFilter);
       
     const admissionFees = todayOthersData.filter(d => d.type === 'Admission Fee').reduce((sum, d) => sum + d.amount, 0);
@@ -230,7 +227,7 @@ export default function CrossCheckReportPage() {
     ? 'All Assigned Branches' 
     : branchesData?.find(b => b.id === filterBranchId)?.name || '';
 
-  const isFilterDisabled = branchesForFilter.length <= 1 && currentUser?.role !== 'Super Admin';
+  const isFilterDisabled = branchesForFilter.length <= 1 && currentUser?.role !== 'Super Admin' && currentUser?.role !== 'Head Office' ;
 
   return (
     <div className="print:p-8">
@@ -253,47 +250,34 @@ export default function CrossCheckReportPage() {
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
             <div className="grid gap-2">
               <Label>Report Date</Label>
-               <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-[240px] justify-start text-left font-normal",
-                      !date && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {date ? format(date, "PPP") : <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={date}
-                    onSelect={setDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+               <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-[240px]"
+              />
             </div>
             
             <div className="grid gap-2">
             <Label>Branch</Label>
-            <Select
-                value={filterBranchId}
-                onValueChange={setFilterBranchId}
-                disabled={isFilterDisabled}
-            >
-                <SelectTrigger className="w-[240px]">
-                <SelectValue placeholder="Select a branch" />
-                </SelectTrigger>
-                <SelectContent>
-                    {(currentUser?.role === 'Super Admin' || branchesForFilter.length > 1) && <SelectItem value="all">All Assigned Branches</SelectItem>}
-                    {branchesForFilter?.map(b => (
-                        <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+             {isFilterDisabled ? (
+                <Input value={branchesForFilter[0]?.name || 'No branch assigned'} disabled className="w-[240px]" />
+              ) : (
+                <Select
+                    value={filterBranchId}
+                    onValueChange={setFilterBranchId}
+                >
+                    <SelectTrigger className="w-[240px]">
+                    <SelectValue placeholder="Select a branch" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {(currentUser?.role === 'Super Admin' || currentUser?.role === 'Head Office' || branchesForFilter.length > 1) && <SelectItem value="all">All Assigned Branches</SelectItem>}
+                        {branchesForFilter?.map(b => (
+                            <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+              )}
             </div>
 
             <Button onClick={handleGenerateReport} disabled={isLoading || !date}>
@@ -316,7 +300,7 @@ export default function CrossCheckReportPage() {
         <Card className="mt-6" id="print-area">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Cross Check Report for {date ? format(date, 'PPP') : ''}</CardTitle>
+              <CardTitle>Cross Check Report for {date ? format(parseISO(date), 'PPP') : ''}</CardTitle>
               <CardDescription>Displaying report for: <span className="font-semibold">{reportTitleBranch}</span></CardDescription>
             </div>
             <Button size="sm" className="gap-1 print:hidden" onClick={handlePrint}>
@@ -330,7 +314,7 @@ export default function CrossCheckReportPage() {
                 <h1 className="text-2xl font-bold mt-2">{orgInfo.name}</h1>
                 <p className="text-sm text-muted-foreground">{orgInfo.bengaliName}</p>
                 <p className="text-xs text-muted-foreground">{orgInfo.address}</p>
-                <h2 className="text-xl font-semibold mt-6 underline decoration-double">Cross Check Report for {date ? format(date, 'PPP') : ''}</h2>
+                <h2 className="text-xl font-semibold mt-6 underline decoration-double">Cross Check Report for {date ? format(parseISO(date), 'PPP') : ''}</h2>
                 <p className="text-md font-medium">Branch: {reportTitleBranch}</p>
             </div>
             <Table className="border">
