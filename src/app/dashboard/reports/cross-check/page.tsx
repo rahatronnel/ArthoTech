@@ -130,7 +130,7 @@ export default function CrossCheckReportPage() {
     if (currentUser?.role === 'Branch User') {
       setFilterBranchId(currentUser.assignment || '');
     } else if (branchesForFilter.length > 0) {
-      // For admins or managers, default to 'all'
+      // For admins or managers, default to 'all' to show summary
       setFilterBranchId('all');
     }
   }, [currentUser, userLoading, branchesForFilter]);
@@ -249,10 +249,8 @@ export default function CrossCheckReportPage() {
         );
       }
 
-      const isFilterDisabled = currentUser && currentUser.role !== 'Super Admin' && currentUser.role !== 'Head Office';
-      const isSingleBranchUser = isFilterDisabled && branchesForFilter.length <= 1;
-
-      if (isSingleBranchUser) {
+      // A Branch User can only see their own branch, so show a disabled input.
+      if (currentUser?.role === 'Branch User') {
         return (
           <div className="grid gap-2">
             <Label>Branch</Label>
@@ -265,7 +263,7 @@ export default function CrossCheckReportPage() {
         );
       }
 
-      // For Admins, HO, and Managers with multiple branches
+      // For Admins, HO, and Managers (Area, Zonal, Regional), show a dropdown.
       return (
         <div className="grid gap-2">
           <Label>Branch</Label>
@@ -418,3 +416,5 @@ export default function CrossCheckReportPage() {
     </div>
   );
 }
+
+    
