@@ -6,7 +6,7 @@ import type { Employee, Branch, Area, Zone, Region } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Edit, FileDown, FileUp, Trash2, Mail, Copy } from 'lucide-react';
+import { PlusCircle, Edit, FileDown, FileUp, Trash2, Mail, Copy, UserX, UserCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -21,6 +21,7 @@ import { Progress } from '@/components/ui/progress';
 import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, deleteApp } from 'firebase/app';
 import { getAuth, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { cn } from '@/lib/utils';
 
 // --- Constants and Types ---
 const ROLES: Employee['role'][] = ['Branch User', 'Area User', 'Zonal User', 'Regional User', 'Head Office', 'Super Admin'];
@@ -51,7 +52,7 @@ export default function EmployeesPage() {
     // --- State Management ---
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
-    const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+    const [employeeToToggleStatus, setEmployeeToToggleStatus] = useState<Employee | null>(null);
     const [isDeleteAllOpen, setIsDeleteAllOpen] = useState(false);
     
     const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -136,8 +137,8 @@ export default function EmployeesPage() {
         setIsFormOpen(true);
     };
     
-    const handleDelete = (employee: Employee) => {
-        setEmployeeToDelete(employee);
+    const handleToggleStatus = (employee: Employee) => {
+        setEmployeeToToggleStatus(employee);
     };
 
     const handleCopyEmail = (email: string) => {
@@ -148,15 +149,18 @@ export default function EmployeesPage() {
         });
     };
     
-    const confirmDelete = async () => {
-        if (!employeeToDelete) return;
+    const confirmToggleStatus = async () => {
+        if (!employeeToToggleStatus) return;
         try {
-            await deleteDoc(doc(firestore, "employees", employeeToDelete.id));
-            toast({ title: "Employee Record Deleted", description: `"${employeeToDelete.name}" has been removed. Their login has not been disabled.` });
+            await setDoc(doc(firestore, "employees", employeeToToggleStatus.id), {
+                disabled: !employeeToToggleStatus.disabled
+            }, { merge: true });
+    
+            toast({ title: `Employee ${employeeToToggleStatus.disabled ? 'Enabled' : 'Disabled'}`, description: `"${employeeToToggleStatus.name}" has been ${employeeToToggleStatus.disabled ? 'enabled' : 'disabled'}.` });
         } catch (error: any) {
-            toast({ variant: "destructive", title: "Deletion Failed", description: error.message });
+            toast({ variant: "destructive", title: "Operation Failed", description: error.message });
         } finally {
-            setEmployeeToDelete(null);
+            setEmployeeToToggleStatus(null);
         }
     };
     
@@ -323,6 +327,7 @@ export default function EmployeesPage() {
                     code: empData.code,
                     role: empData.role,
                     assignment: empData.assignment,
+                    disabled: false,
                 };
                 await setDoc(newDocRef, newEmployee);
                 
@@ -332,7 +337,11 @@ export default function EmployeesPage() {
                 toast({ variant: 'destructive', title: `Error on row ${i+2}`, description: error.message });
                 // Stop the upload on first error
                 setUploadState(s => ({ ...s, status: 'preview' }));
-                await deleteApp(tempApp).catch(() => {}); // Attempt to delete app, ignore if already deleted.
+                try {
+                    await deleteApp(tempApp);
+                } catch (deleteError) {
+                    // Ignore if already deleted
+                }
                 return;
             }
         }
@@ -401,7 +410,7 @@ export default function EmployeesPage() {
                             </TableHeader>
                             <TableBody>
                                 {filteredEmployees.map((emp, index) => (
-                                    <TableRow key={emp.id}>
+                                    <TableRow key={emp.id} className={cn(emp.disabled && 'opacity-50 bg-muted/50')}>
                                         <TableCell>{index + 1}</TableCell>
                                         <TableCell className="font-medium">{emp.name}</TableCell>
                                         <TableCell className="text-muted-foreground">
@@ -427,9 +436,9 @@ export default function EmployeesPage() {
                                                     <Edit className="h-4 w-4" />
                                                     <span className="sr-only">Edit</span>
                                                 </Button>
-                                                <Button variant="ghost" size="icon" onClick={() => handleDelete(emp)} className="text-destructive hover:text-destructive">
-                                                    <Trash2 className="h-4 w-4" />
-                                                    <span className="sr-only">Delete</span>
+                                                <Button variant="ghost" size="icon" onClick={() => handleToggleStatus(emp)} className={cn(emp.disabled ? 'text-green-600 hover:text-green-700' : 'text-destructive hover:text-destructive')}>
+                                                    {emp.disabled ? <UserCheck className="h-4 w-4" /> : <UserX className="h-4 w-4" />}
+                                                    <span className="sr-only">{emp.disabled ? 'Enable' : 'Disable'}</span>
                                                 </Button>
                                             </div>
                                         </TableCell>
@@ -465,15 +474,21 @@ export default function EmployeesPage() {
                 />
             )}
 
-            <AlertDialog open={!!employeeToDelete} onOpenChange={() => setEmployeeToDelete(null)}>
+            <AlertDialog open={!!employeeToToggleStatus} onOpenChange={() => setEmployeeToToggleStatus(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will delete the employee record for "{employeeToDelete?.name}". This action does not disable their login. 
+                            This will {employeeToToggleStatus?.disabled ? 'enable' : 'disable'} the account for "{employeeToToggleStatus?.name}".
+                            {employeeToToggleStatus?.disabled ? ' They will be able to log in again.' : ' They will be immediately logged out and unable to access the system.'}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
-                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">Delete Record</AlertDialogAction></AlertDialogFooter>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmToggleStatus} className={cn(employeeToToggleStatus?.disabled ? 'bg-green-600 hover:bg-green-700' : 'bg-destructive hover:bg-destructive/90')}>
+                            {employeeToToggleStatus?.disabled ? 'Enable' : 'Disable'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
             
@@ -482,7 +497,7 @@ export default function EmployeesPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This will permanently delete all employee records from the database, except for Super Admins. This action cannot be undone and does not disable their logins.
+                            This will permanently delete all employee records from the database, except for Super Admins. This action cannot be undone and will orphan their authentication accounts, preventing re-registration with the same email. For reversible removal, use the 'Disable' action instead.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -598,6 +613,7 @@ function FormDialog({ isOpen, onClose, employee, roles, firestore, existingUsers
                     code,
                     role: role as Employee['role'],
                     assignment: finalAssignment,
+                    disabled: false,
                 };
                 await setDoc(newDocRef, newEmployee);
                 toast({ title: "Employee created successfully" });

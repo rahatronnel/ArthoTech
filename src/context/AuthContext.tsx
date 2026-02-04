@@ -96,7 +96,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const querySnapshot = await getDocs(q);
           if (!querySnapshot.empty) {
             const employeeDoc = querySnapshot.docs[0];
-            setCurrentUser({ id: employeeDoc.id, ...employeeDoc.data() } as Employee);
+            const employeeData = { id: employeeDoc.id, ...employeeDoc.data() } as Employee;
+            
+            if (employeeData.disabled) {
+                console.warn(`User ${user.uid} (${user.email}) is disabled. Forcing logout.`);
+                await signOut(auth);
+            } else {
+                setCurrentUser(employeeData);
+            }
           } else {
             console.warn(`No employee document found for authenticated user ${user.uid}`);
             setCurrentUser(null);
