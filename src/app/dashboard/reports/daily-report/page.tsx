@@ -465,10 +465,14 @@ export default function DailyReportPage() {
   }
   
   const getFooterColSpan = () => {
-    let span = 1; // For SL column
+    let span = 1; // SL column
     if (reportLevel === 'area' && !groupByOfficer) span++; // For Area column
-    if (groupByOfficer) span++; // For Officer column
-    span++; // For Branch column
+    if (groupByOfficer) {
+        span++; // for Branch
+        span++; // For Officer column
+    } else {
+        span++; // for Branch
+    }
     return span;
   }
 
@@ -663,6 +667,7 @@ export default function DailyReportPage() {
                 <TableBody>
                   {reportData.length > 0 ? reportData.map((row, index) => {
                     const isAreaGrouping = reportLevel === 'area' && !groupByOfficer;
+                    const isOfficerGrouping = groupByOfficer;
                     
                     const showAreaCell = isAreaGrouping && !row.isSubtotal &&
                         (index === 0 || reportData[index - 1].areaName !== row.areaName || reportData[index-1].isSubtotal);
@@ -678,19 +683,43 @@ export default function DailyReportPage() {
                         }
                     }
 
+                    const showBranchCellForOfficerGroup = isOfficerGrouping && !row.isSubtotal &&
+                        (index === 0 || reportData[index - 1].branchName !== row.branchName);
+                    let branchRowCountForOfficerGroup = 1;
+                    if (showBranchCellForOfficerGroup) {
+                        for (let i = index + 1; i < reportData.length; i++) {
+                            if (reportData[i].branchName === row.branchName) {
+                                branchRowCountForOfficerGroup++;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+
+
                     return (
-                        <TableRow key={index} className={cn("transition-colors duration-300 hover:bg-accent", row.isSubtotal && "bg-secondary font-bold hover:bg-secondary/80")}>
+                        <TableRow key={index} className={cn("transition-colors duration-300 hover:bg-accent/50", row.isSubtotal && "bg-secondary font-bold hover:bg-secondary/80")}>
                             {row.isSubtotal ? (
                                 <TableCell colSpan={isAreaGrouping ? 2 : 1} className="text-right">{row.branchName}</TableCell>
                             ) : (
                                 <>
                                     <TableCell>{row.sl}</TableCell>
-                                    {showAreaCell && (
+                                    {isAreaGrouping && showAreaCell && (
                                         <TableCell rowSpan={areaRowCount} className="font-medium border-r align-middle text-center">
                                             {row.areaName}
                                         </TableCell>
                                     )}
-                                    <TableCell className="font-medium border-r">{row.branchName}</TableCell>
+
+                                    {isOfficerGrouping ? (
+                                        showBranchCellForOfficerGroup && (
+                                            <TableCell rowSpan={branchRowCountForOfficerGroup} className="font-medium border-r align-middle">
+                                                {row.branchName}
+                                            </TableCell>
+                                        )
+                                    ) : (
+                                        <TableCell className="font-medium border-r">{row.branchName}</TableCell>
+                                    )}
+                                    
                                     {groupByOfficer && <TableCell className="font-medium border-r">{row.officerName} ({row.officerCode})</TableCell>}
                                 </>
                             )}
