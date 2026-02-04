@@ -1,11 +1,15 @@
 "use client";
 
+import { useMemo } from 'react';
 import { StatCard } from '@/components/dashboard/stat-card';
 import { Building2, Users, UserRound, Banknote, Landmark } from 'lucide-react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, collectionGroup, query } from 'firebase/firestore';
-import type { Branch, Employee, Group, Savings, Loan } from '@/lib/data';
+import type { Branch, Employee, Group } from '@/lib/data';
+import { useSavings } from '@/context/SavingsContext';
+import { useLoan } from '@/context/LoanContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Organogram } from '@/components/dashboard/organogram';
 
 function StatSkeleton() {
   return (
@@ -34,32 +38,33 @@ export default function DashboardPage() {
   const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
   const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
 
-  const savingsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'savings')) : null, [firestore]);
-  const { data: savingsData, isLoading: savingsLoading } = useCollection<Savings>(savingsQuery);
-
-  const loansQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'loans')) : null, [firestore]);
-  const { data: loansData, isLoading: loansLoading } = useCollection<Loan>(loansQuery);
-
+  const { savingsTransactions, isLoading: savingsLoading } = useSavings();
+  const { loanCollections, loanDisbursements, isLoading: loansLoading } = useLoan();
+  
   const isLoading = branchesLoading || employeesLoading || groupsLoading || savingsLoading || loansLoading;
+  
+  const totalCurrentSavings = useMemo(() => {
+    if (!groupsData || !savingsTransactions) return 0;
+    const initial = groupsData.reduce((sum, group) => sum + (group.initialSavings || 0), 0);
+    const deposits = savingsTransactions.reduce((sum, t) => sum + t.deposit, 0);
+    const withdrawals = savingsTransactions.reduce((sum, t) => sum + t.withdraw, 0);
+    return initial + deposits - withdrawals;
+  }, [groupsData, savingsTransactions]);
 
-  // WARNING: The calculations below are based on a simplified data model and may not be accurate.
-  // The 'Loan' and 'Savings' collections currently only track disbursements and deposits.
-  // Collections and withdrawals are not yet implemented in Firestore.
-  const totalInitialSavings = groupsData?.reduce((sum, group) => sum + (group.initialSavings || 0), 0) || 0;
-  const totalDeposits = savingsData?.reduce((sum, t) => sum + t.amount, 0) || 0;
-  const totalWithdrawals = 0; // Not implemented yet
-  const totalCurrentSavings = totalInitialSavings + totalDeposits - totalWithdrawals;
+  const totalOutstandingLoan = useMemo(() => {
+    if(!groupsData || !loanDisbursements || !loanCollections) return 0;
+    const initial = groupsData.reduce((sum, group) => sum + (group.totalLoans || 0), 0);
+    const disbursed = loanDisbursements.reduce((sum, d) => sum + d.amount, 0);
+    const collected = loanCollections.reduce((sum, c) => sum + c.amount, 0);
+    return initial + disbursed - collected;
+  }, [groupsData, loanDisbursements, loanCollections]);
 
-  const totalInitialLoans = groupsData?.reduce((sum, group) => sum + (group.totalLoans || 0), 0) || 0;
-  const totalDisbursed = loansData?.reduce((sum, d) => sum + d.amount, 0) || 0;
-  const totalCollected = 0; // Not implemented yet
-  const totalOutstandingLoan = totalInitialLoans + totalDisbursed - totalCollected;
 
   if (isLoading) {
       return (
           <div className="flex flex-col gap-6">
               <div>
-                  <h1 className="text-3xl font-bold">Welcome back, Admin!</h1>
+                  <h1 className="text-3xl font-bold">Welcome back!</h1>
                   <p className="text-muted-foreground">Here's a summary of your organization's activities.</p>
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -69,6 +74,7 @@ export default function DashboardPage() {
                   <StatSkeleton />
                   <StatSkeleton />
               </div>
+              <Skeleton className="h-96 w-full" />
           </div>
       )
   }
@@ -76,7 +82,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
         <div>
-            <h1 className="text-3xl font-bold">Welcome back, Admin!</h1>
+            <h1 className="text-3xl font-bold">Welcome back!</h1>
             <p className="text-muted-foreground">Here's a summary of your organization's activities.</p>
         </div>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -111,6 +117,8 @@ export default function DashboardPage() {
             description="Current outstanding loan balance"
         />
         </div>
+        
+        <Organogram />
     </div>
   );
 }
