@@ -575,29 +575,29 @@ export default function DailyReportPage() {
                 <TableBody>
                   {reportData.length > 0 ? reportData.map((row, index) => (
                      <TableRow key={index}>
-                        <TableCell className="transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{row.sl}</TableCell>
-                        <TableCell className="font-medium border-r transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{row.branchName}</TableCell>
-                        {groupByOfficer && <TableCell className="font-medium border-r transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{row.officerName} ({row.officerCode})</TableCell>}
-                        <TableCell className="text-right transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.memberAddToday)}</TableCell>
-                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.memberAddMonth)}</TableCell>
-                        <TableCell className="text-right transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.memberCancelToday)}</TableCell>
-                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.memberCancelMonth)}</TableCell>
-                        <TableCell className="text-right transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.savingsCollectionToday)}</TableCell>
-                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.savingsCollectionMonth)}</TableCell>
-                        <TableCell className="text-right transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.savingsRefundToday)}</TableCell>
-                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.savingsRefundMonth)}</TableCell>
-                        <TableCell className="text-right transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.loanDisburseToday)}</TableCell>
-                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.loanDisburseMonth)}</TableCell>
-                        <TableCell className="text-right transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.loanCollectionToday)}</TableCell>
-                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.loanCollectionMonth)}</TableCell>
-                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.otherExpense)}</TableCell>
-                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.cash)}</TableCell>
-                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.bank)}</TableCell>
-                        <TableCell className="text-right border-l transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.afternoonCollection)}</TableCell>
-                        <TableCell className="text-right border-l transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.riskFund)}</TableCell>
-                        <TableCell className="text-right border-l transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.processingFee)}</TableCell>
-                        <TableCell className="text-right border-l transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.passbookFee)}</TableCell>
-                        <TableCell className="text-right border-l transition-colors duration-300 hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.admissionFee)}</TableCell>
+                        <TableCell className="transition-colors duration-300 hover:bg-accent">{row.sl}</TableCell>
+                        <TableCell className="font-medium border-r transition-colors duration-300 hover:bg-accent">{row.branchName}</TableCell>
+                        {groupByOfficer && <TableCell className="font-medium border-r transition-colors duration-300 hover:bg-accent">{row.officerName} ({row.officerCode})</TableCell>}
+                        <TableCell className="text-right transition-colors duration-300 hover:bg-accent">{formatCurrency(row.memberAddToday)}</TableCell>
+                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-accent">{formatCurrency(row.memberAddMonth)}</TableCell>
+                        <TableCell className="text-right transition-colors duration-300 hover:bg-accent">{formatCurrency(row.memberCancelToday)}</TableCell>
+                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-accent">{formatCurrency(row.memberCancelMonth)}</TableCell>
+                        <TableCell className="text-right transition-colors duration-300 hover:bg-accent">{formatCurrency(row.savingsCollectionToday)}</TableCell>
+                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-accent">{formatCurrency(row.savingsCollectionMonth)}</TableCell>
+                        <TableCell className="text-right transition-colors duration-300 hover:bg-accent">{formatCurrency(row.savingsRefundToday)}</TableCell>
+                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-accent">{formatCurrency(row.savingsRefundMonth)}</TableCell>
+                        <TableCell className="text-right transition-colors duration-300 hover:bg-accent">{formatCurrency(row.loanDisburseToday)}</TableCell>
+                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-accent">{formatCurrency(row.loanDisburseMonth)}</TableCell>
+                        <TableCell className="text-right transition-colors duration-300 hover:bg-accent">{formatCurrency(row.loanCollectionToday)}</TableCell>
+                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-accent">{formatCurrency(row.loanCollectionMonth)}</TableCell>
+                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-accent">{formatCurrency(row.otherExpense)}</TableCell>
+                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-accent">{formatCurrency(row.cash)}</TableCell>
+                        <TableCell className="text-right border-r transition-colors duration-300 hover:bg-accent">{formatCurrency(row.bank)}</TableCell>
+                        <TableCell className="text-right border-l transition-colors duration-300 hover:bg-accent">{formatCurrency(row.afternoonCollection)}</TableCell>
+                        <TableCell className="text-right border-l transition-colors duration-300 hover:bg-accent">{formatCurrency(row.riskFund)}</TableCell>
+                        <TableCell className="text-right border-l transition-colors duration-300 hover:bg-accent">{formatCurrency(row.processingFee)}</TableCell>
+                        <TableCell className="text-right border-l transition-colors duration-300 hover:bg-accent">{formatCurrency(row.passbookFee)}</TableCell>
+                        <TableCell className="text-right border-l transition-colors duration-300 hover:bg-accent">{formatCurrency(row.admissionFee)}</TableCell>
                     </TableRow>
                   )) : (
                      <TableRow>

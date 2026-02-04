@@ -84,41 +84,25 @@
 }
 
 @layer components {
-  .table-cell-hover-group {
-    @apply relative;
-  }
-  .table-cell-hover-group:hover .table-cell-hover-marker {
-    @apply bg-primary/10;
-  }
-  .table-cell-hover-marker {
-    @apply absolute inset-y-0 -left-px -right-px -z-10 pointer-events-none;
-  }
-
   .btn-smoke-effect {
-    @apply relative overflow-hidden;
+    @apply relative overflow-hidden transition-transform duration-100;
   }
 
+  .btn-smoke-effect:active {
+    @apply scale-[0.98];
+  }
+  
   .btn-smoke-effect:active::after {
     content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 100%;
-    padding-top: 100%; /* Maintain aspect ratio */
-    border-radius: 50%;
-    background: radial-gradient(circle, hsl(var(--primary) / 0.2) 0%, transparent 70%);
+    @apply absolute top-1/2 left-1/2 w-full rounded-full opacity-100 pointer-events-none;
+    padding-top: 100%;
+    background: radial-gradient(circle, hsl(var(--primary) / 0.3) 0%, transparent 65%);
     transform: translate(-50%, -50%) scale(0);
-    opacity: 1;
-    pointer-events: none;
-    animation: smoke-animation 0.6s ease-out;
+    animation: smoke-animation 0.7s ease-out;
   }
 }
 
 @layer utilities {
-    .table-column-hover {
-        @apply [&_tr:hover_td:nth-child(n),&_tr:hover_th:nth-child(n)]:bg-muted/50 [&_thead_th:nth-child(n):hover~*]:bg-transparent;
-    }
-
     @keyframes smoke-animation {
       from {
         transform: translate(-50%, -50%) scale(0);
