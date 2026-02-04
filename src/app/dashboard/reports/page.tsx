@@ -13,6 +13,11 @@ const reports = [
     description: 'A daily summary of all financial and member activities.',
     href: '/dashboard/reports/cross-check',
   },
+  {
+    title: 'Daily Report',
+    description: 'A comprehensive daily report with multiple aggregation levels.',
+    href: '/dashboard/reports/daily-report',
+  },
 ];
 
 export default function ReportsPage() {
