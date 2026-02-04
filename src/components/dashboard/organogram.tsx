@@ -199,42 +199,43 @@ export function Organogram() {
                         display: flex;
                         flex-direction: column;
                         align-items: center;
-                        padding: 2.5rem 0.5rem 0; /* 40px 8px 0 */
+                        padding: 2.5rem 0.5rem 0;
                     }
-                    /* This is the vertical line coming down from a parent to the horizontal line */
+                    /* Vertical line connecting node to horizontal bar */
                     .tree li::after {
                         content: '';
                         position: absolute;
                         left: 50%;
                         top: 0;
-                        width: 1px;
-                        height: 2.5rem; /* 40px */
-                        background: #D1D5DB; /* gray-300 */
+                        width: 2px;
+                        height: 2.5rem;
+                        background: #9CA3AF; /* gray-400 */
+                        transform: translateX(-50%);
                     }
-                    /* This is the horizontal line connecting siblings */
+                    /* Horizontal bar connecting siblings */
                     .tree li::before {
                         content: '';
                         position: absolute;
                         left: 0;
                         top: 0;
                         width: 100%;
-                        height: 1px;
-                        background: #D1D5DB; /* gray-300 */
+                        height: 2px;
+                        background: #9CA3AF; /* gray-400 */
                     }
-                    /* --- Trim horizontal line for first and last child --- */
+                    /* Trim horizontal line for first and last child */
                     .tree li:first-child::before {
                         left: 50%;
                         width: 50%;
                     }
                     .tree li:last-child::before {
-                        right: 50%;
+                        left: 0;
                         width: 50%;
                     }
-                    /* A single child doesn't need the horizontal line before it */
+                    /* A single child doesn't need the horizontal line */
                     .tree li:only-child::before {
                         display: none;
                     }
-                    /* The root li shouldn't have any lines above it */
+                    /* The root li shouldn't have lines above it */
                     .tree > ul > li::before, .tree > ul > li::after {
                         display: none;
                     }
