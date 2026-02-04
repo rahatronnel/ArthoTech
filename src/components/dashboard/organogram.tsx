@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, collectionGroup, query } from 'firebase/firestore';
 import type { Region, Zone, Area, Branch, Employee } from '@/lib/data';
@@ -8,6 +8,7 @@ import { useOrganization } from '@/context/OrganizationContext';
 import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Building, GitFork, Map as RegionIcon, Network, User, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +17,17 @@ interface BranchNode extends Branch { type: 'branch'; children?: undefined; }
 interface AreaNode extends Area { type: 'area'; children: BranchNode[]; }
 interface ZoneNode extends Zone { type: 'zone'; children: AreaNode[]; }
 interface RegionNode extends Region { type: 'region'; children: ZoneNode[]; }
+
+// Helper function to chunk an array
+function chunk<T>(array: T[], size: number): T[][] {
+  const chunked_arr: T[][] = [];
+  let index = 0;
+  while (index < array.length) {
+    chunked_arr.push(array.slice(index, size + index));
+    index += size;
+  }
+  return chunked_arr;
+}
 
 function OrganogramSkeleton() {
     return (
@@ -50,7 +62,7 @@ function OrganogramSkeleton() {
     )
 }
 
-const NodeCard = ({ node, employeeMap }: { node: any; employeeMap: Map<string, string> }) => {
+const NodeCard = ({ node, employeeMap, language }: { node: any; employeeMap: Map<string, string>, language: 'english' | 'bengali' }) => {
     const icons: { [key: string]: React.ElementType } = {
         region: RegionIcon,
         zone: MapPin,
@@ -65,13 +77,14 @@ const NodeCard = ({ node, employeeMap }: { node: any; employeeMap: Map<string, s
     };
     const Icon = icons[node.type];
     const responsibleEmployee = 'responsibleEmployeeId' in node && node.responsibleEmployeeId ? employeeMap.get(node.responsibleEmployeeId) : null;
+    const displayName = language === 'bengali' && node.bengaliName ? node.bengaliName : node.name;
     
     return (
         <div className={cn("relative inline-block rounded-lg border p-3 shadow-sm min-w-56", colors[node.type])}>
             <div className="flex items-center gap-3">
                 {Icon && <Icon className="h-6 w-6 flex-shrink-0" />}
                 <div>
-                    <p className="font-bold">{node.name}</p>
+                    <p className="font-bold">{displayName}</p>
                     <p className="text-xs font-mono">{node.code}</p>
                     {responsibleEmployee && (
                        <div className="flex items-center gap-1 text-xs mt-1 opacity-80">
@@ -85,14 +98,29 @@ const NodeCard = ({ node, employeeMap }: { node: any; employeeMap: Map<string, s
     )
 };
 
-const TreeNode = ({ node, employeeMap }: { node: any; employeeMap: Map<string, string> }) => {
+const TreeNode = ({ node, employeeMap, language }: { node: any; employeeMap: Map<string, string>, language: 'english' | 'bengali' }) => {
+    if (node.type === 'area' && node.children && node.children.length > 0) {
+        const branchChunks = chunk(node.children, 2);
+        return (
+             <li>
+                <NodeCard node={node} employeeMap={employeeMap} language={language} />
+                {branchChunks.map((chunk, index) => (
+                     <ul key={index}>
+                        {chunk.map((branch: any) => (
+                            <TreeNode key={branch.id} node={branch} employeeMap={employeeMap} language={language} />
+                        ))}
+                    </ul>
+                ))}
+            </li>
+        );
+    }
     return (
         <li>
-            <NodeCard node={node} employeeMap={employeeMap} />
+            <NodeCard node={node} employeeMap={employeeMap} language={language} />
             {node.children && node.children.length > 0 && (
                 <ul>
                     {node.children.map((child: any) => (
-                        <TreeNode key={child.id} node={child} employeeMap={employeeMap} />
+                        <TreeNode key={child.id} node={child} employeeMap={employeeMap} language={language} />
                     ))}
                 </ul>
             )}
@@ -104,6 +132,7 @@ const TreeNode = ({ node, employeeMap }: { node: any; employeeMap: Map<string, s
 export function Organogram() {
     const { orgInfo } = useOrganization();
     const firestore = useFirestore();
+    const [language, setLanguage] = useState<'english' | 'bengali'>('english');
 
     const regionsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'regions') : null, [firestore]);
     const { data: regions, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
@@ -156,9 +185,15 @@ export function Organogram() {
     
     return (
         <Card>
-            <CardHeader>
-                <CardTitle>Organization Chart</CardTitle>
-                <CardDescription>A visual representation of your organization's hierarchy.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+                 <div>
+                    <CardTitle>Organization Chart</CardTitle>
+                    <CardDescription>A visual representation of your organization's hierarchy.</CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                    <Button size="sm" variant={language === 'english' ? 'default' : 'outline'} onClick={() => setLanguage('english')}>English</Button>
+                    <Button size="sm" variant={language === 'bengali' ? 'default' : 'outline'} onClick={() => setLanguage('bengali')}>বাংলা</Button>
+                </div>
             </CardHeader>
             <CardContent className="overflow-auto p-6">
                 <div className="tree text-center">
@@ -173,16 +208,18 @@ export function Organogram() {
                                    </div>
                                )}
                                <div>
-                                   <h2 className="text-2xl font-bold text-primary mt-2">{orgInfo.name}</h2>
-                                   <p className="text-muted-foreground">{orgInfo.bengaliName}</p>
+                                   <h2 className="text-2xl font-bold text-primary mt-2">{language === 'bengali' && orgInfo.bengaliName ? orgInfo.bengaliName : orgInfo.name}</h2>
+                                   <p className="text-muted-foreground">{language === 'bengali' ? orgInfo.name : orgInfo.bengaliName}</p>
                                </div>
                            </div>
-                           {treeData.length > 0 && (
+                           {treeData.length > 0 ? (
                                <ul>
                                    {treeData.map((region) => (
-                                       <TreeNode key={region.id} node={region} employeeMap={employeeMap} />
+                                       <TreeNode key={region.id} node={region} employeeMap={employeeMap} language={language} />
                                    ))}
                                </ul>
+                           ) : (
+                                <p className="text-muted-foreground mt-4">No regions found to build the diagram.</p>
                            )}
                        </li>
                     </ul>
