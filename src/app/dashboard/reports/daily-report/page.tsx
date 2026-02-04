@@ -33,7 +33,9 @@ type ReportLevel = 'region' | 'zone' | 'area' | 'branch';
 
 type ReportRowData = {
   sl: number;
-  branchName: string; // Will hold Branch Name or Officer Name based on grouping
+  branchName: string;
+  officerName?: string;
+  officerCode?: string;
   memberAddToday: number;
   memberAddMonth: number;
   memberCancelToday: number;
@@ -186,12 +188,12 @@ export default function DailyReportPage() {
     if (!reportData) return null;
     return reportData.reduce((acc, row) => {
         Object.keys(row).forEach(key => {
-            if (key !== 'branchName' && key !== 'sl') {
+            if (key !== 'branchName' && key !== 'sl' && key !== 'officerName' && key !== 'officerCode') {
                 acc[key as keyof typeof acc] = (acc[key as keyof typeof acc] || 0) + row[key as keyof ReportRowData];
             }
         });
         return acc;
-    }, {} as Omit<ReportRowData, 'branchName' | 'sl'>);
+    }, {} as Omit<ReportRowData, 'sl' | 'branchName' | 'officerName' | 'officerCode'>);
   }, [reportData]);
 
   const handleGenerateReport = () => {
@@ -232,17 +234,19 @@ export default function DailyReportPage() {
     setReportTitle(`${reportLevel.charAt(0).toUpperCase() + reportLevel.slice(1)}-wise Report for: ${titleName} ${groupByOfficer ? '(Grouped by Field Officer)' : ''}`);
 
     if (groupByOfficer) {
-        const employeeMap = new Map(employees?.map(e => [e.id, e.name]));
+        const employeeMap = new Map(employees?.map(e => [e.id, e]));
+        const branchMap = new Map(branches?.map(b => [b.id, b]));
         const branchIdsToReportOn = new Set(branchesToReportOn.map(b => b.id));
-        const groupsInScope = groupsData?.filter(g => branchIdsToReportOn.has(g.branchId)) || [];
-        const officerTotals = new Map<string, Omit<ReportRowData, 'sl' | 'branchName'>>();
-
+        const groupsInScope = groupsData?.filter(g => branchIdsToReportOn.has(g.branchId) && g.responsibleEmployeeId) || [];
+        const officerBranchTotals = new Map<string, Omit<ReportRowData, 'sl' | 'branchName' | 'officerName' | 'officerCode'>>();
+        
         groupsInScope.forEach(group => {
             const officerId = group.responsibleEmployeeId;
-            if (!officerId) return;
+            const branchId = group.branchId;
+            const key = `${branchId}_${officerId}`;
 
-            if (!officerTotals.has(officerId)) {
-                officerTotals.set(officerId, {
+            if (!officerBranchTotals.has(key)) {
+                officerBranchTotals.set(key, {
                     memberAddToday: 0, memberAddMonth: 0,
                     memberCancelToday: 0, memberCancelMonth: 0,
                     savingsCollectionToday: 0, savingsCollectionMonth: 0,
@@ -254,30 +258,45 @@ export default function DailyReportPage() {
                 });
             }
             
-            const officerData = officerTotals.get(officerId)!;
+            const totals = officerBranchTotals.get(key)!;
             const getSumForGroup = (data: any[], amountField: string, interval: {start:Date, end:Date}) => data.filter(item => item.groupId === group.id && isWithinInterval(parseISO(item.date), interval)).reduce((sum, item) => sum + (item[amountField] || 0), 0);
 
-            officerData.memberAddToday += getSumForGroup(memberChanges, 'added', reportInterval);
-            officerData.memberAddMonth += getSumForGroup(memberChanges, 'added', monthInterval);
-            officerData.memberCancelToday += getSumForGroup(memberChanges, 'dropped', reportInterval);
-            officerData.memberCancelMonth += getSumForGroup(memberChanges, 'dropped', monthInterval);
-            officerData.savingsCollectionToday += getSumForGroup(savingsTransactions, 'deposit', reportInterval);
-            officerData.savingsCollectionMonth += getSumForGroup(savingsTransactions, 'deposit', monthInterval);
-            officerData.savingsRefundToday += getSumForGroup(savingsTransactions, 'withdraw', reportInterval);
-            officerData.savingsRefundMonth += getSumForGroup(savingsTransactions, 'withdraw', monthInterval);
-            officerData.loanDisburseToday += getSumForGroup(loanDisbursements, 'amount', reportInterval);
-            officerData.loanDisburseMonth += getSumForGroup(loanDisbursements, 'amount', monthInterval);
-            officerData.loanCollectionToday += getSumForGroup(loanCollections, 'amount', reportInterval);
-            officerData.loanCollectionMonth += getSumForGroup(loanCollections, 'amount', monthInterval);
+            totals.memberAddToday += getSumForGroup(memberChanges, 'added', reportInterval);
+            totals.memberAddMonth += getSumForGroup(memberChanges, 'added', monthInterval);
+            totals.memberCancelToday += getSumForGroup(memberChanges, 'dropped', reportInterval);
+            totals.memberCancelMonth += getSumForGroup(memberChanges, 'dropped', monthInterval);
+            totals.savingsCollectionToday += getSumForGroup(savingsTransactions, 'deposit', reportInterval);
+            totals.savingsCollectionMonth += getSumForGroup(savingsTransactions, 'deposit', monthInterval);
+            totals.savingsRefundToday += getSumForGroup(savingsTransactions, 'withdraw', reportInterval);
+            totals.savingsRefundMonth += getSumForGroup(savingsTransactions, 'withdraw', monthInterval);
+            totals.loanDisburseToday += getSumForGroup(loanDisbursements, 'amount', reportInterval);
+            totals.loanDisburseMonth += getSumForGroup(loanDisbursements, 'amount', monthInterval);
+            totals.loanCollectionToday += getSumForGroup(loanCollections, 'amount', reportInterval);
+            totals.loanCollectionMonth += getSumForGroup(loanCollections, 'amount', monthInterval);
         });
 
-        const processedData: ReportRowData[] = Array.from(officerTotals.entries()).map(([officerId, data], index) => ({
-            sl: index + 1,
-            branchName: employeeMap.get(officerId) || `Unknown Officer (${officerId.substring(0,5)})`,
-            ...data
-        }));
+        const processedData: ReportRowData[] = [];
+        for (const [key, data] of officerBranchTotals.entries()) {
+            const [branchId, officerId] = key.split('_');
+            const branch = branchMap.get(branchId);
+            const employee = employeeMap.get(officerId);
+
+            if (branch && employee) {
+                processedData.push({
+                    sl: 0,
+                    branchName: `${branch.code} - ${branch.name}`,
+                    officerName: employee.name,
+                    officerCode: employee.code,
+                    ...data,
+                });
+            }
+        }
         
+        processedData.sort((a,b) => a.branchName.localeCompare(b.branchName) || (a.officerName || '').localeCompare(b.officerName || ''));
+        processedData.forEach((row, i) => row.sl = i + 1);
+
         setReportData(processedData);
+
     } else {
         const processedData: ReportRowData[] = branchesToReportOn.map((branch, index) => {
             const getSum = (data: any[], amountField: string, interval: {start:Date, end:Date}) => data.filter(item => item.branchId === branch.id && isWithinInterval(parseISO(item.date), interval)).reduce((sum, item) => sum + (item[amountField] || 0), 0);
@@ -285,7 +304,7 @@ export default function DailyReportPage() {
             
             return {
                 sl: index + 1,
-                branchName: branch.name,
+                branchName: `${branch.code} - ${branch.name}`,
                 memberAddToday: getSum(memberChanges, 'added', reportInterval),
                 memberAddMonth: getSum(memberChanges, 'added', monthInterval),
                 memberCancelToday: getSum(memberChanges, 'dropped', reportInterval),
@@ -366,8 +385,6 @@ export default function DailyReportPage() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN').format(amount);
   }
-  
-  const mainColumnHeader = groupByOfficer ? 'Field Officer' : 'Branch';
 
   return (
     <div className="space-y-6 print:p-8">
@@ -522,7 +539,8 @@ export default function DailyReportPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead rowSpan={2} className="align-bottom">SL</TableHead>
-                    <TableHead rowSpan={2} className="align-bottom border-r">{mainColumnHeader}</TableHead>
+                    <TableHead rowSpan={2} className="align-bottom border-r">Branch</TableHead>
+                    {groupByOfficer && <TableHead rowSpan={2} className="align-bottom border-r">Field Officer</TableHead>}
                     <TableHead colSpan={2} className="text-center border-r">Member Add</TableHead>
                     <TableHead colSpan={2} className="text-center border-r">Member Cancel</TableHead>
                     <TableHead colSpan={2} className="text-center border-r">Savings Collection</TableHead>
@@ -559,6 +577,7 @@ export default function DailyReportPage() {
                      <TableRow key={index}>
                         <TableCell>{row.sl}</TableCell>
                         <TableCell className="font-medium border-r">{row.branchName}</TableCell>
+                        {groupByOfficer && <TableCell className="font-medium border-r">{row.officerName} ({row.officerCode})</TableCell>}
                         <TableCell className="text-right">{formatCurrency(row.memberAddToday)}</TableCell>
                         <TableCell className="text-right border-r">{formatCurrency(row.memberAddMonth)}</TableCell>
                         <TableCell className="text-right">{formatCurrency(row.memberCancelToday)}</TableCell>
@@ -582,7 +601,7 @@ export default function DailyReportPage() {
                     </TableRow>
                   )) : (
                      <TableRow>
-                        <TableCell colSpan={22} className="h-24 text-center text-muted-foreground">
+                        <TableCell colSpan={groupByOfficer ? 23 : 22} className="h-24 text-center text-muted-foreground">
                             No data found for the selected criteria.
                         </TableCell>
                      </TableRow>
@@ -591,7 +610,7 @@ export default function DailyReportPage() {
                 {reportTotals && (
                     <TableFooter>
                         <TableRow className="bg-muted/50 font-bold">
-                            <TableCell colSpan={2} className="text-right">Grand Total</TableCell>
+                            <TableCell colSpan={groupByOfficer ? 3 : 2} className="text-right">Grand Total</TableCell>
                             <TableCell className="text-right">{formatCurrency(reportTotals.memberAddToday)}</TableCell>
                             <TableCell className="text-right border-r">{formatCurrency(reportTotals.memberAddMonth)}</TableCell>
                             <TableCell className="text-right">{formatCurrency(reportTotals.memberCancelToday)}</TableCell>
