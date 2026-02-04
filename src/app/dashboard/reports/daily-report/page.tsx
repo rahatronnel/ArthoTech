@@ -10,20 +10,50 @@ import { Calendar as CalendarIcon, ChevronLeft, Printer } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DateRange } from 'react-day-picker';
-import { format } from 'date-fns';
+import { format, startOfMonth, endOfMonth, isWithinInterval, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, collectionGroup, query } from 'firebase/firestore';
-import type { Region, Zone, Area, Branch } from '@/lib/data';
+import type { Region, Zone, Area, Branch, OtherDataEntry } from '@/lib/data';
 import { useAuth } from '@/context/AuthContext';
 import { useOrganization } from '@/context/OrganizationContext';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
+import { useMember } from '@/context/MemberContext';
+import { useSavings } from '@/context/SavingsContext';
+import { useLoan } from '@/context/LoanContext';
+import { useOthersData } from '@/context/OthersDataContext';
+import { Skeleton } from '@/components/ui/skeleton';
 
 
 type ReportLevel = 'region' | 'zone' | 'area' | 'branch';
+
+type ReportRowData = {
+  sl: number;
+  branchName: string;
+  memberAddToday: number;
+  memberAddMonth: number;
+  memberCancelToday: number;
+  memberCancelMonth: number;
+  savingsCollectionToday: number;
+  savingsCollectionMonth: number;
+  savingsRefundToday: number;
+  savingsRefundMonth: number;
+  loanDisburseToday: number;
+  loanDisburseMonth: number;
+  loanCollectionToday: number;
+  loanCollectionMonth: number;
+  otherExpense: number;
+  cash: number;
+  bank: number;
+  afternoonCollection: number;
+  riskFund: number;
+  processingFee: number;
+  passbookFee: number;
+  admissionFee: number;
+};
 
 export default function DailyReportPage() {
   const [reportLevel, setReportLevel] = useState<ReportLevel>('branch');
@@ -33,12 +63,17 @@ export default function DailyReportPage() {
     to: new Date(),
   });
   const [selectedMonth, setSelectedMonth] = useState<string>('');
-  const [reportData, setReportData] = useState<any[] | null>(null);
+  const [reportData, setReportData] = useState<ReportRowData[] | null>(null);
   const [reportTitle, setReportTitle] = useState('');
   
   const firestore = useFirestore();
   const { currentUser, loading: userLoading } = useAuth();
   const { orgInfo } = useOrganization();
+
+  const { memberChanges, isLoading: membersLoading } = useMember();
+  const { savingsTransactions, isLoading: savingsLoading } = useSavings();
+  const { loanDisbursements, loanCollections, isLoading: loansLoading } = useLoan();
+  const { othersData, isLoading: othersLoading } = useOthersData();
 
   const regionsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'regions') : null, [firestore]);
   const { data: regions, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
@@ -52,7 +87,7 @@ export default function DailyReportPage() {
   const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
   const { data: branches, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
 
-  const isLoading = regionsLoading || zonesLoading || areasLoading || branchesLoading || userLoading;
+  const isLoading = regionsLoading || zonesLoading || areasLoading || branchesLoading || userLoading || membersLoading || savingsLoading || loansLoading || othersLoading;
 
   const { availableLevels, availableRegions, availableZones, availableAreas, availableBranches } = useMemo(() => {
     if (!currentUser || isLoading) {
@@ -125,10 +160,10 @@ export default function DailyReportPage() {
 
     return {
       availableLevels,
-      availableRegions,
-      availableZones,
-      availableAreas,
-      availableBranches,
+      availableRegions: filteredRegions,
+      availableZones: filteredZones,
+      availableAreas: filteredAreas,
+      availableBranches: filteredBranches,
     };
   }, [currentUser, isLoading, regions, zones, areas, branches]);
 
@@ -139,23 +174,89 @@ export default function DailyReportPage() {
     }
   }, [availableLevels, reportLevel]);
 
+  const reportTotals = useMemo(() => {
+    if (!reportData) return null;
+    return reportData.reduce((acc, row) => {
+        Object.keys(row).forEach(key => {
+            if (key !== 'branchName' && key !== 'sl') {
+                acc[key as keyof typeof acc] = (acc[key as keyof typeof acc] || 0) + row[key as keyof ReportRowData];
+            }
+        });
+        return acc;
+    }, {} as Omit<ReportRowData, 'branchName' | 'sl'>);
+  }, [reportData]);
+
   const handleGenerateReport = () => {
-    // This is where you would fetch and process data based on filters.
-    // For now, we'll just set dummy data to show the report card.
-    setReportData([]); // Setting to an empty array to trigger render
-    
-    const levelName = reportLevel.charAt(0).toUpperCase() + reportLevel.slice(1);
-    let selectedName = 'All';
-     if(selectedId !== 'all') {
-      const dataMap: { [key in ReportLevel]: any[] } = {
-        region: availableRegions,
-        zone: availableZones,
-        area: availableAreas,
-        branch: availableBranches,
-      };
-      selectedName = dataMap[reportLevel].find(item => item.id === selectedId)?.name || 'N/A';
+    if (!date?.from || isLoading) {
+      return;
     }
-    setReportTitle(`${levelName}-wise Report for: ${selectedName}`);
+    
+    // --- 1. Date Setup ---
+    const fromDate = date.from;
+    const toDate = date.to || date.from;
+    const reportInterval = { start: fromDate, end: toDate };
+    const monthStart = startOfMonth(fromDate);
+    const monthEnd = endOfMonth(fromDate);
+    const monthInterval = { start: monthStart, end: monthEnd };
+
+    // --- 2. Determine Branches ---
+    let branchesToReportOn: Branch[] = [];
+    let titleName = 'All';
+
+    if (reportLevel === 'branch') {
+        if (selectedId === 'all') { branchesToReportOn = availableBranches; titleName = 'All available branches'; } 
+        else { const branch = availableBranches.find(b => b.id === selectedId); if (branch) { branchesToReportOn = [branch]; titleName = branch.name; } }
+    } else if (reportLevel === 'area') {
+        const areaIds = selectedId === 'all' ? new Set(availableAreas.map(a => a.id)) : new Set([selectedId]);
+        branchesToReportOn = availableBranches.filter(b => areaIds.has(b.areaId));
+        if (selectedId !== 'all') titleName = availableAreas.find(a => a.id === selectedId)?.name || '';
+    } else if (reportLevel === 'zone') {
+        const zoneIds = selectedId === 'all' ? new Set(availableZones.map(z => z.id)) : new Set([selectedId]);
+        const areaIds = new Set(areas?.filter(a => zoneIds.has(a.zoneId)).map(a => a.id));
+        branchesToReportOn = availableBranches.filter(b => areaIds.has(b.areaId));
+        if (selectedId !== 'all') titleName = availableZones.find(z => z.id === selectedId)?.name || '';
+    } else if (reportLevel === 'region') {
+        const regionIds = selectedId === 'all' ? new Set(availableRegions.map(r => r.id)) : new Set([selectedId]);
+        const zoneIds = new Set(zones?.filter(z => regionIds.has(z.regionId)).map(z => z.id));
+        const areaIds = new Set(areas?.filter(a => zoneIds.has(a.zoneId)).map(a => a.id));
+        branchesToReportOn = availableBranches.filter(b => areaIds.has(b.areaId));
+        if (selectedId !== 'all') titleName = availableRegions.find(r => r.id === selectedId)?.name || '';
+    }
+
+    setReportTitle(`${reportLevel.charAt(0).toUpperCase() + reportLevel.slice(1)}-wise Report for: ${titleName}`);
+
+    // --- 3. Process Data ---
+    const processedData: ReportRowData[] = branchesToReportOn.map((branch, index) => {
+        const getSum = (data: any[], amountField: string, interval: {start:Date, end:Date}) => data.filter(item => item.branchId === branch.id && isWithinInterval(parseISO(item.date), interval)).reduce((sum, item) => sum + (item[amountField] || 0), 0);
+        const getSumOthers = (data: OtherDataEntry[], type: OtherDataEntry['type'], interval: {start:Date, end:Date}) => data.filter(item => item.branchId === branch.id && item.type === type && isWithinInterval(parseISO(item.date), interval)).reduce((sum, item) => sum + (item.amount || 0), 0);
+        
+        return {
+            sl: index + 1,
+            branchName: branch.name,
+            memberAddToday: getSum(memberChanges, 'added', reportInterval),
+            memberAddMonth: getSum(memberChanges, 'added', monthInterval),
+            memberCancelToday: getSum(memberChanges, 'dropped', reportInterval),
+            memberCancelMonth: getSum(memberChanges, 'dropped', monthInterval),
+            savingsCollectionToday: getSum(savingsTransactions, 'deposit', reportInterval),
+            savingsCollectionMonth: getSum(savingsTransactions, 'deposit', monthInterval),
+            savingsRefundToday: getSum(savingsTransactions, 'withdraw', reportInterval),
+            savingsRefundMonth: getSum(savingsTransactions, 'withdraw', monthInterval),
+            loanDisburseToday: getSum(loanDisbursements, 'amount', reportInterval),
+            loanDisburseMonth: getSum(loanDisbursements, 'amount', monthInterval),
+            loanCollectionToday: getSum(loanCollections, 'amount', reportInterval),
+            loanCollectionMonth: getSum(loanCollections, 'amount', monthInterval),
+            otherExpense: getSumOthers(othersData, 'Others Expenses', reportInterval),
+            cash: getSumOthers(othersData, 'Cash', reportInterval),
+            bank: getSumOthers(othersData, 'Bank', reportInterval),
+            afternoonCollection: getSumOthers(othersData, 'Afternoon Collection', reportInterval),
+            riskFund: getSumOthers(othersData, 'Risk Fund', reportInterval),
+            processingFee: getSumOthers(othersData, 'Processing Fee', reportInterval),
+            passbookFee: getSumOthers(othersData, 'Passbook Fee', reportInterval),
+            admissionFee: getSumOthers(othersData, 'Admission Fee', reportInterval),
+        };
+    });
+
+    setReportData(processedData);
   };
   
   const handlePrint = () => {
@@ -207,6 +308,10 @@ export default function DailyReportPage() {
       </div>
     );
   };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN').format(amount);
+  }
 
   return (
     <div className="space-y-6 print:p-8">
@@ -309,6 +414,20 @@ export default function DailyReportPage() {
           </div>
         </CardContent>
       </Card>
+      
+      {isLoading && !reportData && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Report Results</CardTitle>
+            <CardDescription>Your generated report will appear here.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </CardContent>
+        </Card>
+      )}
 
       {reportData && (
         <Card id="print-area">
@@ -374,18 +493,72 @@ export default function DailyReportPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  <TableRow>
-                    <TableCell colSpan={22} className="h-24 text-center text-muted-foreground">
-                      Report data will be populated here.
-                    </TableCell>
-                  </TableRow>
+                  {reportData.length > 0 ? reportData.map((row, index) => (
+                     <TableRow key={index}>
+                        <TableCell>{row.sl}</TableCell>
+                        <TableCell className="font-medium border-r">{row.branchName}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.memberAddToday)}</TableCell>
+                        <TableCell className="text-right border-r">{formatCurrency(row.memberAddMonth)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.memberCancelToday)}</TableCell>
+                        <TableCell className="text-right border-r">{formatCurrency(row.memberCancelMonth)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.savingsCollectionToday)}</TableCell>
+                        <TableCell className="text-right border-r">{formatCurrency(row.savingsCollectionMonth)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.savingsRefundToday)}</TableCell>
+                        <TableCell className="text-right border-r">{formatCurrency(row.savingsRefundMonth)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.loanDisburseToday)}</TableCell>
+                        <TableCell className="text-right border-r">{formatCurrency(row.loanDisburseMonth)}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(row.loanCollectionToday)}</TableCell>
+                        <TableCell className="text-right border-r">{formatCurrency(row.loanCollectionMonth)}</TableCell>
+                        <TableCell className="text-right border-r">{formatCurrency(row.otherExpense)}</TableCell>
+                        <TableCell className="text-right border-r">{formatCurrency(row.cash)}</TableCell>
+                        <TableCell className="text-right border-r">{formatCurrency(row.bank)}</TableCell>
+                        <TableCell className="text-right border-l">{formatCurrency(row.afternoonCollection)}</TableCell>
+                        <TableCell className="text-right border-l">{formatCurrency(row.riskFund)}</TableCell>
+                        <TableCell className="text-right border-l">{formatCurrency(row.processingFee)}</TableCell>
+                        <TableCell className="text-right border-l">{formatCurrency(row.passbookFee)}</TableCell>
+                        <TableCell className="text-right border-l">{formatCurrency(row.admissionFee)}</TableCell>
+                    </TableRow>
+                  )) : (
+                     <TableRow>
+                        <TableCell colSpan={22} className="h-24 text-center text-muted-foreground">
+                            No data found for the selected criteria.
+                        </TableCell>
+                     </TableRow>
+                  )}
                 </TableBody>
+                {reportTotals && (
+                    <TableFooter>
+                        <TableRow className="bg-muted/50 font-bold">
+                            <TableCell colSpan={2} className="text-right">Grand Total</TableCell>
+                            <TableCell className="text-right">{formatCurrency(reportTotals.memberAddToday)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(reportTotals.memberAddMonth)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(reportTotals.memberCancelToday)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(reportTotals.memberCancelMonth)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(reportTotals.savingsCollectionToday)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(reportTotals.savingsCollectionMonth)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(reportTotals.savingsRefundToday)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(reportTotals.savingsRefundMonth)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(reportTotals.loanDisburseToday)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(reportTotals.loanDisburseMonth)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(reportTotals.loanCollectionToday)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(reportTotals.loanCollectionMonth)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(reportTotals.otherExpense)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(reportTotals.cash)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(reportTotals.bank)}</TableCell>
+                            <TableCell className="text-right border-l">{formatCurrency(reportTotals.afternoonCollection)}</TableCell>
+                            <TableCell className="text-right border-l">{formatCurrency(reportTotals.riskFund)}</TableCell>
+                            <TableCell className="text-right border-l">{formatCurrency(reportTotals.processingFee)}</TableCell>
+                            <TableCell className="text-right border-l">{formatCurrency(reportTotals.passbookFee)}</TableCell>
+                            <TableCell className="text-right border-l">{formatCurrency(reportTotals.admissionFee)}</TableCell>
+                        </TableRow>
+                    </TableFooter>
+                )}
               </Table>
           </CardContent>
         </Card>
       )}
 
-      {!reportData && (
+      {!reportData && !isLoading && (
         <Card>
             <CardHeader>
                 <CardTitle>Report Results</CardTitle>
@@ -401,4 +574,3 @@ export default function DailyReportPage() {
     </div>
   );
 }
-
