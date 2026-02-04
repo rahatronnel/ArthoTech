@@ -1,3 +1,4 @@
+
 export type Region = {
   id: string;
   name: string;
@@ -104,7 +105,6 @@ export type Group = {
   name: string;
   responsibleEmployeeId: string;
   initialMembers: number;
-  totalLoans: number;
   initialSavings: number;
   status: 'Active' | 'Inactive';
   code: string;

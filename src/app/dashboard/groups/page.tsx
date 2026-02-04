@@ -117,7 +117,7 @@ export default function GroupsPage() {
         "Code": "",
         "Day": "Saturday",
         "Branch Code": "",
-        "Leader Code": "",
+        "Leader Name and Code": "Asif Hawlader - 137",
         "Initial Members": 0,
         "Initial Savings": 0,
         "Status": "Active"
@@ -159,19 +159,27 @@ export default function GroupsPage() {
         const areaMap = new Map(areas?.map(a => [a.id, a]));
 
         jsonData.forEach((row, index) => {
-          const { "Group Name": name, "Code": code, "Day": day, "Branch Code": branchCode, "Leader Code": leaderCode, "Initial Members": initialMembers, "Initial Savings": initialSavings, "Status": status } = row;
-          if (!name || !code || !day || !branchCode || !leaderCode || !status) {
+          const { "Group Name": name, "Code": code, "Day": day, "Branch Code": branchCode, "Leader Name and Code": leaderInfo, "Initial Members": initialMembers, "Initial Savings": initialSavings, "Status": status } = row;
+          if (!name || !code || !day || !branchCode || !leaderInfo || !status) {
             errors.push(`Row ${index + 2}: Missing required fields.`);
             return;
           }
+          
+          const leaderCodeRaw = String(leaderInfo).split(' - ').pop()?.trim();
+          if (!leaderCodeRaw) {
+             errors.push(`Row ${index + 2}: Leader Name and Code "${leaderInfo}" is not in the correct 'Name - Code' format.`);
+             return;
+          }
+          const leaderCodeValue = leaderCodeRaw.toLowerCase();
+
           const normalizedBranchCode = String(branchCode).trim().toLowerCase();
           if (!branchMap.has(normalizedBranchCode)) {
             errors.push(`Row ${index + 2}: Branch with code "${branchCode}" not found.`);
             return;
           }
-          const leaderCodeValue = String(leaderCode).trim().toLowerCase();
+          
           if (!employeeMap.has(leaderCodeValue)) {
-            errors.push(`Row ${index + 2}: Leader with code "${leaderCode}" not found.`);
+            errors.push(`Row ${index + 2}: Leader with code "${leaderCodeRaw}" not found.`);
             return;
           }
 
@@ -182,8 +190,6 @@ export default function GroupsPage() {
           let zoneId = branchForGroup.zoneId;
           let areaId = branchForGroup.areaId;
 
-          // If the branch document is missing path info (e.g., it's older data),
-          // we fall back to looking up its parent Area to find the path.
           if (!regionId || !zoneId) {
             const area = areaMap.get(areaId);
             if (area) {
@@ -225,7 +231,6 @@ export default function GroupsPage() {
         responsibleEmployeeId: groupData.responsibleEmployeeId,
         initialMembers: groupData.initialMembers,
         initialSavings: groupData.initialSavings,
-        totalLoans: 0,
         branchId: groupData.branchId,
         areaId: groupData.areaId,
         zoneId: groupData.zoneId,
@@ -350,7 +355,6 @@ export default function GroupsPage() {
             initialMembers,
             initialSavings,
             status: status as Group['status'],
-            totalLoans: 0,
             branchId,
             areaId: selectedBranch.areaId,
             zoneId: selectedBranch.zoneId,
