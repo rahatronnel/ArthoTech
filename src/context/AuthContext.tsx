@@ -35,39 +35,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     
     const ensureSuperAdminExists = async () => {
-      const q = query(collection(firestore, "employees"), where("email", "==", "superadmin@example.com"));
-      const querySnapshot = await getDocs(q);
+      if (!firestore) return;
+      // This temporary app instance allows us to attempt user creation without affecting the main app's auth state.
+      const tempApp = initializeApp(firebaseConfig, `superadmin-creation-${Date.now()}`);
+      const tempAuth = getAuth(tempApp);
+      try {
+        // Attempt to create the superadmin auth user. This will only succeed if it doesn't exist.
+        const userCredential = await createUserWithEmailAndPassword(tempAuth, "superadmin@example.com", "abc123");
+        const uid = userCredential.user.uid;
+        
+        console.log("Super Admin auth user was missing, recreating now...");
 
-      if (querySnapshot.empty) {
-        console.log("Super Admin not found in Firestore, attempting to create...");
-        const tempApp = initializeApp(firebaseConfig, `superadmin-creation-${Date.now()}`);
-        const tempAuth = getAuth(tempApp);
-        try {
-          const userCredential = await createUserWithEmailAndPassword(tempAuth, "superadmin@example.com", "abc123");
-          const uid = userCredential.user.uid;
-          
-          const newDocRef = doc(collection(firestore, "employees"));
-          const newEmployee: Employee = {
-              id: newDocRef.id,
-              uid: uid,
-              email: "superadmin@example.com",
-              name: "Super Admin",
-              bengaliName: "সুপার অ্যাডমিন",
-              code: "S_ADMIN",
-              role: 'Super Admin',
-              assignment: 'Head Office',
-          };
-          await setDoc(newDocRef, newEmployee);
-          console.log("Super Admin user created successfully.");
-        } catch (error: any) {
-          if (error.code === 'auth/email-already-in-use') {
-            console.log("Super Admin auth user already exists but Firestore record was missing. This is an inconsistent state and may require manual resolution if login fails.");
-          } else {
-            console.error("Failed to create Super Admin user:", error);
-          }
-        } finally {
-          await deleteApp(tempApp);
+        // Check for an existing Firestore document for the superadmin
+        const q = query(collection(firestore, "employees"), where("email", "==", "superadmin@example.com"));
+        const querySnapshot = await getDocs(q);
+
+        if (!querySnapshot.empty) {
+            // If a doc exists, update its UID to match the newly created auth user.
+            const docRef = querySnapshot.docs[0].ref;
+            await setDoc(docRef, { uid: uid }, { merge: true });
+            console.log("Super Admin's Firestore document has been updated with the new UID.");
+        } else {
+            // If no doc exists, create one.
+            const newDocRef = doc(collection(firestore, "employees"));
+            const newEmployee: Employee = {
+                id: newDocRef.id,
+                uid: uid,
+                email: "superadmin@example.com",
+                name: "Super Admin",
+                bengaliName: "সুপার অ্যাডমিন",
+                code: "S_ADMIN",
+                role: 'Super Admin',
+                assignment: 'Head Office',
+            };
+            await setDoc(newDocRef, newEmployee);
+            console.log("New Super Admin record created in Firestore.");
         }
+      } catch (error: any) {
+        if (error.code === 'auth/email-already-in-use') {
+          // This is the expected, normal case where the user already exists. Do nothing.
+          console.log("Super Admin auth user verified. Self-healing not needed.");
+        } else {
+          // Log any other unexpected errors during the self-healing process.
+          console.error("An unexpected error occurred during Super Admin self-healing:", error);
+        }
+      } finally {
+        // Clean up the temporary app instance.
+        await deleteApp(tempApp);
       }
     };
 
