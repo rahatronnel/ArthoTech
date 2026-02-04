@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSavings } from '@/context/SavingsContext';
 import { useToast } from '@/hooks/use-toast';
@@ -94,6 +94,22 @@ export default function SavingsBalancePage() {
   // State for the report
   const [searchDate, setSearchDate] = useState('');
   const [reportData, setReportData] = useState<ReportRow[] | null>(null);
+
+  const reportTotals = useMemo(() => {
+    if (!reportData) {
+      return { opening: 0, deposited: 0, withdrawn: 0, closing: 0 };
+    }
+    return reportData.reduce(
+      (acc, row) => {
+        acc.opening += row.openingBalance;
+        acc.deposited += row.depositedToday;
+        acc.withdrawn += row.withdrawnToday;
+        acc.closing += row.closingBalance;
+        return acc;
+      },
+      { opening: 0, deposited: 0, withdrawn: 0, closing: 0 }
+    );
+  }, [reportData]);
 
   // State for deletion
   const [isDeleteByDateOpen, setIsDeleteByDateOpen] = useState(false);
@@ -436,6 +452,17 @@ export default function SavingsBalancePage() {
                               </TableRow>
                           ))}
                       </TableBody>
+                      {reportData.length > 0 && (
+                        <TableFooter>
+                            <TableRow className="bg-muted/80 hover:bg-muted">
+                               <TableCell className="font-bold text-lg">Total</TableCell>
+                               <TableCell className="text-right font-bold text-lg">{formatCurrency(reportTotals.opening)}</TableCell>
+                               <TableCell className="text-right font-bold text-lg text-green-600">+{formatCurrency(reportTotals.deposited)}</TableCell>
+                               <TableCell className="text-right font-bold text-lg text-red-600">-{formatCurrency(reportTotals.withdrawn)}</TableCell>
+                               <TableCell className="text-right font-extrabold text-lg">{formatCurrency(reportTotals.closing)}</TableCell>
+                            </TableRow>
+                        </TableFooter>
+                      )}
                   </Table>
               ) : (
                   <div className="text-center py-10 text-muted-foreground">
@@ -526,3 +553,4 @@ export default function SavingsBalancePage() {
     </div>
   );
 }
+
