@@ -82,3 +82,25 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .table-cell-hover-group {
+    @apply relative;
+  }
+  .table-cell-hover-group:hover .table-cell-hover-marker {
+    @apply bg-primary/10;
+  }
+  .table-cell-hover-marker {
+    @apply absolute inset-y-0 -left-px -right-px -z-10 pointer-events-none;
+  }
+
+  .table-row:hover .table-cell-content {
+      @apply bg-muted/50;
+  }
+}
+
+@layer utilities {
+    .table-column-hover {
+        @apply [&_tr:hover_td:nth-child(n),&_tr:hover_th:nth-child(n)]:bg-muted/50 [&_thead_th:nth-child(n):hover~*]:bg-transparent;
+    }
+}
