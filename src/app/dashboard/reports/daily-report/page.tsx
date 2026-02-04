@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -13,20 +14,108 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Input } from '@/components/ui/input';
+import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, collectionGroup, query } from 'firebase/firestore';
+import type { Region, Zone, Area, Branch } from '@/lib/data';
 
 type ReportLevel = 'region' | 'zone' | 'area' | 'branch';
 
 export default function DailyReportPage() {
   const [reportLevel, setReportLevel] = useState<ReportLevel>('branch');
+  const [selectedId, setSelectedId] = useState<string>('all');
   const [date, setDate] = useState<DateRange | undefined>({
     from: new Date(),
     to: new Date(),
   });
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  
+  const firestore = useFirestore();
+
+  const regionsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'regions') : null, [firestore]);
+  const { data: regions, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
+
+  const zonesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'zones')) : null, [firestore]);
+  const { data: zones, isLoading: zonesLoading } = useCollection<Zone>(zonesQuery);
+
+  const areasQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'areas')) : null, [firestore]);
+  const { data: areas, isLoading: areasLoading } = useCollection<Area>(areasQuery);
+
+  const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
+  const { data: branches, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
+
+  const isLoading = regionsLoading || zonesLoading || areasLoading || branchesLoading;
 
   const handleGenerateReport = () => {
     // Logic to generate report will be added later
-    console.log({ reportLevel, date, selectedMonth });
+    console.log({ reportLevel, selectedId, date, selectedMonth });
+  };
+  
+  const renderDynamicFilter = () => {
+    const commonProps = {
+      value: selectedId,
+      onValueChange: setSelectedId,
+      disabled: isLoading,
+    };
+
+    const triggerPlaceholder = `Select a ${reportLevel}`;
+    const allOptionLabel = `All ${reportLevel}s`;
+
+    switch (reportLevel) {
+      case 'region':
+        return (
+          <div className="space-y-2">
+            <Label>Region</Label>
+            <Select {...commonProps}>
+              <SelectTrigger><SelectValue placeholder={triggerPlaceholder} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{allOptionLabel}</SelectItem>
+                {regions?.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      case 'zone':
+        return (
+          <div className="space-y-2">
+            <Label>Zone</Label>
+            <Select {...commonProps}>
+              <SelectTrigger><SelectValue placeholder={triggerPlaceholder} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{allOptionLabel}</SelectItem>
+                {zones?.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      case 'area':
+        return (
+          <div className="space-y-2">
+            <Label>Area</Label>
+            <Select {...commonProps}>
+              <SelectTrigger><SelectValue placeholder={triggerPlaceholder} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{allOptionLabel}</SelectItem>
+                {areas?.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      case 'branch':
+        return (
+          <div className="space-y-2">
+            <Label>Branch</Label>
+            <Select {...commonProps}>
+              <SelectTrigger><SelectValue placeholder={triggerPlaceholder} /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{allOptionLabel}</SelectItem>
+                {branches?.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -49,7 +138,7 @@ export default function DailyReportPage() {
         <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2">
             <Label htmlFor="report-level">Report Level</Label>
-            <Select value={reportLevel} onValueChange={(value) => setReportLevel(value as ReportLevel)}>
+            <Select value={reportLevel} onValueChange={(value) => { setReportLevel(value as ReportLevel); setSelectedId('all'); }}>
               <SelectTrigger id="report-level">
                 <SelectValue placeholder="Select a level" />
               </SelectTrigger>
@@ -61,6 +150,8 @@ export default function DailyReportPage() {
               </SelectContent>
             </Select>
           </div>
+
+          {renderDynamicFilter()}
 
           <div className="space-y-2">
             <Label htmlFor="date-range">Date Range</Label>
@@ -113,7 +204,9 @@ export default function DailyReportPage() {
           </div>
 
            <div className="flex items-end">
-             <Button onClick={handleGenerateReport} className="w-full">Generate Report</Button>
+             <Button onClick={handleGenerateReport} className="w-full" disabled={isLoading}>
+                {isLoading ? 'Loading...' : 'Generate Report'}
+             </Button>
           </div>
         </CardContent>
       </Card>
@@ -133,3 +226,4 @@ export default function DailyReportPage() {
     </div>
   );
 }
+
