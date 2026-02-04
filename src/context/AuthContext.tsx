@@ -20,6 +20,9 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Flag to ensure the super admin check only runs once per app lifecycle
+let superAdminCheckPerformed = false;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
@@ -35,7 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     
     const ensureSuperAdminExists = async () => {
-      if (!firestore) return;
+      if (superAdminCheckPerformed || !firestore) return;
+      superAdminCheckPerformed = true;
+
       // This temporary app instance allows us to attempt user creation without affecting the main app's auth state.
       const tempApp = initializeApp(firebaseConfig, `superadmin-creation-${Date.now()}`);
       const tempAuth = getAuth(tempApp);
@@ -81,7 +86,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } finally {
         // Clean up the temporary app instance.
-        await deleteApp(tempApp);
+        try {
+          await deleteApp(tempApp);
+        } catch (e) {
+          // This can happen if the app was already deleted or never initialized properly. It's safe to ignore.
+        }
       }
     };
 
