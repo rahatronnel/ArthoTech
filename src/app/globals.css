@@ -85,23 +85,19 @@
 
 @layer utilities {
     .smoke-overlay {
-      @apply fixed top-1/2 left-1/2 z-[9999] pointer-events-none;
-      width: 150vmax;
-      height: 150vmax;
-      border-radius: 50%;
-      background: radial-gradient(circle, hsl(var(--background) / 0.4) 0%, hsl(var(--background) / 0) 50%);
-      transform-origin: center;
-      animation: smoke-expand 1s ease-out forwards;
+        @apply fixed inset-0 z-[9999] pointer-events-none bg-background;
+        animation: page-fade-effect 1s ease-out forwards;
     }
 
-    @keyframes smoke-expand {
-      from {
-        transform: translate(-50%, -50%) scale(0);
-        opacity: 1;
-      }
-      to {
-        transform: translate(-50%, -50%) scale(1);
-        opacity: 0;
-      }
+    @keyframes page-fade-effect {
+        0% {
+          opacity: 0;
+        }
+        50% {
+          opacity: 0.7;
+        }
+        100% {
+          opacity: 0;
+        }
     }
 }
