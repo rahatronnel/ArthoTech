@@ -296,26 +296,11 @@ export default function DailyReportPage() {
 
                 finalReportData.push(rowData);
                 
-                areaSubtotal.memberAddToday += rowData.memberAddToday;
-                areaSubtotal.memberAddMonth += rowData.memberAddMonth;
-                areaSubtotal.memberCancelToday += rowData.memberCancelToday;
-                areaSubtotal.memberCancelMonth += rowData.memberCancelMonth;
-                areaSubtotal.savingsCollectionToday += rowData.savingsCollectionToday;
-                areaSubtotal.savingsCollectionMonth += rowData.savingsCollectionMonth;
-                areaSubtotal.savingsRefundToday += rowData.savingsRefundToday;
-                areaSubtotal.savingsRefundMonth += rowData.savingsRefundMonth;
-                areaSubtotal.loanDisburseToday += rowData.loanDisburseToday;
-                areaSubtotal.loanDisburseMonth += rowData.loanDisburseMonth;
-                areaSubtotal.loanCollectionToday += rowData.loanCollectionToday;
-                areaSubtotal.loanCollectionMonth += rowData.loanCollectionMonth;
-                areaSubtotal.otherExpense += rowData.otherExpense;
-                areaSubtotal.cash += rowData.cash;
-                areaSubtotal.bank += rowData.bank;
-                areaSubtotal.afternoonCollection += rowData.afternoonCollection;
-                areaSubtotal.riskFund += rowData.riskFund;
-                areaSubtotal.processingFee += rowData.processingFee;
-                areaSubtotal.passbookFee += rowData.passbookFee;
-                areaSubtotal.admissionFee += rowData.admissionFee;
+                Object.keys(areaSubtotal).forEach(key => {
+                    if (typeof areaSubtotal[key as keyof ReportRowData] === 'number') {
+                        (areaSubtotal[key as keyof ReportRowData] as number) += (rowData[key as keyof ReportRowData] as number);
+                    }
+                });
             });
             
             if (areaBranches.length > 0) {
@@ -480,9 +465,10 @@ export default function DailyReportPage() {
   }
   
   const getFooterColSpan = () => {
-    let span = 1;
-    if (reportLevel === 'area' && !groupByOfficer) span++;
-    if (groupByOfficer) span++;
+    let span = 1; // For SL column
+    if (reportLevel === 'area' && !groupByOfficer) span++; // For Area column
+    if (groupByOfficer) span++; // For Officer column
+    span++; // For Branch column
     return span;
   }
 
@@ -675,40 +661,62 @@ export default function DailyReportPage() {
                   </TableRow>
                 </thead>
                 <TableBody>
-                  {reportData.length > 0 ? reportData.map((row, index) => (
-                     <TableRow key={index} className={cn("transition-colors duration-300 hover:bg-accent", row.isSubtotal && "bg-secondary font-bold hover:bg-secondary/80")}>
-                        {row.isSubtotal ? (
-                            <TableCell colSpan={getFooterColSpan() + 1} className="text-right">{row.branchName}</TableCell>
-                        ) : (
-                            <>
-                                <TableCell>{row.sl}</TableCell>
-                                {(reportLevel === 'area' && !groupByOfficer) && <TableCell className="font-medium border-r">{row.areaName}</TableCell>}
-                                <TableCell className="font-medium border-r">{row.branchName}</TableCell>
-                                {groupByOfficer && <TableCell className="font-medium border-r">{row.officerName} ({row.officerCode})</TableCell>}
-                            </>
-                        )}
-                        <TableCell className="text-right">{formatCurrency(row.memberAddToday)}</TableCell>
-                        <TableCell className="text-right border-r">{formatCurrency(row.memberAddMonth)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(row.memberCancelToday)}</TableCell>
-                        <TableCell className="text-right border-r">{formatCurrency(row.memberCancelMonth)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(row.savingsCollectionToday)}</TableCell>
-                        <TableCell className="text-right border-r">{formatCurrency(row.savingsCollectionMonth)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(row.savingsRefundToday)}</TableCell>
-                        <TableCell className="text-right border-r">{formatCurrency(row.savingsRefundMonth)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(row.loanDisburseToday)}</TableCell>
-                        <TableCell className="text-right border-r">{formatCurrency(row.loanDisburseMonth)}</TableCell>
-                        <TableCell className="text-right">{formatCurrency(row.loanCollectionToday)}</TableCell>
-                        <TableCell className="text-right border-r">{formatCurrency(row.loanCollectionMonth)}</TableCell>
-                        <TableCell className="text-right border-r">{formatCurrency(row.otherExpense)}</TableCell>
-                        <TableCell className="text-right border-r">{formatCurrency(row.cash)}</TableCell>
-                        <TableCell className="text-right border-r">{formatCurrency(row.bank)}</TableCell>
-                        <TableCell className="text-right border-l">{formatCurrency(row.afternoonCollection)}</TableCell>
-                        <TableCell className="text-right border-l">{formatCurrency(row.riskFund)}</TableCell>
-                        <TableCell className="text-right border-l">{formatCurrency(row.processingFee)}</TableCell>
-                        <TableCell className="text-right border-l">{formatCurrency(row.passbookFee)}</TableCell>
-                        <TableCell className="text-right border-l">{formatCurrency(row.admissionFee)}</TableCell>
-                    </TableRow>
-                  )) : (
+                  {reportData.length > 0 ? reportData.map((row, index) => {
+                    const isAreaGrouping = reportLevel === 'area' && !groupByOfficer;
+                    
+                    const showAreaCell = isAreaGrouping && !row.isSubtotal &&
+                        (index === 0 || reportData[index - 1].areaName !== row.areaName || reportData[index-1].isSubtotal);
+
+                    let areaRowCount = 1;
+                    if (showAreaCell) {
+                        for (let i = index + 1; i < reportData.length; i++) {
+                            if (reportData[i].areaName === row.areaName && !reportData[i].isSubtotal) {
+                                areaRowCount++;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+
+                    return (
+                        <TableRow key={index} className={cn("transition-colors duration-300 hover:bg-accent", row.isSubtotal && "bg-secondary font-bold hover:bg-secondary/80")}>
+                            {row.isSubtotal ? (
+                                <TableCell colSpan={isAreaGrouping ? 2 : 1} className="text-right">{row.branchName}</TableCell>
+                            ) : (
+                                <>
+                                    <TableCell>{row.sl}</TableCell>
+                                    {showAreaCell && (
+                                        <TableCell rowSpan={areaRowCount} className="font-medium border-r align-middle text-center">
+                                            {row.areaName}
+                                        </TableCell>
+                                    )}
+                                    <TableCell className="font-medium border-r">{row.branchName}</TableCell>
+                                    {groupByOfficer && <TableCell className="font-medium border-r">{row.officerName} ({row.officerCode})</TableCell>}
+                                </>
+                            )}
+                            <TableCell className="text-right">{formatCurrency(row.memberAddToday)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(row.memberAddMonth)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(row.memberCancelToday)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(row.memberCancelMonth)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(row.savingsCollectionToday)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(row.savingsCollectionMonth)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(row.savingsRefundToday)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(row.savingsRefundMonth)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(row.loanDisburseToday)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(row.loanDisburseMonth)}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(row.loanCollectionToday)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(row.loanCollectionMonth)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(row.otherExpense)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(row.cash)}</TableCell>
+                            <TableCell className="text-right border-r">{formatCurrency(row.bank)}</TableCell>
+                            <TableCell className="text-right border-l">{formatCurrency(row.afternoonCollection)}</TableCell>
+                            <TableCell className="text-right border-l">{formatCurrency(row.riskFund)}</TableCell>
+                            <TableCell className="text-right border-l">{formatCurrency(row.processingFee)}</TableCell>
+                            <TableCell className="text-right border-l">{formatCurrency(row.passbookFee)}</TableCell>
+                            <TableCell className="text-right border-l">{formatCurrency(row.admissionFee)}</TableCell>
+                        </TableRow>
+                    );
+                  }) : (
                      <TableRow>
                         <TableCell colSpan={groupByOfficer ? 23 : (reportLevel === 'area' ? 23 : 22)} className="h-24 text-center text-muted-foreground">
                             No data found for the selected criteria.
@@ -719,7 +727,7 @@ export default function DailyReportPage() {
                 {reportTotals && (
                     <tfoot className="sticky bottom-0 bg-muted/80 backdrop-blur-sm shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.1),0_-2px_4px_-2px_rgb(0,0,0,0.1)]">
                         <TableRow className="font-bold hover:bg-transparent">
-                            <TableCell colSpan={getFooterColSpan() + 1} className="text-right">Grand Total</TableCell>
+                            <TableCell colSpan={getFooterColSpan()} className="text-right">Grand Total</TableCell>
                             <TableCell className="text-right">{formatCurrency(reportTotals.memberAddToday)}</TableCell>
                             <TableCell className="text-right border-r">{formatCurrency(reportTotals.memberAddMonth)}</TableCell>
                             <TableCell className="text-right">{formatCurrency(reportTotals.memberCancelToday)}</TableCell>
