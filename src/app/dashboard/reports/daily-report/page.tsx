@@ -5,18 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar as CalendarIcon, ChevronLeft } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronLeft, Printer } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { DateRange } from 'react-day-picker';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, collectionGroup, query } from 'firebase/firestore';
 import type { Region, Zone, Area, Branch } from '@/lib/data';
 import { useAuth } from '@/context/AuthContext';
+import { useOrganization } from '@/context/OrganizationContext';
 
 type ReportLevel = 'region' | 'zone' | 'area' | 'branch';
 
@@ -28,9 +30,12 @@ export default function DailyReportPage() {
     to: new Date(),
   });
   const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [reportData, setReportData] = useState<any[] | null>(null);
+  const [reportTitle, setReportTitle] = useState('');
   
   const firestore = useFirestore();
   const { currentUser, loading: userLoading } = useAuth();
+  const { orgInfo } = useOrganization();
 
   const regionsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'regions') : null, [firestore]);
   const { data: regions, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
@@ -132,9 +137,28 @@ export default function DailyReportPage() {
   }, [availableLevels, reportLevel]);
 
   const handleGenerateReport = () => {
-    console.log({ reportLevel, selectedId, date, selectedMonth });
+    // This is where you would fetch and process data based on filters.
+    // For now, we'll just set dummy data to show the report card.
+    setReportData([]); // Setting to an empty array to trigger render
+    
+    const levelName = reportLevel.charAt(0).toUpperCase() + reportLevel.slice(1);
+    let selectedName = 'All';
+     if(selectedId !== 'all') {
+      const dataMap: { [key in ReportLevel]: any[] } = {
+        region: availableRegions,
+        zone: availableZones,
+        area: availableAreas,
+        branch: availableBranches,
+      };
+      selectedName = dataMap[reportLevel].find(item => item.id === selectedId)?.name || 'N/A';
+    }
+    setReportTitle(`${levelName}-wise Report for: ${selectedName}`);
   };
   
+  const handlePrint = () => {
+    window.print();
+  };
+
   const renderDynamicFilter = () => {
     const dataMap: { [key in ReportLevel]: { data: any[], name: string } } = {
         region: { data: availableRegions, name: 'Region' },
@@ -182,7 +206,7 @@ export default function DailyReportPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 print:p-8">
        <div className="flex items-center gap-4 mb-6 print:hidden">
             <Button variant="outline" size="icon" asChild>
                 <Link href="/dashboard/reports">
@@ -193,12 +217,12 @@ export default function DailyReportPage() {
             <h1 className="text-3xl font-bold">Daily Report</h1>
         </div>
 
-      <Card>
+      <Card className="print:hidden">
         <CardHeader>
           <CardTitle>Report Filters</CardTitle>
           <CardDescription>Select the criteria for your report.</CardDescription>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-5 items-end">
           <div className="space-y-2">
             <Label htmlFor="report-level">Report Level</Label>
             <Select 
@@ -271,26 +295,65 @@ export default function DailyReportPage() {
                 />
           </div>
 
-           <div className="flex items-end">
+           <div className="flex items-end gap-2">
              <Button onClick={handleGenerateReport} className="w-full" disabled={isLoading}>
                 {isLoading ? 'Loading...' : 'Generate Report'}
+             </Button>
+              <Button onClick={handlePrint} variant="outline" size="icon" disabled={!reportData}>
+                <Printer className="h-4 w-4" />
+                <span className="sr-only">Print</span>
              </Button>
           </div>
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-            <CardTitle>Report Results</CardTitle>
-            <CardDescription>Your generated report will appear here.</CardDescription>
-        </CardHeader>
-        <CardContent>
-            <div className="text-center py-10 text-muted-foreground">
-                <p>Please select your filters and click "Generate Report".</p>
-                <p className="text-sm">The report columns will be defined next.</p>
+      {reportData && (
+        <Card id="print-area">
+          <CardHeader className="print:hidden">
+              <CardTitle>Report Results</CardTitle>
+              <CardDescription>{reportTitle}</CardDescription>
+          </CardHeader>
+
+          <div className="hidden print:block text-center mb-8">
+            {orgInfo.logo && <Image src={orgInfo.logo} alt={orgInfo.name} width={120} height={50} className="mx-auto object-contain" />}
+            <h1 className="text-2xl font-bold mt-2">{orgInfo.name}</h1>
+            <p className="text-sm">{orgInfo.address}</p>
+            <p className="text-sm font-semibold">MRA Certificate No: 195874</p>
+            <h2 className="text-xl font-semibold mt-6 underline decoration-double">Daily Report</h2>
+            <div className="text-sm text-muted-foreground mt-2">
+                <p>
+                  <span className="font-semibold">Search By:</span> {reportTitle}
+                </p>
+                <p>
+                  <span className="font-semibold">Date:</span> {date?.from ? format(date.from, 'PPP') : 'N/A'}{date?.to && date.from !== date.to ? ` to ${format(date.to, 'PPP')}` : ''}
+                </p>
+                <p>
+                  <span className="font-semibold">Print Date:</span> {format(new Date(), 'PPP')}
+                </p>
             </div>
-        </CardContent>
-      </Card>
+          </div>
+
+          <CardContent>
+              <div className="text-center py-10 text-muted-foreground">
+                  <p>The report columns will be defined next.</p>
+              </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {!reportData && (
+        <Card>
+            <CardHeader>
+                <CardTitle>Report Results</CardTitle>
+                <CardDescription>Your generated report will appear here.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <div className="text-center py-10 text-muted-foreground">
+                    <p>Please select your filters and click "Generate Report".</p>
+                </div>
+            </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
