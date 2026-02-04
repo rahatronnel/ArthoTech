@@ -68,7 +68,7 @@ export default function DailyReportPage() {
   const [reportData, setReportData] = useState<ReportRowData[] | null>(null);
   const [reportTitle, setReportTitle] = useState('');
   const [groupByOfficer, setGroupByOfficer] = useState(false);
-  const [showSmokeOverlay, setShowSmokeOverlay] = useState(false);
+  const [smokeTrigger, setSmokeTrigger] = useState(0);
   
   const firestore = useFirestore();
   const { currentUser, loading: userLoading } = useAuth();
@@ -197,8 +197,7 @@ export default function DailyReportPage() {
   }, [reportData]);
 
   const handleGenerateReport = () => {
-    setShowSmokeOverlay(true);
-    setTimeout(() => setShowSmokeOverlay(false), 1000);
+    setSmokeTrigger(key => key + 1);
 
     if (!date?.from || isLoading) {
       return;
@@ -391,7 +390,7 @@ export default function DailyReportPage() {
 
   return (
     <div className="space-y-6 print:p-8">
-      {showSmokeOverlay && <div className="smoke-overlay" />}
+      {smokeTrigger > 0 && <div key={smokeTrigger} className="smoke-overlay" />}
        <div className="flex items-center gap-4 mb-6 print:hidden">
             <Button variant="outline" size="icon" asChild>
                 <Link href="/dashboard/reports">
@@ -481,7 +480,7 @@ export default function DailyReportPage() {
           </div>
 
            <div className="flex items-end gap-2">
-             <Button onClick={handleGenerateReport} className="w-full btn-smoke-effect" disabled={isLoading}>
+             <Button onClick={handleGenerateReport} className="w-full" disabled={isLoading}>
                 {isLoading ? 'Loading...' : 'Generate Report'}
              </Button>
               <Button onClick={handlePrint} variant="outline" size="icon" disabled={!reportData}>

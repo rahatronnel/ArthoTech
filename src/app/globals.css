@@ -83,48 +83,21 @@
   }
 }
 
-@layer components {
-  .btn-smoke-effect {
-    @apply relative overflow-hidden transition-transform duration-100;
-  }
-
-  .btn-smoke-effect:active {
-    @apply scale-[0.98];
-  }
-  
-  .btn-smoke-effect:active::after {
-    content: '';
-    @apply absolute top-1/2 left-1/2 w-full rounded-full opacity-100 pointer-events-none;
-    padding-top: 100%;
-    background: radial-gradient(circle, hsl(var(--primary) / 0.3) 0%, transparent 65%);
-    transform: translate(-50%, -50%) scale(0);
-    animation: smoke-animation 0.7s ease-out;
-  }
-}
-
 @layer utilities {
-    @keyframes smoke-animation {
-      from {
-        transform: translate(-50%, -50%) scale(0);
-        opacity: 1;
-      }
-      to {
-        transform: translate(-50%, -50%) scale(3);
-        opacity: 0;
-      }
-    }
-
     .smoke-overlay {
       @apply fixed inset-0 z-[200] pointer-events-none;
       background: radial-gradient(circle at center, hsla(var(--background), 0.1) 0%, hsla(var(--background), 0.8) 70%, hsl(var(--background)) 100%);
-      animation: page-smoke-out 1s ease-out forwards;
+      animation: page-smoke-in-out 1s ease-out forwards;
     }
 
-    @keyframes page-smoke-out {
-      from {
+    @keyframes page-smoke-in-out {
+      0% {
+        opacity: 0;
+      }
+      30% {
         opacity: 1;
       }
-      to {
+      100% {
         opacity: 0;
       }
     }
