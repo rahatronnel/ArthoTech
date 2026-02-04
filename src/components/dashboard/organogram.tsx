@@ -160,11 +160,11 @@ export function Organogram() {
                 <CardTitle>Organization Chart</CardTitle>
                 <CardDescription>A visual representation of your organization's hierarchy.</CardDescription>
             </CardHeader>
-            <CardContent className="overflow-auto p-6 text-center" style={{ minHeight: '500vh' }}>
-                <div className="tree inline-block">
-                    <ul>
+            <CardContent className="overflow-auto p-6">
+                <div className="tree text-center">
+                    <ul className="inline-block">
                        <li>
-                           <div className="inline-block align-top text-center">
+                           <div className="inline-block align-top text-center mb-10">
                                {orgInfo.logo ? (
                                    <Image src={orgInfo.logo} alt={orgInfo.name} width={80} height={80} className="mx-auto h-20 w-20 rounded-full object-contain border-4 border-primary p-1" />
                                ) : (
@@ -187,59 +187,6 @@ export function Organogram() {
                        </li>
                     </ul>
                 </div>
-                 <style jsx>{`
-                    .tree, .tree ul, .tree li {
-                        position: relative;
-                    }
-                    .tree ul {
-                        display: flex;
-                        justify-content: center;
-                    }
-                    .tree li {
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        padding: 4rem 0.5rem 0;
-                    }
-                    /* Vertical line connecting node to horizontal bar */
-                    .tree li::after {
-                        content: '';
-                        position: absolute;
-                        left: 50%;
-                        top: 0;
-                        width: 2px;
-                        height: 4rem;
-                        background: #9CA3AF; /* gray-400 */
-                        transform: translateX(-50%);
-                    }
-                    /* Horizontal bar connecting siblings */
-                    .tree li::before {
-                        content: '';
-                        position: absolute;
-                        left: 0;
-                        top: 0;
-                        width: 100%;
-                        height: 2px;
-                        background: #9CA3AF; /* gray-400 */
-                    }
-                    /* Trim horizontal line for first and last child */
-                    .tree li:first-child::before {
-                        left: 50%;
-                        width: 50%;
-                    }
-                    .tree li:last-child::before {
-                        left: 0;
-                        width: 50%;
-                    }
-                    /* A single child doesn't need the horizontal line */
-                    .tree li:only-child::before {
-                        display: none;
-                    }
-                    /* The root li shouldn't have lines above it */
-                    .tree > ul > li::before, .tree > ul > li::after {
-                        display: none;
-                    }
-                `}</style>
             </CardContent>
         </Card>
     )

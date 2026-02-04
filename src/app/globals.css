@@ -101,3 +101,72 @@
         }
     }
 }
+
+/* Organogram Tree Styles */
+.tree, .tree ul, .tree li {
+    position: relative;
+}
+
+.tree ul {
+    display: flex;
+    justify-content: center;
+    list-style-type: none;
+    padding: 0;
+}
+
+.tree li {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2.5rem 0.5rem 0; /* a lot of top padding for lines */
+    list-style-type: none;
+}
+
+/* Vertical line connecting node to the horizontal bar above it */
+.tree li::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 2px;
+    height: 2.5rem; /* Match top padding */
+    background: hsl(var(--border));
+    transform: translateX(-50%);
+}
+
+/* Horizontal bar connecting siblings */
+.tree li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 2px;
+    background: hsl(var(--border));
+}
+
+/* Trim horizontal line for first and last child */
+.tree li:first-child::before {
+    left: 50%;
+    width: 50%;
+}
+
+.tree li:last-child::before {
+    left: 0;
+    width: 50%;
+}
+
+/* A single child doesn't need the horizontal line */
+.tree li:only-child::before {
+    display: none;
+}
+
+/* The root of the tree (and its direct child `ul`) shouldn't have lines above them */
+.tree > ul > li::before,
+.tree > ul > li::after {
+    display: none;
+}
+
+.tree > ul > li > ul {
+    padding-top: 0;
+}
