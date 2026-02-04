@@ -559,7 +559,9 @@ export default function GroupsPage() {
               <TableRow>
                 <TableHead>SL</TableHead>
                 <TableHead>Group Name</TableHead>
-                <TableHead className="hidden md:table-cell">Group Code</TableHead>
+                <TableHead>Group Code</TableHead>
+                <TableHead>Branch</TableHead>
+                <TableHead>Branch Code</TableHead>
                 <TableHead>Group Day</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Leader</TableHead>
@@ -574,7 +576,9 @@ export default function GroupsPage() {
                 <TableRow key={group.id}>
                   <TableCell>{(currentPage - 1) * rowsPerPage + index + 1}</TableCell>
                   <TableCell className="font-medium">{group.name}</TableCell>
-                  <TableCell className="hidden md:table-cell">{group.code}</TableCell>
+                  <TableCell>{group.code}</TableCell>
+                  <TableCell>{getBranchName(group.branchId)}</TableCell>
+                  <TableCell>{getBranchCode(group.branchId)}</TableCell>
                   <TableCell>{group.day}</TableCell>
                   <TableCell>
                     <Badge variant={group.status === 'Active' ? 'default' : 'secondary'}>{group.status}</Badge>
