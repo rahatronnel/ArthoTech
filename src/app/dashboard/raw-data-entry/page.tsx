@@ -83,6 +83,7 @@ export default function RawDataEntryPage() {
     const [uploadedData, setUploadedData] = useState<UploadedRow[]>([]);
     const [uploadDate, setUploadDate] = useState(new Date().toISOString().split('T')[0]);
     const [wizardStep, setWizardStep] = useState(0);
+    const [droppedMembers, setDroppedMembers] = useState<Record<string, number>>({});
 
 
     const firestore = useFirestore();
@@ -345,12 +346,12 @@ export default function RawDataEntryPage() {
             if (row['Loan Collection Total'] > 0) {
                 addLoanCollection({ date: uploadDate, groupId: group.id, branchId: group.branchId, amount: row['Loan Collection Total'], notes: `Regular: ${row['Loan Collection Regular']}, Due: ${row['Loan Collection Due']}, Advance: ${row['Loan Collection Advance']}` });
             }
-            const admissionFeesAmount = row['Admission fees'];
-            if (admissionFeesAmount > 0) {
-                const membersAdded = admissionFeesAmount / 10;
-                if (membersAdded > 0) {
-                     addMemberChange({ date: uploadDate, groupId: group.id, branchId: group.branchId, added: membersAdded, dropped: 0, notes: `From raw data upload.` });
-                }
+            
+            const membersAdded = Math.floor((row['Admission fees'] || 0) / 10);
+            const membersDropped = droppedMembers[group.id] || 0;
+
+            if (membersAdded > 0 || membersDropped > 0) {
+                 addMemberChange({ date: uploadDate, groupId: group.id, branchId: group.branchId, added: membersAdded, dropped: membersDropped, notes: `From raw data upload.` });
             }
             
             const otherDataMapping: { [key: string]: OtherDataEntry['type'] } = {
@@ -388,6 +389,7 @@ export default function RawDataEntryPage() {
         setUploadedData([]);
         setFile(null);
         setWizardStep(0);
+        setDroppedMembers({});
         const fileInput = document.getElementById('raw-data-upload') as HTMLInputElement;
         if (fileInput) fileInput.value = '';
     };
@@ -445,7 +447,13 @@ export default function RawDataEntryPage() {
 
             <ConfirmationWizard
                 isOpen={isConfirmDialogOpen}
-                onOpenChange={setIsConfirmDialogOpen}
+                onOpenChange={(open) => {
+                  setIsConfirmDialogOpen(open);
+                  if (!open) {
+                    setWizardStep(0);
+                    setDroppedMembers({});
+                  }
+                }}
                 wizardStep={wizardStep}
                 setWizardStep={setWizardStep}
                 uploadedData={uploadedData}
@@ -454,6 +462,8 @@ export default function RawDataEntryPage() {
                 handleConfirmUpload={handleConfirmUpload}
                 groupsData={groupsData}
                 employeesData={employeesData}
+                droppedMembers={droppedMembers}
+                setDroppedMembers={setDroppedMembers}
             />
 
             <Card>
@@ -946,7 +956,7 @@ const Step4Fees = ({ data }: { data: UploadedRow[] }) => {
 };
 
 // Step 5: Member Changes
-const Step5MemberChanges = ({ data }: { data: UploadedRow[] }) => {
+const Step5MemberChanges = ({ data, droppedMembers, setDroppedMembers, groupsData }: { data: UploadedRow[], droppedMembers: Record<string, number>, setDroppedMembers: React.Dispatch<React.SetStateAction<Record<string, number>>>, groupsData: GroupData[] | null }) => {
     const totals = useMemo(() => {
         return data.reduce((acc, row) => {
             acc.members += Math.floor(row['Admission fees'] / 10);
@@ -954,37 +964,91 @@ const Step5MemberChanges = ({ data }: { data: UploadedRow[] }) => {
         }, { members: 0 });
     }, [data]);
 
+    const groupMap = useMemo(() => {
+        if (!groupsData) return new Map();
+        return new Map(groupsData.map(g => [String(g.code).trim().toLowerCase(), g]));
+    }, [groupsData]);
+
+    const handleDropChange = (groupCode: string, value: string) => {
+        const group = groupMap.get(groupCode.toLowerCase());
+        const droppedCount = Number(value) || 0;
+        if (group) {
+            setDroppedMembers(prev => ({...prev, [group.id]: droppedCount}));
+        }
+    }
+
+    const totalDropped = useMemo(() => {
+        return Object.values(droppedMembers).reduce((sum, count) => sum + count, 0);
+    }, [droppedMembers]);
+
+    // Only show groups that are in the uploaded data
+    const relevantGroups = useMemo(() => {
+        const groupCodesInUpload = new Set(data.map(row => row['Samity ID'].toLowerCase()));
+        return groupsData?.filter(g => groupCodesInUpload.has(String(g.code).trim().toLowerCase())) || [];
+    }, [data, groupsData]);
+
     return (
         <Card>
             <CardHeader>
                 <CardTitle>Step 5: Member Changes & Final Confirmation</CardTitle>
-                <CardDescription>Review member changes and confirm the upload to save all transactions.</CardDescription>
+                <CardDescription>Review member changes, manually enter dropped members, and confirm the upload.</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
-                <Card>
+            <CardContent className="grid gap-6 md:grid-cols-2">
+                <Card className="flex flex-col">
                     <CardHeader className="pb-2">
                         <CardDescription>Total Members Admitted</CardDescription>
                         <CardTitle className="text-3xl text-green-600">+{totals.members}</CardTitle>
                     </CardHeader>
                      <CardContent>
-                        <p className="text-sm text-muted-foreground">Calculated from Admission Fees.</p>
+                        <p className="text-sm text-muted-foreground">Calculated automatically from Admission Fees in the uploaded file.</p>
                     </CardContent>
                 </Card>
-                <Card>
+                 <Card className="flex flex-col">
                     <CardHeader className="pb-2">
                         <CardDescription>Total Members Dropped</CardDescription>
-                        <CardTitle className="text-3xl text-red-600">-0</CardTitle>
+                        <CardTitle className="text-3xl text-red-600">-{totalDropped}</CardTitle>
                     </CardHeader>
-                    <CardContent>
-                        <p className="text-sm text-muted-foreground">This upload does not handle member dropouts.</p>
+                     <CardContent>
+                        <p className="text-sm text-muted-foreground">Sum of manually entered values below.</p>
                     </CardContent>
                 </Card>
+
+                <div className="md:col-span-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Enter Dropped Members</CardTitle>
+                            <CardDescription>Enter the number of members who dropped out from each group today. Leave as 0 if none.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ScrollArea className="h-64">
+                                <div className="space-y-4 pr-6">
+                                {relevantGroups.map(group => (
+                                    <div key={group.id} className="flex items-center justify-between">
+                                        <Label htmlFor={`drop-${group.id}`} className="flex-1">{group.name} ({group.code})</Label>
+                                        <Input 
+                                            id={`drop-${group.id}`}
+                                            type="number" 
+                                            min="0"
+                                            className="w-24"
+                                            placeholder="0"
+                                            value={droppedMembers[group.id] || ''}
+                                            onChange={(e) => handleDropChange(group.code, e.target.value)}
+                                        />
+                                    </div>
+                                ))}
+                                {relevantGroups.length === 0 && <p className="text-muted-foreground text-center">No groups found in upload to modify.</p>}
+                                </div>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                </div>
             </CardContent>
         </Card>
     );
 };
 
-const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, uploadedData, uploadDate, setUploadDate, handleConfirmUpload, groupsData, employeesData }: any) => {
+
+const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, uploadedData, uploadDate, setUploadDate, handleConfirmUpload, groupsData, employeesData, droppedMembers, setDroppedMembers }: any) => {
     
      const handleClose = (open: boolean) => {
         if (!open) {
@@ -1023,7 +1087,7 @@ const ConfirmationWizard = ({ isOpen, onOpenChange, wizardStep, setWizardStep, u
                     {wizardStep === 2 && <Step2Loans data={uploadedData} />}
                     {wizardStep === 3 && <Step3OfficerSummary data={uploadedData} groupsData={groupsData} employeesData={employeesData} />}
                     {wizardStep === 4 && <Step4Fees data={uploadedData} />}
-                    {wizardStep === 5 && <Step5MemberChanges data={uploadedData} />}
+                    {wizardStep === 5 && <Step5MemberChanges data={uploadedData} droppedMembers={droppedMembers} setDroppedMembers={setDroppedMembers} groupsData={groupsData} />}
                 </div>
 
                 <DialogFooter className="mt-auto pt-4 border-t !justify-between">
