@@ -231,10 +231,19 @@ export default function EmployeesPage() {
             const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Email': email, 'Password': password, 'Role': role, 'Assignment Code': assignmentCode } = row;
             const rowIndex = index + 2;
 
-            if (!name || !code || !role || !assignmentCode || !email || !password) {
-                errors.push(`Row ${rowIndex}: Missing required fields.`);
+            const missingFields = [];
+            if (!name) missingFields.push('Name');
+            if (!code) missingFields.push('Code');
+            if (!email) missingFields.push('Email');
+            if (!password) missingFields.push('Password');
+            if (!role) missingFields.push('Role');
+            if (!assignmentCode) missingFields.push('Assignment Code');
+
+            if (missingFields.length > 0) {
+                errors.push(`Row ${rowIndex}: Missing required fields: ${missingFields.join(', ')}.`);
                 return;
             }
+
             if (!ROLES.includes(role)) {
                 errors.push(`Row ${rowIndex}: Invalid role "${role}".`);
                 return;
@@ -704,5 +713,7 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
         </Dialog>
     );
 }
+
+    
 
     
