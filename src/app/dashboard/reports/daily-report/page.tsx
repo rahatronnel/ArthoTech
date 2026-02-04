@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -340,8 +341,8 @@ export default function DailyReportPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead rowSpan={2} className="align-bottom">SL</TableHead>
-                    <TableHead rowSpan={2} className="align-bottom">Branch</TableHead>
-                    <TableHead colSpan={2} className="text-center border-x">Member Add</TableHead>
+                    <TableHead rowSpan={2} className="align-bottom border-r">Branch</TableHead>
+                    <TableHead colSpan={2} className="text-center border-r">Member Add</TableHead>
                     <TableHead colSpan={2} className="text-center border-r">Member Cancel</TableHead>
                     <TableHead colSpan={2} className="text-center border-r">Savings Collection</TableHead>
                     <TableHead colSpan={2} className="text-center border-r">Savings Refund</TableHead>
@@ -350,17 +351,9 @@ export default function DailyReportPage() {
                     <TableHead rowSpan={2} className="align-bottom border-r">Other Expense</TableHead>
                     <TableHead rowSpan={2} className="align-bottom border-r">Cash</TableHead>
                     <TableHead rowSpan={2} className="align-bottom border-r">Bank</TableHead>
-                    <TableHead rowSpan={2} className="align-bottom border-r">Afternoon Collection</TableHead>
-                    <TableHead rowSpan={2} className="align-bottom border-r">Risk Fund</TableHead>
-                    <TableHead rowSpan={2} className="align-bottom border-r">Processing Fee</TableHead>
-                    <TableHead rowSpan={2} className="align-bottom border-r">Passbook Fee</TableHead>
-                    <TableHead rowSpan={2} className="align-bottom">Admission Fee</TableHead>
+                    <TableHead colSpan={5} className="text-center">Others Collections</TableHead>
                   </TableRow>
                   <TableRow>
-                    <TableHead className="text-center border-x">Today</TableHead>
-                    <TableHead className="text-center">This Month</TableHead>
-                    <TableHead className="text-center border-l">Today</TableHead>
-                    <TableHead className="text-center border-r">This Month</TableHead>
                     <TableHead className="text-center">Today</TableHead>
                     <TableHead className="text-center border-r">This Month</TableHead>
                     <TableHead className="text-center">Today</TableHead>
@@ -369,6 +362,15 @@ export default function DailyReportPage() {
                     <TableHead className="text-center border-r">This Month</TableHead>
                     <TableHead className="text-center">Today</TableHead>
                     <TableHead className="text-center border-r">This Month</TableHead>
+                    <TableHead className="text-center">Today</TableHead>
+                    <TableHead className="text-center border-r">This Month</TableHead>
+                    <TableHead className="text-center">Today</TableHead>
+                    <TableHead className="text-center border-r">This Month</TableHead>
+                    <TableHead className="text-center border-l">Afternoon Collection</TableHead>
+                    <TableHead className="text-center border-l">Risk Fund</TableHead>
+                    <TableHead className="text-center border-l">Processing Fee</TableHead>
+                    <TableHead className="text-center border-l">Passbook Fee</TableHead>
+                    <TableHead className="text-center border-l">Admission Fee</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -399,3 +401,4 @@ export default function DailyReportPage() {
     </div>
   );
 }
+
