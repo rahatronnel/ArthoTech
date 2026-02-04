@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query, deleteField } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -234,20 +234,27 @@ export default function ZonesPage() {
       try {
         if (editingZone) { // Update
           const zoneDocRef = doc(firestore, 'regions', editingZone.regionId, 'zones', editingZone.id);
-          const updatedData: Partial<Zone> = { name, bengaliName, code, responsibleEmployeeId: finalEmployeeId, regionId };
+          const updatedData: {[key: string]: any} = { name, bengaliName, code, regionId };
+          if(finalEmployeeId) {
+            updatedData.responsibleEmployeeId = finalEmployeeId;
+          } else {
+            updatedData.responsibleEmployeeId = deleteField();
+          }
           await setDoc(zoneDocRef, updatedData, { merge: true });
           toast({ title: "Zone updated", description: `"${name}" has been updated.` });
         } else { // Create
           const newDocRef = doc(collection(firestore, 'regions', regionId, 'zones'));
-          const newZone: Zone = {
+          const newZoneData: {[key: string]: any} = {
             id: newDocRef.id,
             name,
             bengaliName,
             code,
             regionId,
-            responsibleEmployeeId: finalEmployeeId,
           };
-          await setDoc(newDocRef, newZone);
+          if (finalEmployeeId) {
+            newZoneData.responsibleEmployeeId = finalEmployeeId;
+          }
+          await setDoc(newDocRef, newZoneData);
           toast({ title: "Zone created", description: `"${name}" has been created.` });
         }
         handleDialogClose();
@@ -477,7 +484,3 @@ export default function ZonesPage() {
     </Card>
   );
 }
-
-    
-
-    

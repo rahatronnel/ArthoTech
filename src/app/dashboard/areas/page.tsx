@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, collectionGroup, query, deleteField } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -249,21 +249,28 @@ export default function AreasPage() {
       try {
         if (editingArea) { // Update
           const areaDocRef = doc(firestore, 'regions', editingArea.regionId, 'zones', editingArea.zoneId, 'areas', editingArea.id);
-          const updatedData: Partial<Area> = { name, bengaliName, code, responsibleEmployeeId: finalEmployeeId, zoneId, regionId };
+          const updatedData: {[key:string]: any} = { name, bengaliName, code, zoneId, regionId };
+          if(finalEmployeeId) {
+            updatedData.responsibleEmployeeId = finalEmployeeId;
+          } else {
+            updatedData.responsibleEmployeeId = deleteField();
+          }
           await setDoc(areaDocRef, updatedData, { merge: true });
           toast({ title: "Area updated", description: `"${name}" has been updated.` });
         } else { // Create
           const newDocRef = doc(collection(firestore, 'regions', regionId, 'zones', zoneId, 'areas'));
-          const newArea: Area = {
+          const newAreaData: {[key:string]: any} = {
             id: newDocRef.id,
             name,
             bengaliName,
             code,
             zoneId,
             regionId,
-            responsibleEmployeeId: finalEmployeeId,
           };
-          await setDoc(newDocRef, newArea);
+          if(finalEmployeeId) {
+            newAreaData.responsibleEmployeeId = finalEmployeeId;
+          }
+          await setDoc(newDocRef, newAreaData);
           toast({ title: "Area created", description: `"${name}" has been created.` });
         }
         handleDialogClose();
@@ -510,5 +517,3 @@ export default function AreasPage() {
     </Card>
   );
 }
-
-    

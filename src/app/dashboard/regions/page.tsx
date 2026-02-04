@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, writeBatch, getDocs, deleteField } from 'firebase/firestore';
 import * as XLSX from 'xlsx';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
@@ -213,19 +213,26 @@ export default function RegionsPage() {
       try {
         if (editingRegion) { // Update
           const regionDocRef = doc(firestore, 'regions', editingRegion.id);
-          const updatedData: Partial<Region> = { name, bengaliName, code, responsibleEmployeeId: finalEmployeeId };
+          const updatedData: {[key: string]: any} = { name, bengaliName, code };
+          if (finalEmployeeId) {
+            updatedData.responsibleEmployeeId = finalEmployeeId;
+          } else {
+            updatedData.responsibleEmployeeId = deleteField();
+          }
           await setDoc(regionDocRef, updatedData, { merge: true });
           toast({ title: "Region updated", description: `"${name}" has been updated.` });
         } else { // Create
           const newDocRef = doc(collection(firestore, 'regions'));
-          const newRegion: Region = {
+          const newRegionData: {[key: string]: any} = {
               id: newDocRef.id,
               name,
               bengaliName,
               code,
-              responsibleEmployeeId: finalEmployeeId,
           };
-          await setDoc(newDocRef, newRegion);
+          if (finalEmployeeId) {
+            newRegionData.responsibleEmployeeId = finalEmployeeId;
+          }
+          await setDoc(newDocRef, newRegionData);
           toast({ title: "Region created", description: `"${name}" has been added.` });
         }
         handleDialogClose();
@@ -434,7 +441,3 @@ export default function RegionsPage() {
     </Card>
   );
 }
-
-    
-
-    
