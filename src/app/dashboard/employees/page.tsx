@@ -63,8 +63,8 @@ export default function EmployeesPage() {
         progress: number;
     }>({ status: 'idle', data: [], errors: [], progress: 0 });
 
-    const [filterBranchId, setFilterBranchId] = useState<string>('all');
-    const [filterCode, setFilterCode] = useState<string>('');
+    const [branchSearch, setBranchSearch] = useState('');
+    const [employeeSearch, setEmployeeSearch] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [rowsPerPage, setRowsPerPage] = useState(50);
 
@@ -72,47 +72,85 @@ export default function EmployeesPage() {
 
      const assignmentMaps = useMemo(() => {
         return {
-            regions: new Map(regionsData?.map(r => [r.id, r.name])),
-            zones: new Map(zonesData?.map(z => [z.id, z.name])),
-            areas: new Map(areasData?.map(a => [a.id, a.name])),
-            branches: new Map(branchesData?.map(b => [b.id, b.name])),
+            regions: {
+                name: new Map(regionsData?.map(r => [r.id, r.name])),
+                code: new Map(regionsData?.map(r => [r.id, r.code])),
+            },
+            zones: {
+                name: new Map(zonesData?.map(z => [z.id, z.name])),
+                code: new Map(zonesData?.map(z => [z.id, z.code])),
+            },
+            areas: {
+                name: new Map(areasData?.map(a => [a.id, a.name])),
+                code: new Map(areasData?.map(a => [a.id, a.code])),
+            },
+            branches: {
+                name: new Map(branchesData?.map(b => [b.id, b.name])),
+                code: new Map(branchesData?.map(b => [b.id, b.code])),
+            },
         };
     }, [regionsData, zonesData, areasData, branchesData]);
     
+    const getAssignmentName = (employee: Employee): string => {
+        if (employee.assignment === 'Head Office') return 'Head Office';
+        if (!employee.assignment) return 'N/A';
+
+        switch (employee.role) {
+            case 'Regional User': return assignmentMaps.regions.name.get(employee.assignment) || 'Unknown';
+            case 'Zonal User': return assignmentMaps.zones.name.get(employee.assignment) || 'Unknown';
+            case 'Area User': return assignmentMaps.areas.name.get(employee.assignment) || 'Unknown';
+            case 'Branch User': return assignmentMaps.branches.name.get(employee.assignment) || 'Unknown';
+            default: return 'N/A';
+        }
+    };
+    
+    const getAssignmentCode = (employee: Employee): string => {
+        if (employee.assignment === 'Head Office') return 'HO';
+        if (!employee.assignment) return '';
+
+        switch (employee.role) {
+            case 'Regional User': return assignmentMaps.regions.code.get(employee.assignment) || '';
+            case 'Zonal User': return assignmentMaps.zones.code.get(employee.assignment) || '';
+            case 'Area User': return assignmentMaps.areas.code.get(employee.assignment) || '';
+            case 'Branch User': return assignmentMaps.branches.code.get(employee.assignment) || '';
+            default: return '';
+        }
+    };
+
     const employees = useMemo(() => employeesData?.filter(e => e.role !== 'Super Admin') || [], [employeesData]);
+    
+    const sortedEmployees = useMemo(() => {
+        if (!employees) return [];
+        return [...employees].sort((a, b) => {
+            const codeA = getAssignmentCode(a);
+            const codeB = getAssignmentCode(b);
+            return codeA.localeCompare(codeB);
+        });
+    }, [employees, assignmentMaps]);
 
     const filteredEmployees = useMemo(() => {
-        let employeesToFilter = employees;
+        let employeesToFilter = sortedEmployees;
 
-        // Filter by branch hierarchy
-        if (filterBranchId !== 'all' && branchesData) {
-            const selectedBranch = branchesData.find(b => b.id === filterBranchId);
-            if (selectedBranch) {
-                const relevantIds = {
-                    branch: selectedBranch.id,
-                    area: selectedBranch.areaId,
-                    zone: selectedBranch.zoneId,
-                    region: selectedBranch.regionId
-                };
-                employeesToFilter = employeesToFilter.filter(e => {
-                    return (e.role === 'Branch User' && e.assignment === relevantIds.branch) ||
-                           (e.role === 'Area User' && e.assignment === relevantIds.area) ||
-                           (e.role === 'Zonal User' && e.assignment === relevantIds.zone) ||
-                           (e.role === 'Regional User' && e.assignment === relevantIds.region);
-                });
-            }
+        if (branchSearch) {
+            const searchTerm = branchSearch.toLowerCase();
+            employeesToFilter = employeesToFilter.filter(e => {
+                const assignmentName = getAssignmentName(e).toLowerCase();
+                const assignmentCode = getAssignmentCode(e).toLowerCase();
+                return assignmentName.includes(searchTerm) || assignmentCode.includes(searchTerm);
+            });
         }
 
-        // Filter by employee code
-        if (filterCode) {
+        if (employeeSearch) {
+            const searchTerm = employeeSearch.toLowerCase();
             employeesToFilter = employeesToFilter.filter(e => 
-                e.code.toLowerCase().includes(filterCode.toLowerCase())
+                e.code.toLowerCase().includes(searchTerm) ||
+                e.name.toLowerCase().includes(searchTerm)
             );
         }
         
         return employeesToFilter;
 
-    }, [employees, branchesData, filterBranchId, filterCode]);
+    }, [sortedEmployees, branchSearch, employeeSearch, getAssignmentName, getAssignmentCode]);
 
     const paginatedEmployees = useMemo(() => {
         const startIndex = (currentPage - 1) * rowsPerPage;
@@ -121,19 +159,6 @@ export default function EmployeesPage() {
     }, [filteredEmployees, currentPage, rowsPerPage]);
 
     const totalPages = Math.ceil(filteredEmployees.length / rowsPerPage);
-
-    const getAssignmentName = (employee: Employee): string => {
-        if (employee.assignment === 'Head Office') return 'Head Office';
-        if (!employee.assignment) return 'N/A';
-
-        switch (employee.role) {
-            case 'Regional User': return assignmentMaps.regions.get(employee.assignment) || 'Unknown';
-            case 'Zonal User': return assignmentMaps.zones.get(employee.assignment) || 'Unknown';
-            case 'Area User': return assignmentMaps.areas.get(employee.assignment) || 'Unknown';
-            case 'Branch User': return assignmentMaps.branches.get(employee.assignment) || 'Unknown';
-            default: return 'N/A';
-        }
-    };
     
     // --- Core Functions ---
     const handleAddNew = () => {
@@ -381,25 +406,21 @@ export default function EmployeesPage() {
                     <div className="flex items-center gap-4 mb-4">
                         <div className="grid gap-1.5">
                             <Label htmlFor="branch-filter">Filter by Branch</Label>
-                            <Select value={filterBranchId} onValueChange={setFilterBranchId}>
-                                <SelectTrigger id="branch-filter" className="w-[250px]">
-                                    <SelectValue placeholder="Select a branch" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All Branches</SelectItem>
-                                    {branchesData?.map(branch => (
-                                        <SelectItem key={branch.id} value={branch.id}>{branch.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
+                            <Input
+                                id="branch-filter"
+                                placeholder="Type branch name or code..."
+                                value={branchSearch}
+                                onChange={e => setBranchSearch(e.target.value)}
+                                className="w-[250px]"
+                            />
                         </div>
                         <div className="grid gap-1.5">
-                            <Label htmlFor="code-filter">Filter by Code</Label>
+                            <Label htmlFor="employee-filter">Filter by Employee</Label>
                             <Input
-                                id="code-filter"
-                                placeholder="Enter employee code"
-                                value={filterCode}
-                                onChange={e => setFilterCode(e.target.value)}
+                                id="employee-filter"
+                                placeholder="Enter name or code..."
+                                value={employeeSearch}
+                                onChange={e => setEmployeeSearch(e.target.value)}
                                 className="w-[250px]"
                             />
                         </div>
@@ -814,3 +835,4 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
     
 
     
+
