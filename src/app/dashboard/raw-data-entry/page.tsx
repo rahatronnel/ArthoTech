@@ -273,7 +273,7 @@ export default function RawDataEntryPage() {
             return;
         }
         
-        processExcel(file);
+        setIsProcessing(true);
     };
 
     const handleConfirmUpload = () => {
@@ -437,6 +437,9 @@ export default function RawDataEntryPage() {
                 open={isProcessing}
                 onFinished={() => {
                     setIsProcessing(false);
+                    if (file) {
+                        processExcel(file);
+                    }
                 }}
             />
 
