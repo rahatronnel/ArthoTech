@@ -169,7 +169,7 @@ export default function DailyReportPage() {
     }
 
     return {
-      availableLevels,
+      availableLevels: filteredLevels,
       availableRegions: filteredRegions,
       availableZones: filteredZones,
       availableAreas: filteredAreas,
@@ -539,7 +539,7 @@ export default function DailyReportPage() {
 
           <CardContent className="overflow-x-auto">
                <Table>
-                <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm shadow-lg">
+                <thead className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm shadow-lg">
                   <TableRow>
                     <TableHead rowSpan={2} className="align-bottom">SL</TableHead>
                     <TableHead rowSpan={2} className="align-bottom border-r">Branch</TableHead>
@@ -574,7 +574,7 @@ export default function DailyReportPage() {
                     <TableHead className="text-center border-l">Passbook Fee</TableHead>
                     <TableHead className="text-center border-l">Admission Fee</TableHead>
                   </TableRow>
-                </TableHeader>
+                </thead>
                 <TableBody>
                   {reportData.length > 0 ? reportData.map((row, index) => (
                      <TableRow key={index}>
@@ -611,7 +611,7 @@ export default function DailyReportPage() {
                   )}
                 </TableBody>
                 {reportTotals && (
-                    <TableFooter className="sticky bottom-0 bg-muted/80 backdrop-blur-sm shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.1),0_-2px_4px_-2px_rgb(0,0,0,0.1)]">
+                    <tfoot className="sticky bottom-0 bg-muted/80 backdrop-blur-sm shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.1),0_-2px_4px_-2px_rgb(0,0,0,0.1)]">
                         <TableRow className="font-bold hover:bg-transparent">
                             <TableCell colSpan={groupByOfficer ? 3 : 2} className="text-right">Grand Total</TableCell>
                             <TableCell className="text-right">{formatCurrency(reportTotals.memberAddToday)}</TableCell>
@@ -635,7 +635,7 @@ export default function DailyReportPage() {
                             <TableCell className="text-right border-l">{formatCurrency(reportTotals.passbookFee)}</TableCell>
                             <TableCell className="text-right border-l">{formatCurrency(reportTotals.admissionFee)}</TableCell>
                         </TableRow>
-                    </TableFooter>
+                    </tfoot>
                 )}
               </Table>
           </CardContent>
