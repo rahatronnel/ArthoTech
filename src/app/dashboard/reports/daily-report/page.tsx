@@ -1,7 +1,6 @@
-
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -17,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, collectionGroup, query } from 'firebase/firestore';
 import type { Region, Zone, Area, Branch } from '@/lib/data';
+import { useAuth } from '@/context/AuthContext';
 
 type ReportLevel = 'region' | 'zone' | 'area' | 'branch';
 
@@ -30,6 +30,7 @@ export default function DailyReportPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   
   const firestore = useFirestore();
+  const { currentUser, loading: userLoading } = useAuth();
 
   const regionsQuery = useMemoFirebase(() => firestore ? collection(firestore, 'regions') : null, [firestore]);
   const { data: regions, isLoading: regionsLoading } = useCollection<Region>(regionsQuery);
@@ -43,79 +44,141 @@ export default function DailyReportPage() {
   const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
   const { data: branches, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
 
-  const isLoading = regionsLoading || zonesLoading || areasLoading || branchesLoading;
+  const isLoading = regionsLoading || zonesLoading || areasLoading || branchesLoading || userLoading;
+
+  const { availableLevels, availableRegions, availableZones, availableAreas, availableBranches } = useMemo(() => {
+    if (!currentUser || isLoading) {
+      return { availableLevels: [], availableRegions: [], availableZones: [], availableAreas: [], availableBranches: [] };
+    }
+
+    const { role, assignment } = currentUser;
+
+    if (role === 'Super Admin' || role === 'Head Office') {
+      return {
+        availableLevels: ['region', 'zone', 'area', 'branch'],
+        availableRegions: regions || [],
+        availableZones: zones || [],
+        availableAreas: areas || [],
+        availableBranches: branches || [],
+      };
+    }
+
+    let filteredLevels: ReportLevel[] = [];
+    let filteredRegions: Region[] = [];
+    let filteredZones: Zone[] = [];
+    let filteredAreas: Area[] = [];
+    let filteredBranches: Branch[] = [];
+
+    switch (role) {
+      case 'Regional User':
+        filteredLevels = ['region', 'zone', 'area', 'branch'];
+        const userRegion = regions?.find(r => r.id === assignment);
+        if (userRegion) {
+          filteredRegions = [userRegion];
+          const regionZones = zones?.filter(z => z.regionId === userRegion.id) || [];
+          filteredZones = regionZones;
+          const zoneIds = new Set(regionZones.map(z => z.id));
+          const regionAreas = areas?.filter(a => zoneIds.has(a.zoneId)) || [];
+          filteredAreas = regionAreas;
+          const areaIds = new Set(regionAreas.map(a => a.id));
+          filteredBranches = branches?.filter(b => areaIds.has(b.areaId)) || [];
+        }
+        break;
+      
+      case 'Zonal User':
+        filteredLevels = ['zone', 'area', 'branch'];
+        const userZone = zones?.find(z => z.id === assignment);
+        if (userZone) {
+          filteredZones = [userZone];
+          const zoneAreas = areas?.filter(a => a.zoneId === userZone.id) || [];
+          filteredAreas = zoneAreas;
+          const areaIds = new Set(zoneAreas.map(a => a.id));
+          filteredBranches = branches?.filter(b => areaIds.has(b.areaId)) || [];
+        }
+        break;
+
+      case 'Area User':
+        filteredLevels = ['area', 'branch'];
+        const userArea = areas?.find(a => a.id === assignment);
+        if (userArea) {
+          filteredAreas = [userArea];
+          filteredBranches = branches?.filter(b => b.areaId === userArea.id) || [];
+        }
+        break;
+
+      case 'Branch User':
+        filteredLevels = ['branch'];
+        const userBranch = branches?.find(b => b.id === assignment);
+        if (userBranch) {
+          filteredBranches = [userBranch];
+        }
+        break;
+    }
+
+    return {
+      availableLevels,
+      availableRegions,
+      availableZones,
+      availableAreas,
+      availableBranches,
+    };
+  }, [currentUser, isLoading, regions, zones, areas, branches]);
+
+  useEffect(() => {
+    if (availableLevels.length > 0 && !availableLevels.includes(reportLevel)) {
+      setReportLevel(availableLevels[0]);
+      setSelectedId('all');
+    }
+  }, [availableLevels, reportLevel]);
 
   const handleGenerateReport = () => {
-    // Logic to generate report will be added later
     console.log({ reportLevel, selectedId, date, selectedMonth });
   };
   
   const renderDynamicFilter = () => {
-    const commonProps = {
-      value: selectedId,
-      onValueChange: setSelectedId,
-      disabled: isLoading,
+    const dataMap: { [key in ReportLevel]: { data: any[], name: string } } = {
+        region: { data: availableRegions, name: 'Region' },
+        zone: { data: availableZones, name: 'Zone' },
+        area: { data: availableAreas, name: 'Area' },
+        branch: { data: availableBranches, name: 'Branch' },
     };
 
-    const triggerPlaceholder = `Select a ${reportLevel}`;
-    const allOptionLabel = `All ${reportLevel}s`;
+    const { data, name } = dataMap[reportLevel];
+    const isLocked = data.length === 1 && currentUser?.role !== 'Super Admin' && currentUser?.role !== 'Head Office';
 
-    switch (reportLevel) {
-      case 'region':
+    useEffect(() => {
+      if(isLocked && data[0] && selectedId !== data[0].id) {
+        setSelectedId(data[0].id);
+      }
+    }, [isLocked, data, selectedId]);
+
+    if (isLocked) {
         return (
-          <div className="space-y-2">
-            <Label>Region</Label>
-            <Select {...commonProps}>
-              <SelectTrigger><SelectValue placeholder={triggerPlaceholder} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{allOptionLabel}</SelectItem>
-                {regions?.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="space-y-2">
+                <Label>{name}</Label>
+                <Input value={data[0]?.name || 'Loading...'} disabled />
+            </div>
         );
-      case 'zone':
-        return (
-          <div className="space-y-2">
-            <Label>Zone</Label>
-            <Select {...commonProps}>
-              <SelectTrigger><SelectValue placeholder={triggerPlaceholder} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{allOptionLabel}</SelectItem>
-                {zones?.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        );
-      case 'area':
-        return (
-          <div className="space-y-2">
-            <Label>Area</Label>
-            <Select {...commonProps}>
-              <SelectTrigger><SelectValue placeholder={triggerPlaceholder} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{allOptionLabel}</SelectItem>
-                {areas?.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        );
-      case 'branch':
-        return (
-          <div className="space-y-2">
-            <Label>Branch</Label>
-            <Select {...commonProps}>
-              <SelectTrigger><SelectValue placeholder={triggerPlaceholder} /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{allOptionLabel}</SelectItem>
-                {branches?.map(item => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-        );
-      default:
-        return null;
     }
+    
+    return (
+      <div className="space-y-2">
+        <Label>{name}</Label>
+        <Select
+          value={selectedId}
+          onValueChange={setSelectedId}
+          disabled={isLoading}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={`Select a ${reportLevel}`} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{`All available ${name}s`}</SelectItem>
+            {data?.map((item: any) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+    );
   };
 
   return (
@@ -138,15 +201,20 @@ export default function DailyReportPage() {
         <CardContent className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-2">
             <Label htmlFor="report-level">Report Level</Label>
-            <Select value={reportLevel} onValueChange={(value) => { setReportLevel(value as ReportLevel); setSelectedId('all'); }}>
+            <Select 
+              value={reportLevel} 
+              onValueChange={(value) => { setReportLevel(value as ReportLevel); setSelectedId('all'); }}
+              disabled={availableLevels.length <= 1}
+            >
               <SelectTrigger id="report-level">
                 <SelectValue placeholder="Select a level" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="region">Region-wise</SelectItem>
-                <SelectItem value="zone">Zone-wise</SelectItem>
-                <SelectItem value="area">Area-wise</SelectItem>
-                <SelectItem value="branch">Branch-wise</SelectItem>
+                {availableLevels.map(level => (
+                  <SelectItem key={level} value={level}>
+                    {level.charAt(0).toUpperCase() + level.slice(1)}-wise
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -226,4 +294,3 @@ export default function DailyReportPage() {
     </div>
   );
 }
-
