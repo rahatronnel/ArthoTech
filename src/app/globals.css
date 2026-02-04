@@ -113,4 +113,19 @@
         opacity: 0;
       }
     }
+
+    .smoke-overlay {
+      @apply fixed inset-0 z-[200] pointer-events-none;
+      background: radial-gradient(circle at center, hsla(var(--background), 0.1) 0%, hsla(var(--background), 0.8) 70%, hsl(var(--background)) 100%);
+      animation: page-smoke-out 1s ease-out forwards;
+    }
+
+    @keyframes page-smoke-out {
+      from {
+        opacity: 1;
+      }
+      to {
+        opacity: 0;
+      }
+    }
 }
