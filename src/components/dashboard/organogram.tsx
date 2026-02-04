@@ -8,7 +8,7 @@ import { useOrganization } from '@/context/OrganizationContext';
 import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Building, GitFork, MapPin as MapIcon, Network, User } from 'lucide-react';
+import { Building, GitFork, Map as RegionIcon, MapPin, Network, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Data structure for the tree
@@ -52,7 +52,7 @@ function OrganogramSkeleton() {
 
 const NodeCard = ({ node, employeeMap }: { node: any; employeeMap: Map<string, string> }) => {
     const icons: { [key: string]: React.ElementType } = {
-        region: MapIcon,
+        region: RegionIcon,
         zone: MapPin,
         area: Network,
         branch: Building,
