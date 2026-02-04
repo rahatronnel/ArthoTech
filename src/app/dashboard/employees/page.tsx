@@ -176,7 +176,7 @@ export default function EmployeesPage() {
         const templateData = [{
             "Name": "", "Bengali Name": "", "Code": "", "Email": "", "Password": "",
             "Role": "Branch User | Area User | Zonal User | Regional User | Head Office",
-            "Assignment Name": "Name of the Region/Zone/Area/Branch",
+            "Assignment Code": "Code of the Region/Zone/Area/Branch (or 'Head Office')",
         }];
         const ws = XLSX.utils.json_to_sheet(templateData);
         const wb = XLSX.utils.book_new();
@@ -220,18 +220,18 @@ export default function EmployeesPage() {
         const fileCodes = new Set<string>();
         const fileEmails = new Set<string>();
         
-        const assignmentNameMaps = {
-            'Regional User': new Map(regionsData?.map(r => [r.name.toLowerCase(), r.id])),
-            'Zonal User': new Map(zonesData?.map(z => [z.name.toLowerCase(), z.id])),
-            'Area User': new Map(areasData?.map(a => [a.name.toLowerCase(), a.id])),
-            'Branch User': new Map(branchesData?.map(b => [b.name.toLowerCase(), b.id])),
+        const assignmentCodeMaps = {
+            'Regional User': new Map(regionsData?.filter(r => r.code).map(r => [r.code.toLowerCase().trim(), r.id])),
+            'Zonal User': new Map(zonesData?.filter(z => z.code).map(z => [z.code.toLowerCase().trim(), z.id])),
+            'Area User': new Map(areasData?.filter(a => a.code).map(a => [a.code.toLowerCase().trim(), a.id])),
+            'Branch User': new Map(branchesData?.filter(b => b.code).map(b => [b.code.toLowerCase().trim(), b.id])),
         };
 
         jsonData.forEach((row, index) => {
-            const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Email': email, 'Password': password, 'Role': role, 'Assignment Name': assignmentName } = row;
+            const { 'Name': name, 'Bengali Name': bengaliName, 'Code': code, 'Email': email, 'Password': password, 'Role': role, 'Assignment Code': assignmentCode } = row;
             const rowIndex = index + 2;
 
-            if (!name || !code || !role || !assignmentName || !email || !password) {
+            if (!name || !code || !role || !assignmentCode || !email || !password) {
                 errors.push(`Row ${rowIndex}: Missing required fields.`);
                 return;
             }
@@ -242,18 +242,18 @@ export default function EmployeesPage() {
 
             let assignmentId: string | undefined = undefined;
             if (role === 'Head Office' || role === 'Super Admin') {
-                if (assignmentName.toLowerCase() === 'head office') {
+                if (String(assignmentCode).toLowerCase().trim() === 'head office') {
                     assignmentId = 'Head Office';
                 }
             } else {
-                const nameMap = assignmentNameMaps[role as keyof typeof assignmentNameMaps];
-                if (nameMap) {
-                    assignmentId = nameMap.get(String(assignmentName).toLowerCase().trim());
+                const codeMap = assignmentCodeMaps[role as keyof typeof assignmentCodeMaps];
+                if (codeMap) {
+                    assignmentId = codeMap.get(String(assignmentCode).toLowerCase().trim());
                 }
             }
 
             if (!assignmentId) {
-                 errors.push(`Row ${rowIndex}: Invalid assignment "${assignmentName}" for role "${role}".`);
+                 errors.push(`Row ${rowIndex}: Invalid assignment code "${assignmentCode}" for role "${role}".`);
                  return;
             }
 
