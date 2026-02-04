@@ -324,7 +324,6 @@ export default function EmployeesPage() {
                 toast({ variant: 'destructive', title: `Error on row ${i+2}`, description: error.message });
                 // Stop the upload on first error
                 setUploadState(s => ({ ...s, status: 'preview' }));
-                await deleteApp(tempApp);
                 return;
             } finally {
                 await deleteApp(tempApp);
@@ -713,6 +712,8 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
         </Dialog>
     );
 }
+
+    
 
     
 
