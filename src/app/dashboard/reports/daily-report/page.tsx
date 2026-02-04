@@ -255,7 +255,8 @@ export default function DailyReportPage() {
             const areaBranches = areaMap.get(areaId)!;
             const areaName = areas?.find(a => a.id === areaId)?.name || 'Unknown Area';
             
-            const areaSubtotal: Omit<ReportRowData, 'sl' | 'branchName' | 'areaName' | 'isSubtotal' | 'officerName' | 'officerCode'> = {
+            const areaSubtotal: ReportRowData = {
+                sl: 0, isSubtotal: true, branchName: `Subtotal for ${areaName}`, areaName: areaName,
                 memberAddToday: 0, memberAddMonth: 0, memberCancelToday: 0, memberCancelMonth: 0,
                 savingsCollectionToday: 0, savingsCollectionMonth: 0, savingsRefundToday: 0, savingsRefundMonth: 0,
                 loanDisburseToday: 0, loanDisburseMonth: 0, loanCollectionToday: 0, loanCollectionMonth: 0,
@@ -295,21 +296,31 @@ export default function DailyReportPage() {
 
                 finalReportData.push(rowData);
                 
-                Object.keys(rowData).forEach(key => {
-                    const typedKey = key as keyof ReportRowData;
-                    if (typeof rowData[typedKey] === 'number' && key !== 'sl') {
-                       (areaSubtotal[key as keyof typeof areaSubtotal] as number) += (rowData[typedKey] as number);
-                    }
-                });
+                areaSubtotal.memberAddToday += rowData.memberAddToday;
+                areaSubtotal.memberAddMonth += rowData.memberAddMonth;
+                areaSubtotal.memberCancelToday += rowData.memberCancelToday;
+                areaSubtotal.memberCancelMonth += rowData.memberCancelMonth;
+                areaSubtotal.savingsCollectionToday += rowData.savingsCollectionToday;
+                areaSubtotal.savingsCollectionMonth += rowData.savingsCollectionMonth;
+                areaSubtotal.savingsRefundToday += rowData.savingsRefundToday;
+                areaSubtotal.savingsRefundMonth += rowData.savingsRefundMonth;
+                areaSubtotal.loanDisburseToday += rowData.loanDisburseToday;
+                areaSubtotal.loanDisburseMonth += rowData.loanDisburseMonth;
+                areaSubtotal.loanCollectionToday += rowData.loanCollectionToday;
+                areaSubtotal.loanCollectionMonth += rowData.loanCollectionMonth;
+                areaSubtotal.otherExpense += rowData.otherExpense;
+                areaSubtotal.cash += rowData.cash;
+                areaSubtotal.bank += rowData.bank;
+                areaSubtotal.afternoonCollection += rowData.afternoonCollection;
+                areaSubtotal.riskFund += rowData.riskFund;
+                areaSubtotal.processingFee += rowData.processingFee;
+                areaSubtotal.passbookFee += rowData.passbookFee;
+                areaSubtotal.admissionFee += rowData.admissionFee;
             });
-
-            finalReportData.push({
-                sl: 0,
-                isSubtotal: true,
-                branchName: `Subtotal for ${areaName}`,
-                areaName: areaName,
-                ...areaSubtotal
-            });
+            
+            if (areaBranches.length > 0) {
+              finalReportData.push(areaSubtotal);
+            }
         }
         setReportData(finalReportData);
 
@@ -477,7 +488,7 @@ export default function DailyReportPage() {
 
   return (
     <div className="space-y-6 print:p-8">
-      {smokeTrigger > 0 && <div key={smokeTrigger} className="page-fade-effect fixed inset-0 z-[9999] pointer-events-none bg-background" />}
+      {smokeTrigger > 0 && <div key={smokeTrigger} className="smoke-overlay" />}
        <div className="flex items-center gap-4 mb-6 print:hidden">
             <Button variant="outline" size="icon" asChild>
                 <Link href="/dashboard/reports">
@@ -699,7 +710,7 @@ export default function DailyReportPage() {
                     </TableRow>
                   )) : (
                      <TableRow>
-                        <TableCell colSpan={groupByOfficer ? 23 : 22} className="h-24 text-center text-muted-foreground">
+                        <TableCell colSpan={groupByOfficer ? 23 : (reportLevel === 'area' ? 23 : 22)} className="h-24 text-center text-muted-foreground">
                             No data found for the selected criteria.
                         </TableCell>
                      </TableRow>
