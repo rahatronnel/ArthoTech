@@ -4,7 +4,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import type { Employee, Branch, Area, Zone, Region } from '@/lib/data';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { PlusCircle, Edit, FileDown, FileUp, Trash2, Mail, Copy, UserX, UserCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -65,6 +65,8 @@ export default function EmployeesPage() {
 
     const [filterBranchId, setFilterBranchId] = useState<string>('all');
     const [filterCode, setFilterCode] = useState<string>('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [rowsPerPage, setRowsPerPage] = useState(50);
 
     const isLoading = employeesLoading || branchesLoading || areasLoading || zonesLoading || regionsLoading;
 
@@ -112,6 +114,13 @@ export default function EmployeesPage() {
 
     }, [employees, branchesData, filterBranchId, filterCode]);
 
+    const paginatedEmployees = useMemo(() => {
+        const startIndex = (currentPage - 1) * rowsPerPage;
+        const endIndex = startIndex + rowsPerPage;
+        return filteredEmployees.slice(startIndex, endIndex);
+    }, [filteredEmployees, currentPage, rowsPerPage]);
+
+    const totalPages = Math.ceil(filteredEmployees.length / rowsPerPage);
 
     const getAssignmentName = (employee: Employee): string => {
         if (employee.assignment === 'Head Office') return 'Head Office';
@@ -409,9 +418,9 @@ export default function EmployeesPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredEmployees.map((emp, index) => (
+                                {paginatedEmployees.map((emp, index) => (
                                     <TableRow key={emp.id} className={cn(emp.disabled && 'opacity-50 bg-muted/50')}>
-                                        <TableCell>{index + 1}</TableCell>
+                                        <TableCell>{(currentPage - 1) * rowsPerPage + index + 1}</TableCell>
                                         <TableCell className="font-medium">{emp.name}</TableCell>
                                         <TableCell className="text-muted-foreground">
                                             <div className="flex items-center gap-2">
@@ -448,6 +457,53 @@ export default function EmployeesPage() {
                         </Table>
                     )}
                 </CardContent>
+                <CardFooter className="flex items-center justify-between pt-6">
+                    <div className="text-sm text-muted-foreground">
+                        Showing {paginatedEmployees.length} of {filteredEmployees.length} employees.
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <Label htmlFor="rows-per-page">Rows per page</Label>
+                            <Select
+                                value={String(rowsPerPage)}
+                                onValueChange={(value) => {
+                                    setRowsPerPage(Number(value));
+                                    setCurrentPage(1);
+                                }}
+                            >
+                                <SelectTrigger id="rows-per-page" className="w-20">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {[50, 100, 150, 200].map(size => (
+                                        <SelectItem key={size} value={String(size)}>{size}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="text-sm font-medium">
+                            Page {currentPage} of {totalPages}
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                disabled={currentPage === 1}
+                            >
+                                Previous
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                disabled={currentPage === totalPages || totalPages === 0}
+                            >
+                                Next
+                            </Button>
+                        </div>
+                    </div>
+                </CardFooter>
             </Card>
 
             {isFormOpen && (
