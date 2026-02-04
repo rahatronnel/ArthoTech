@@ -169,31 +169,33 @@ export function Organogram() {
                 <CardTitle>Organization Chart</CardTitle>
                 <CardDescription>A visual representation of your organization's hierarchy.</CardDescription>
             </CardHeader>
-            <CardContent className="overflow-x-auto p-6">
-                <div className="inline-block min-w-full align-middle">
-                    {/* Head of organization */}
-                    <div className="flex items-center gap-4 mb-8">
-                        {orgInfo.logo ? (
-                            <Image src={orgInfo.logo} alt={orgInfo.name} width={64} height={64} className="h-16 w-16 rounded-full object-contain border-2 border-primary p-1" />
-                        ) : (
-                            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 border-2 border-primary">
-                                <GitFork className="h-8 w-8 text-primary" />
+            <CardContent className="overflow-auto p-6" style={{ minHeight: '120vh' }}>
+                <div className="flex justify-center">
+                    <div className="inline-block">
+                        {/* Head of organization */}
+                        <div className="flex items-center gap-4 mb-8">
+                            {orgInfo.logo ? (
+                                <Image src={orgInfo.logo} alt={orgInfo.name} width={64} height={64} className="h-16 w-16 rounded-full object-contain border-2 border-primary p-1" />
+                            ) : (
+                                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10 border-2 border-primary">
+                                    <GitFork className="h-8 w-8 text-primary" />
+                                </div>
+                            )}
+                            <div>
+                                <h2 className="text-xl font-bold text-primary">{orgInfo.name}</h2>
+                                <p className="text-muted-foreground">{orgInfo.bengaliName}</p>
                             </div>
-                        )}
-                        <div>
-                            <h2 className="text-xl font-bold text-primary">{orgInfo.name}</h2>
-                            <p className="text-muted-foreground">{orgInfo.bengaliName}</p>
                         </div>
-                    </div>
-                    
-                    {/* The tree starts here */}
-                    <div className="relative">
-                        <div className="absolute top-8 left-8 h-full w-px bg-gray-400"></div>
-                         <ul className="space-y-8">
-                             {treeData.map((region, index) => (
-                                 <TreeNode key={region.id} node={region} isLast={index === treeData.length - 1} />
-                            ))}
-                        </ul>
+                        
+                        {/* The tree starts here */}
+                        <div className="relative">
+                            <div className="absolute top-8 left-8 h-full w-px bg-gray-400"></div>
+                             <ul className="space-y-8">
+                                 {treeData.map((region, index) => (
+                                     <TreeNode key={region.id} node={region} isLast={index === treeData.length - 1} />
+                                ))}
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </CardContent>
