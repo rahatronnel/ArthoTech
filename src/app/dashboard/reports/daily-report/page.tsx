@@ -15,9 +15,10 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, collectionGroup, query } from 'firebase/firestore';
-import type { Region, Zone, Area, Branch, OtherDataEntry } from '@/lib/data';
+import type { Region, Zone, Area, Branch, OtherDataEntry, Group, Employee } from '@/lib/data';
 import { useAuth } from '@/context/AuthContext';
 import { useOrganization } from '@/context/OrganizationContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '@/components/ui/table';
@@ -32,7 +33,7 @@ type ReportLevel = 'region' | 'zone' | 'area' | 'branch';
 
 type ReportRowData = {
   sl: number;
-  branchName: string;
+  branchName: string; // Will hold Branch Name or Officer Name based on grouping
   memberAddToday: number;
   memberAddMonth: number;
   memberCancelToday: number;
@@ -65,6 +66,7 @@ export default function DailyReportPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [reportData, setReportData] = useState<ReportRowData[] | null>(null);
   const [reportTitle, setReportTitle] = useState('');
+  const [groupByOfficer, setGroupByOfficer] = useState(false);
   
   const firestore = useFirestore();
   const { currentUser, loading: userLoading } = useAuth();
@@ -87,7 +89,13 @@ export default function DailyReportPage() {
   const branchesQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'branches')) : null, [firestore]);
   const { data: branches, isLoading: branchesLoading } = useCollection<Branch>(branchesQuery);
 
-  const isLoading = regionsLoading || zonesLoading || areasLoading || branchesLoading || userLoading || membersLoading || savingsLoading || loansLoading || othersLoading;
+  const groupsQuery = useMemoFirebase(() => firestore ? query(collectionGroup(firestore, 'groups')) : null, [firestore]);
+  const { data: groupsData, isLoading: groupsLoading } = useCollection<Group>(groupsQuery);
+  
+  const employeesQuery = useMemoFirebase(() => firestore ? collection(firestore, 'employees') : null, [firestore]);
+  const { data: employees, isLoading: employeesLoading } = useCollection<Employee>(employeesQuery);
+
+  const isLoading = regionsLoading || zonesLoading || areasLoading || branchesLoading || userLoading || membersLoading || savingsLoading || loansLoading || othersLoading || groupsLoading || employeesLoading;
 
   const { availableLevels, availableRegions, availableZones, availableAreas, availableBranches } = useMemo(() => {
     if (!currentUser || isLoading) {
@@ -191,7 +199,6 @@ export default function DailyReportPage() {
       return;
     }
     
-    // --- 1. Date Setup ---
     const fromDate = date.from;
     const toDate = date.to || date.from;
     const reportInterval = { start: fromDate, end: toDate };
@@ -199,7 +206,6 @@ export default function DailyReportPage() {
     const monthEnd = endOfMonth(fromDate);
     const monthInterval = { start: monthStart, end: monthEnd };
 
-    // --- 2. Determine Branches ---
     let branchesToReportOn: Branch[] = [];
     let titleName = 'All';
 
@@ -223,40 +229,88 @@ export default function DailyReportPage() {
         if (selectedId !== 'all') titleName = availableRegions.find(r => r.id === selectedId)?.name || '';
     }
 
-    setReportTitle(`${reportLevel.charAt(0).toUpperCase() + reportLevel.slice(1)}-wise Report for: ${titleName}`);
+    setReportTitle(`${reportLevel.charAt(0).toUpperCase() + reportLevel.slice(1)}-wise Report for: ${titleName} ${groupByOfficer ? '(Grouped by Field Officer)' : ''}`);
 
-    // --- 3. Process Data ---
-    const processedData: ReportRowData[] = branchesToReportOn.map((branch, index) => {
-        const getSum = (data: any[], amountField: string, interval: {start:Date, end:Date}) => data.filter(item => item.branchId === branch.id && isWithinInterval(parseISO(item.date), interval)).reduce((sum, item) => sum + (item[amountField] || 0), 0);
-        const getSumOthers = (data: OtherDataEntry[], type: OtherDataEntry['type'], interval: {start:Date, end:Date}) => data.filter(item => item.branchId === branch.id && item.type === type && isWithinInterval(parseISO(item.date), interval)).reduce((sum, item) => sum + (item.amount || 0), 0);
-        
-        return {
+    if (groupByOfficer) {
+        const employeeMap = new Map(employees?.map(e => [e.id, e.name]));
+        const branchIdsToReportOn = new Set(branchesToReportOn.map(b => b.id));
+        const groupsInScope = groupsData?.filter(g => branchIdsToReportOn.has(g.branchId)) || [];
+        const officerTotals = new Map<string, Omit<ReportRowData, 'sl' | 'branchName'>>();
+
+        groupsInScope.forEach(group => {
+            const officerId = group.responsibleEmployeeId;
+            if (!officerId) return;
+
+            if (!officerTotals.has(officerId)) {
+                officerTotals.set(officerId, {
+                    memberAddToday: 0, memberAddMonth: 0,
+                    memberCancelToday: 0, memberCancelMonth: 0,
+                    savingsCollectionToday: 0, savingsCollectionMonth: 0,
+                    savingsRefundToday: 0, savingsRefundMonth: 0,
+                    loanDisburseToday: 0, loanDisburseMonth: 0,
+                    loanCollectionToday: 0, loanCollectionMonth: 0,
+                    otherExpense: 0, cash: 0, bank: 0, afternoonCollection: 0,
+                    riskFund: 0, processingFee: 0, passbookFee: 0, admissionFee: 0,
+                });
+            }
+            
+            const officerData = officerTotals.get(officerId)!;
+            const getSumForGroup = (data: any[], amountField: string, interval: {start:Date, end:Date}) => data.filter(item => item.groupId === group.id && isWithinInterval(parseISO(item.date), interval)).reduce((sum, item) => sum + (item[amountField] || 0), 0);
+
+            officerData.memberAddToday += getSumForGroup(memberChanges, 'added', reportInterval);
+            officerData.memberAddMonth += getSumForGroup(memberChanges, 'added', monthInterval);
+            officerData.memberCancelToday += getSumForGroup(memberChanges, 'dropped', reportInterval);
+            officerData.memberCancelMonth += getSumForGroup(memberChanges, 'dropped', monthInterval);
+            officerData.savingsCollectionToday += getSumForGroup(savingsTransactions, 'deposit', reportInterval);
+            officerData.savingsCollectionMonth += getSumForGroup(savingsTransactions, 'deposit', monthInterval);
+            officerData.savingsRefundToday += getSumForGroup(savingsTransactions, 'withdraw', reportInterval);
+            officerData.savingsRefundMonth += getSumForGroup(savingsTransactions, 'withdraw', monthInterval);
+            officerData.loanDisburseToday += getSumForGroup(loanDisbursements, 'amount', reportInterval);
+            officerData.loanDisburseMonth += getSumForGroup(loanDisbursements, 'amount', monthInterval);
+            officerData.loanCollectionToday += getSumForGroup(loanCollections, 'amount', reportInterval);
+            officerData.loanCollectionMonth += getSumForGroup(loanCollections, 'amount', monthInterval);
+        });
+
+        const processedData: ReportRowData[] = Array.from(officerTotals.entries()).map(([officerId, data], index) => ({
             sl: index + 1,
-            branchName: branch.name,
-            memberAddToday: getSum(memberChanges, 'added', reportInterval),
-            memberAddMonth: getSum(memberChanges, 'added', monthInterval),
-            memberCancelToday: getSum(memberChanges, 'dropped', reportInterval),
-            memberCancelMonth: getSum(memberChanges, 'dropped', monthInterval),
-            savingsCollectionToday: getSum(savingsTransactions, 'deposit', reportInterval),
-            savingsCollectionMonth: getSum(savingsTransactions, 'deposit', monthInterval),
-            savingsRefundToday: getSum(savingsTransactions, 'withdraw', reportInterval),
-            savingsRefundMonth: getSum(savingsTransactions, 'withdraw', monthInterval),
-            loanDisburseToday: getSum(loanDisbursements, 'amount', reportInterval),
-            loanDisburseMonth: getSum(loanDisbursements, 'amount', monthInterval),
-            loanCollectionToday: getSum(loanCollections, 'amount', reportInterval),
-            loanCollectionMonth: getSum(loanCollections, 'amount', monthInterval),
-            otherExpense: getSumOthers(othersData, 'Others Expenses', reportInterval),
-            cash: getSumOthers(othersData, 'Cash', reportInterval),
-            bank: getSumOthers(othersData, 'Bank', reportInterval),
-            afternoonCollection: getSumOthers(othersData, 'Afternoon Collection', reportInterval),
-            riskFund: getSumOthers(othersData, 'Risk Fund', reportInterval),
-            processingFee: getSumOthers(othersData, 'Processing Fee', reportInterval),
-            passbookFee: getSumOthers(othersData, 'Passbook Fee', reportInterval),
-            admissionFee: getSumOthers(othersData, 'Admission Fee', reportInterval),
-        };
-    });
+            branchName: employeeMap.get(officerId) || `Unknown Officer (${officerId.substring(0,5)})`,
+            ...data
+        }));
+        
+        setReportData(processedData);
+    } else {
+        const processedData: ReportRowData[] = branchesToReportOn.map((branch, index) => {
+            const getSum = (data: any[], amountField: string, interval: {start:Date, end:Date}) => data.filter(item => item.branchId === branch.id && isWithinInterval(parseISO(item.date), interval)).reduce((sum, item) => sum + (item[amountField] || 0), 0);
+            const getSumOthers = (data: OtherDataEntry[], type: OtherDataEntry['type'], interval: {start:Date, end:Date}) => data.filter(item => item.branchId === branch.id && item.type === type && isWithinInterval(parseISO(item.date), interval)).reduce((sum, item) => sum + (item.amount || 0), 0);
+            
+            return {
+                sl: index + 1,
+                branchName: branch.name,
+                memberAddToday: getSum(memberChanges, 'added', reportInterval),
+                memberAddMonth: getSum(memberChanges, 'added', monthInterval),
+                memberCancelToday: getSum(memberChanges, 'dropped', reportInterval),
+                memberCancelMonth: getSum(memberChanges, 'dropped', monthInterval),
+                savingsCollectionToday: getSum(savingsTransactions, 'deposit', reportInterval),
+                savingsCollectionMonth: getSum(savingsTransactions, 'deposit', monthInterval),
+                savingsRefundToday: getSum(savingsTransactions, 'withdraw', reportInterval),
+                savingsRefundMonth: getSum(savingsTransactions, 'withdraw', monthInterval),
+                loanDisburseToday: getSum(loanDisbursements, 'amount', reportInterval),
+                loanDisburseMonth: getSum(loanDisbursements, 'amount', monthInterval),
+                loanCollectionToday: getSum(loanCollections, 'amount', reportInterval),
+                loanCollectionMonth: getSum(loanCollections, 'amount', monthInterval),
+                otherExpense: getSumOthers(othersData, 'Others Expenses', reportInterval),
+                cash: getSumOthers(othersData, 'Cash', reportInterval),
+                bank: getSumOthers(othersData, 'Bank', reportInterval),
+                afternoonCollection: getSumOthers(othersData, 'Afternoon Collection', reportInterval),
+                riskFund: getSumOthers(othersData, 'Risk Fund', reportInterval),
+                processingFee: getSumOthers(othersData, 'Processing Fee', reportInterval),
+                passbookFee: getSumOthers(othersData, 'Passbook Fee', reportInterval),
+                admissionFee: getSumOthers(othersData, 'Admission Fee', reportInterval),
+            };
+        });
 
-    setReportData(processedData);
+        setReportData(processedData);
+    }
   };
   
   const handlePrint = () => {
@@ -312,6 +366,8 @@ export default function DailyReportPage() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN').format(amount);
   }
+  
+  const mainColumnHeader = groupByOfficer ? 'Field Officer' : 'Branch';
 
   return (
     <div className="space-y-6 print:p-8">
@@ -412,6 +468,12 @@ export default function DailyReportPage() {
                 <span className="sr-only">Print</span>
              </Button>
           </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="group-by-officer" checked={groupByOfficer} onCheckedChange={(checked) => setGroupByOfficer(!!checked)} />
+            <Label htmlFor="group-by-officer" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                Group by Field Officer
+            </Label>
+          </div>
         </CardContent>
       </Card>
       
@@ -460,7 +522,7 @@ export default function DailyReportPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead rowSpan={2} className="align-bottom">SL</TableHead>
-                    <TableHead rowSpan={2} className="align-bottom border-r">Branch</TableHead>
+                    <TableHead rowSpan={2} className="align-bottom border-r">{mainColumnHeader}</TableHead>
                     <TableHead colSpan={2} className="text-center border-r">Member Add</TableHead>
                     <TableHead colSpan={2} className="text-center border-r">Member Cancel</TableHead>
                     <TableHead colSpan={2} className="text-center border-r">Savings Collection</TableHead>
