@@ -14,8 +14,6 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useMember } from '@/context/MemberContext';
-import { useSavings } from '@/context/SavingsContext';
-import { useLoan } from '@/context/LoanContext';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
 import { collection, doc, setDoc, deleteDoc, writeBatch, collectionGroup, query, getDocs } from 'firebase/firestore';
 import type { Group, Employee, Branch, Area } from '@/lib/data';
@@ -54,15 +52,9 @@ export default function GroupsPage() {
   const [rowsPerPage, setRowsPerPage] = useState(50);
 
   const { memberChanges } = useMember();
-  const { savingsTransactions } = useSavings(); 
-  const { loanDisbursements, loanCollections } = useLoan();
 
   const weekDays = ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  };
-  
   const userVisibleGroups = useMemo(() => {
     if (!groupsData) return [];
     return groupsData;
@@ -116,26 +108,6 @@ export default function GroupsPage() {
       .filter(c => c.groupId === groupId)
       .reduce((sum, change) => sum + change.dropped, 0);
     return initialMembers + totalAdded - totalDropped;
-  };
-
-  const calculateCurrentSavings = (groupId: string, initialSavings: number) => {
-    const totalDeposits = savingsTransactions
-        .filter(t => t.groupId === groupId)
-        .reduce((sum, t) => sum + t.deposit, 0);
-    const totalWithdrawals = savingsTransactions
-        .filter(t => t.groupId === groupId)
-        .reduce((sum, t) => sum + t.withdraw, 0);
-    return initialSavings + totalDeposits - totalWithdrawals;
-  };
-
-  const calculateCurrentLoan = (groupId: string, initialLoan: number) => {
-    const totalDisbursed = loanDisbursements
-        .filter(t => t.groupId === groupId)
-        .reduce((sum, t) => sum + t.amount, 0);
-    const totalCollected = loanCollections
-        .filter(t => t.groupId === groupId)
-        .reduce((sum, t) => sum + t.amount, 0);
-    return initialLoan + totalDisbursed - totalCollected;
   };
 
   const handleDownloadTemplate = () => {
@@ -566,8 +538,6 @@ export default function GroupsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Leader</TableHead>
                 <TableHead className="text-right">Members</TableHead>
-                <TableHead className="hidden text-right lg:table-cell">Total Loans</TableHead>
-                <TableHead className="hidden text-right lg:table-cell">Total Savings</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -585,8 +555,6 @@ export default function GroupsPage() {
                   </TableCell>
                   <TableCell>{getEmployeeName(group.responsibleEmployeeId)}</TableCell>
                   <TableCell className="text-right">{calculateCurrentMembers(group.id, group.initialMembers)}</TableCell>
-                  <TableCell className="hidden text-right lg:table-cell">{formatCurrency(calculateCurrentLoan(group.id, group.totalLoans))}</TableCell>
-                  <TableCell className="hidden text-right lg:table-cell">{formatCurrency(calculateCurrentSavings(group.id, group.initialSavings))}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
                         <Button variant="ghost" size="icon" onClick={() => handleEditClick(group)}>
