@@ -99,15 +99,15 @@ const NodeCard = ({ node, employeeMap, language }: { node: any; employeeMap: Map
 };
 
 const TreeNode = ({ node, employeeMap, language }: { node: any; employeeMap: Map<string, string>, language: 'english' | 'bengali' }) => {
-    if (node.type === 'area' && node.children && node.children.length > 0) {
-        const branchChunks = chunk(node.children, 2);
+    if ((node.type === 'zone' || node.type === 'area') && node.children && node.children.length > 0) {
+        const chunks = chunk(node.children, 2);
         return (
              <li>
                 <NodeCard node={node} employeeMap={employeeMap} language={language} />
-                {branchChunks.map((chunk, index) => (
+                {chunks.map((chunk, index) => (
                      <ul key={index}>
-                        {chunk.map((branch: any) => (
-                            <TreeNode key={branch.id} node={branch} employeeMap={employeeMap} language={language} />
+                        {chunk.map((child: any) => (
+                            <TreeNode key={child.id} node={child} employeeMap={employeeMap} language={language} />
                         ))}
                     </ul>
                 ))}
