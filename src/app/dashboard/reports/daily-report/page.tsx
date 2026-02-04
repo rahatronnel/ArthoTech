@@ -19,6 +19,8 @@ import { collection, collectionGroup, query } from 'firebase/firestore';
 import type { Region, Zone, Area, Branch } from '@/lib/data';
 import { useAuth } from '@/context/AuthContext';
 import { useOrganization } from '@/context/OrganizationContext';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+
 
 type ReportLevel = 'region' | 'zone' | 'area' | 'branch';
 
@@ -334,9 +336,49 @@ export default function DailyReportPage() {
           </div>
 
           <CardContent>
-              <div className="text-center py-10 text-muted-foreground">
-                  <p>The report columns will be defined next.</p>
-              </div>
+               <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead rowSpan={2} className="align-bottom">SL</TableHead>
+                    <TableHead rowSpan={2} className="align-bottom">Branch</TableHead>
+                    <TableHead colSpan={2} className="text-center border-x">Member Add</TableHead>
+                    <TableHead colSpan={2} className="text-center border-r">Member Cancel</TableHead>
+                    <TableHead colSpan={2} className="text-center border-r">Savings Collection</TableHead>
+                    <TableHead colSpan={2} className="text-center border-r">Savings Refund</TableHead>
+                    <TableHead colSpan={2} className="text-center border-r">Loan Disburse</TableHead>
+                    <TableHead colSpan={2} className="text-center border-r">Loan Collection</TableHead>
+                    <TableHead rowSpan={2} className="align-bottom border-r">Other Expense</TableHead>
+                    <TableHead rowSpan={2} className="align-bottom border-r">Cash</TableHead>
+                    <TableHead rowSpan={2} className="align-bottom border-r">Bank</TableHead>
+                    <TableHead rowSpan={2} className="align-bottom border-r">Afternoon Collection</TableHead>
+                    <TableHead rowSpan={2} className="align-bottom border-r">Risk Fund</TableHead>
+                    <TableHead rowSpan={2} className="align-bottom border-r">Processing Fee</TableHead>
+                    <TableHead rowSpan={2} className="align-bottom border-r">Passbook Fee</TableHead>
+                    <TableHead rowSpan={2} className="align-bottom">Admission Fee</TableHead>
+                  </TableRow>
+                  <TableRow>
+                    <TableHead className="text-center border-x">Today</TableHead>
+                    <TableHead className="text-center">This Month</TableHead>
+                    <TableHead className="text-center border-l">Today</TableHead>
+                    <TableHead className="text-center border-r">This Month</TableHead>
+                    <TableHead className="text-center">Today</TableHead>
+                    <TableHead className="text-center border-r">This Month</TableHead>
+                    <TableHead className="text-center">Today</TableHead>
+                    <TableHead className="text-center border-r">This Month</TableHead>
+                    <TableHead className="text-center">Today</TableHead>
+                    <TableHead className="text-center border-r">This Month</TableHead>
+                    <TableHead className="text-center">Today</TableHead>
+                    <TableHead className="text-center border-r">This Month</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell colSpan={22} className="h-24 text-center text-muted-foreground">
+                      Report data will be populated here.
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
           </CardContent>
         </Card>
       )}
