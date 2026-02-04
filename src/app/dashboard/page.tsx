@@ -10,6 +10,7 @@ import { useSavings } from '@/context/SavingsContext';
 import { useLoan } from '@/context/LoanContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Organogram } from '@/components/dashboard/organogram';
+import { EmployeeDiagram } from '@/components/dashboard/employee-diagram';
 
 function StatSkeleton() {
   return (
@@ -75,6 +76,7 @@ export default function DashboardPage() {
                   <StatSkeleton />
               </div>
               <Skeleton className="h-96 w-full" />
+              <Skeleton className="h-96 w-full mt-6" />
           </div>
       )
   }
@@ -119,6 +121,7 @@ export default function DashboardPage() {
         </div>
         
         <Organogram />
+        <EmployeeDiagram />
     </div>
   );
 }
