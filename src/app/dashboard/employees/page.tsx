@@ -6,7 +6,7 @@ import type { Employee, Branch, Area, Zone, Region } from '@/lib/data';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { PlusCircle, Edit, FileDown, FileUp, Trash2, Mail } from 'lucide-react';
+import { PlusCircle, Edit, FileDown, FileUp, Trash2, Mail, Copy } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
@@ -138,6 +138,14 @@ export default function EmployeesPage() {
     
     const handleDelete = (employee: Employee) => {
         setEmployeeToDelete(employee);
+    };
+
+    const handleCopyEmail = (email: string) => {
+        navigator.clipboard.writeText(email);
+        toast({
+            title: "Email Copied",
+            description: `${email} has been copied to your clipboard.`,
+        });
     };
     
     const confirmDelete = async () => {
@@ -319,14 +327,13 @@ export default function EmployeesPage() {
                 await setDoc(newDocRef, newEmployee);
                 
                 setUploadState(s => ({ ...s, progress: ((i + 1) / s.data.length) * 100 }));
-
+                await deleteApp(tempApp);
             } catch (error: any) {
                 toast({ variant: 'destructive', title: `Error on row ${i+2}`, description: error.message });
                 // Stop the upload on first error
                 setUploadState(s => ({ ...s, status: 'preview' }));
+                await deleteApp(tempApp).catch(() => {}); // Attempt to delete app, ignore if already deleted.
                 return;
-            } finally {
-                await deleteApp(tempApp);
             }
         }
         
@@ -383,6 +390,7 @@ export default function EmployeesPage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
+                                    <TableHead>SL</TableHead>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Email</TableHead>
                                     <TableHead>Code</TableHead>
@@ -392,10 +400,24 @@ export default function EmployeesPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredEmployees.map((emp) => (
+                                {filteredEmployees.map((emp, index) => (
                                     <TableRow key={emp.id}>
+                                        <TableCell>{index + 1}</TableCell>
                                         <TableCell className="font-medium">{emp.name}</TableCell>
-                                        <TableCell className="text-muted-foreground">{emp.email}</TableCell>
+                                        <TableCell className="text-muted-foreground">
+                                            <div className="flex items-center gap-2">
+                                                <span>{emp.email}</span>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6"
+                                                    onClick={() => handleCopyEmail(emp.email)}
+                                                >
+                                                    <Copy className="h-3 w-3" />
+                                                    <span className="sr-only">Copy Email</span>
+                                                </Button>
+                                            </div>
+                                        </TableCell>
                                         <TableCell>{emp.code}</TableCell>
                                         <TableCell>{emp.role}</TableCell>
                                         <TableCell>{getAssignmentName(emp)}</TableCell>
@@ -712,6 +734,8 @@ function UploadDialog({ isOpen, setIsOpen, state, onConfirm }: any) {
         </Dialog>
     );
 }
+
+    
 
     
 
