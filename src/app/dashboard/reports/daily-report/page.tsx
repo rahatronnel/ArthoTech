@@ -535,8 +535,8 @@ export default function DailyReportPage() {
           </div>
 
           <CardContent className="overflow-x-auto">
-               <Table className="[--hover-bg:hsl(var(--muted)/0.5)] group-hover/table:bg-blue-300">
-                <TableHeader className="sticky top-0 z-10 bg-background/80 backdrop-blur-sm shadow-sm group-has-hover:bg-red-200">
+               <Table>
+                <TableHeader className="sticky top-0 z-10 bg-muted/80 backdrop-blur-sm shadow-lg">
                   <TableRow>
                     <TableHead rowSpan={2} className="align-bottom">SL</TableHead>
                     <TableHead rowSpan={2} className="align-bottom border-r">Branch</TableHead>
@@ -574,30 +574,30 @@ export default function DailyReportPage() {
                 </TableHeader>
                 <TableBody>
                   {reportData.length > 0 ? reportData.map((row, index) => (
-                     <TableRow key={index} className="group/row">
-                        <TableCell className="group-hover/row:bg-[--hover-bg]">{row.sl}</TableCell>
-                        <TableCell className="font-medium border-r group-hover/row:bg-[--hover-bg]">{row.branchName}</TableCell>
-                        {groupByOfficer && <TableCell className="font-medium border-r group-hover/row:bg-[--hover-bg]">{row.officerName} ({row.officerCode})</TableCell>}
-                        <TableCell className="text-right group-hover/row:bg-[--hover-bg]">{formatCurrency(row.memberAddToday)}</TableCell>
-                        <TableCell className="text-right border-r group-hover/row:bg-[--hover-bg]">{formatCurrency(row.memberAddMonth)}</TableCell>
-                        <TableCell className="text-right group-hover/row:bg-[--hover-bg]">{formatCurrency(row.memberCancelToday)}</TableCell>
-                        <TableCell className="text-right border-r group-hover/row:bg-[--hover-bg]">{formatCurrency(row.memberCancelMonth)}</TableCell>
-                        <TableCell className="text-right group-hover/row:bg-[--hover-bg]">{formatCurrency(row.savingsCollectionToday)}</TableCell>
-                        <TableCell className="text-right border-r group-hover/row:bg-[--hover-bg]">{formatCurrency(row.savingsCollectionMonth)}</TableCell>
-                        <TableCell className="text-right group-hover/row:bg-[--hover-bg]">{formatCurrency(row.savingsRefundToday)}</TableCell>
-                        <TableCell className="text-right border-r group-hover/row:bg-[--hover-bg]">{formatCurrency(row.savingsRefundMonth)}</TableCell>
-                        <TableCell className="text-right group-hover/row:bg-[--hover-bg]">{formatCurrency(row.loanDisburseToday)}</TableCell>
-                        <TableCell className="text-right border-r group-hover/row:bg-[--hover-bg]">{formatCurrency(row.loanDisburseMonth)}</TableCell>
-                        <TableCell className="text-right group-hover/row:bg-[--hover-bg]">{formatCurrency(row.loanCollectionToday)}</TableCell>
-                        <TableCell className="text-right border-r group-hover/row:bg-[--hover-bg]">{formatCurrency(row.loanCollectionMonth)}</TableCell>
-                        <TableCell className="text-right border-r group-hover/row:bg-[--hover-bg]">{formatCurrency(row.otherExpense)}</TableCell>
-                        <TableCell className="text-right border-r group-hover/row:bg-[--hover-bg]">{formatCurrency(row.cash)}</TableCell>
-                        <TableCell className="text-right border-r group-hover/row:bg-[--hover-bg]">{formatCurrency(row.bank)}</TableCell>
-                        <TableCell className="text-right border-l group-hover/row:bg-[--hover-bg]">{formatCurrency(row.afternoonCollection)}</TableCell>
-                        <TableCell className="text-right border-l group-hover/row:bg-[--hover-bg]">{formatCurrency(row.riskFund)}</TableCell>
-                        <TableCell className="text-right border-l group-hover/row:bg-[--hover-bg]">{formatCurrency(row.processingFee)}</TableCell>
-                        <TableCell className="text-right border-l group-hover/row:bg-[--hover-bg]">{formatCurrency(row.passbookFee)}</TableCell>
-                        <TableCell className="text-right border-l group-hover/row:bg-[--hover-bg]">{formatCurrency(row.admissionFee)}</TableCell>
+                     <TableRow key={index}>
+                        <TableCell className="hover:bg-primary/10 hover:font-semibold">{row.sl}</TableCell>
+                        <TableCell className="font-medium border-r hover:bg-primary/10 hover:font-semibold">{row.branchName}</TableCell>
+                        {groupByOfficer && <TableCell className="font-medium border-r hover:bg-primary/10 hover:font-semibold">{row.officerName} ({row.officerCode})</TableCell>}
+                        <TableCell className="text-right hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.memberAddToday)}</TableCell>
+                        <TableCell className="text-right border-r hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.memberAddMonth)}</TableCell>
+                        <TableCell className="text-right hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.memberCancelToday)}</TableCell>
+                        <TableCell className="text-right border-r hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.memberCancelMonth)}</TableCell>
+                        <TableCell className="text-right hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.savingsCollectionToday)}</TableCell>
+                        <TableCell className="text-right border-r hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.savingsCollectionMonth)}</TableCell>
+                        <TableCell className="text-right hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.savingsRefundToday)}</TableCell>
+                        <TableCell className="text-right border-r hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.savingsRefundMonth)}</TableCell>
+                        <TableCell className="text-right hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.loanDisburseToday)}</TableCell>
+                        <TableCell className="text-right border-r hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.loanDisburseMonth)}</TableCell>
+                        <TableCell className="text-right hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.loanCollectionToday)}</TableCell>
+                        <TableCell className="text-right border-r hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.loanCollectionMonth)}</TableCell>
+                        <TableCell className="text-right border-r hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.otherExpense)}</TableCell>
+                        <TableCell className="text-right border-r hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.cash)}</TableCell>
+                        <TableCell className="text-right border-r hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.bank)}</TableCell>
+                        <TableCell className="text-right border-l hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.afternoonCollection)}</TableCell>
+                        <TableCell className="text-right border-l hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.riskFund)}</TableCell>
+                        <TableCell className="text-right border-l hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.processingFee)}</TableCell>
+                        <TableCell className="text-right border-l hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.passbookFee)}</TableCell>
+                        <TableCell className="text-right border-l hover:bg-primary/10 hover:font-semibold">{formatCurrency(row.admissionFee)}</TableCell>
                     </TableRow>
                   )) : (
                      <TableRow>
@@ -608,7 +608,7 @@ export default function DailyReportPage() {
                   )}
                 </TableBody>
                 {reportTotals && (
-                    <TableFooter className="sticky bottom-0 bg-background/80 backdrop-blur-sm shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.1),0_-2px_4px_-2px_rgb(0,0,0,0.1)]">
+                    <TableFooter className="sticky bottom-0 bg-muted/80 backdrop-blur-sm shadow-[0_-4px_6px_-1px_rgb(0,0,0,0.1),0_-2px_4px_-2px_rgb(0,0,0,0.1)]">
                         <TableRow className="font-bold hover:bg-transparent">
                             <TableCell colSpan={groupByOfficer ? 3 : 2} className="text-right">Grand Total</TableCell>
                             <TableCell className="text-right">{formatCurrency(reportTotals.memberAddToday)}</TableCell>
