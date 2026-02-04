@@ -8,7 +8,7 @@ import { useOrganization } from '@/context/OrganizationContext';
 import Image from 'next/image';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Building, GitFork, Map as RegionIcon, MapPin, Network, User } from 'lucide-react';
+import { Building, GitFork, Map as RegionIcon, Network, User, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // Data structure for the tree
@@ -199,7 +199,7 @@ export function Organogram() {
                         display: flex;
                         flex-direction: column;
                         align-items: center;
-                        padding: 2.5rem 0.5rem 0;
+                        padding: 4rem 0.5rem 0;
                     }
                     /* Vertical line connecting node to horizontal bar */
                     .tree li::after {
@@ -208,7 +208,7 @@ export function Organogram() {
                         left: 50%;
                         top: 0;
                         width: 2px;
-                        height: 2.5rem;
+                        height: 4rem;
                         background: #9CA3AF; /* gray-400 */
                         transform: translateX(-50%);
                     }
